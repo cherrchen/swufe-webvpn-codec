@@ -1,6 +1,6 @@
 # 测试策略
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 **用途**：定义测试分层、覆盖要求与运行方式，是「什么算已验证」的判断依据之一。
 **唯一来源**：测试策略在本文件定义；单个 Feature 的验证项登记在 `specs/<id>/verification.md`，不要在本文件复制具体用例。层次划分沿用原包测试计划的 L0–L3 口径。
@@ -22,8 +22,8 @@
 ## 2. 覆盖要求
 
 ```text
-Coverage target: TBD（实现未开始，尚未设定数值目标）
-Coverage tool:   TBD（实现未开始，工具选型待定）
+Coverage target: TBD（M1 未设定数值目标；当前基线为 L0/L1/L2 的 154 个用例全绿）
+Coverage tool:   TBD（M1 未引入；层与用例即当前的可回归证据）
 Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 ```
 
@@ -41,9 +41,11 @@ Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 ## 3. 测试命名与组织
 
 ```text
-Location:  TBD（实现未开始；由 specs/001-phase1-local-bridge 的首个实现任务确定）
-Naming:    TBD（同上）
-Structure: TBD（同上；优先 Arrange / Act / Assert）
+Location:  tests/l0（单元：codec、allowlist、config）、tests/l1（组件：addon 请求/响应改写、日志、热更新）、tests/l2（集成：真 mitmdump + curl + 假上游）；
+           共享 fixture：tests/conftest.py（配置工厂，不含 mitmproxy 依赖）与 tests/l1/conftest.py（flow / addon 工厂）
+Naming:    文件 test_<主题>.py；函数 test_<行为>（用例编号写进函数名，如 test_tc_f01_allowlisted_request_is_rewritten_end_to_end）；
+           参数化用 @pytest.mark.parametrize("输入, 期望", [...])
+Structure: Arrange / Act / Assert（必要时以注释分段）
 ```
 
 ## 4. 何时必须补测试
@@ -58,12 +60,12 @@ Structure: TBD（同上；优先 Arrange / Act / Assert）
 ## 5. 运行方式
 
 ```text
-Run all:        TBD（实现未开始）
-Run one file:   TBD（实现未开始）
-Run with watch: TBD（实现未开始）
-CI test job:    无。当前 CI 仅做文档检查（npm run docs:check），
-                见 .github/workflows/docs-check.yml；
-                该工作流不构建、不运行任何代码测试，实现开始后另行接入
+Run all:        uv sync && uv run pytest（L0+L1+L2；不需要外网）
+Run one file:   uv run pytest tests/l1/test_addon_request.py
+Run with watch: uv run pytest -f（需 pytest-xdist 插件；本期未引入，未安装时手动重跑 uv run pytest）
+CI test job:    L0：.github/workflows/python-tests.yml（pull_request 与 main 推送时执行 uv sync --frozen + uv run pytest tests/l0 -q）；
+                L1/L2 需 mitmdump、curl 与本地端口，只在本地跑；
+                文档检查另由 .github/workflows/docs-check.yml 负责
 ```
 
 文档检查工作流：[docs-check.yml](../../.github/workflows/docs-check.yml)（`pull_request` 与 `main` 推送时运行 `npm run docs:check` 与 `npm run typecheck`）。

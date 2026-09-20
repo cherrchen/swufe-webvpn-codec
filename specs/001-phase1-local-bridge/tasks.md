@@ -1,9 +1,9 @@
 # Tasks: Phase 1 本机桥（001-phase1-local-bridge）
 
 > Spec ID: 001
-> Status: Draft
+> Status: In Progress
 > Owner: cherrchen
-> Last Updated: 2026-09-20
+> Last Updated: 2026-09-21
 
 > 本文件供 Coding Agent **逐条执行**。任务必须足够小、可独立验证、说明输入输出与依赖。
 > **禁止**把「实现整个 Feature」当作一个任务。
@@ -36,20 +36,20 @@
 
 ## Phase 2 — WRD 与核心库（WBS 2）
 
-- [ ] T003 固化 WRD codec 库（Python 权威实现） — 输入：归档原型 `99-appendix/wrd_codec.py`、[docs/api/wrd-codec-library.md](../../docs/api/wrd-codec-library.md) — 输出：可导入的 codec 模块，实现 `encryptHost` / `decryptHost` / `encodeUrl` / `decodeUrl`，默认 `key = iv = wrdvpnisthebest!` 且可配置覆盖 — 依赖：无 — 验证：`python -c` 对 authserver 样本 decode 得 `authserver.swufe.edu.cn`（TC-A01）、重编码一致（TC-A02） — 关联：REQ-006 / NFR-002 / ADR-0005
-- [ ] T004 建立 codec 向量测试 — 输入：T003 模块、归档样本（authserver / jwxt / 带端口） — 输出：L0 测试文件，覆盖样本 URL 解密、重编码一致、jwxt 编码可回解、`http-8080` scheme token、错误 key 失败 — 依赖：T003 — 验证：运行 L0 测试，TC-A01..TC-A05 全部通过 — 关联：REQ-006 / NFR-002 / AC-007
-- [ ] T005 实现 allowlist 匹配库 — 输入：[docs/architecture/data-model.md](../../docs/architecture/data-model.md) 的匹配算法 — 输出：`match(host)` 函数：精确命中、`includeSwufeWildcard` 时匹配 apex `swufe.edu.cn` 与 `.swufe.edu.cn` 后缀、`webvpn.swufe.edu.cn`/`authserver.swufe.edu.cn` 硬编码排除 — 依赖：无 — 验证：L0 测试 TC-B02、TC-B03、TC-B04 通过 — 关联：REQ-005 / REQ-008 / EC-001 / EC-003
-- [ ] T006 实现 allowlist 持久化与默认值 — 输入：T005、`AllowlistConfig` 实体定义 — 输出：`userData/config.json` 读写（`hosts`、`includeSwufeWildcard`、`updatedAt`；默认 `{"hosts":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false}`）与主机名小写化/合法性校验 — 依赖：T005 — 验证：L1 测试 TC-B01（默认含 jwxt）、TC-B05（增删后重启仍在） — 关联：REQ-005 / AC-006
+- [x] T003 固化 WRD codec 库（Python 权威实现） — 输入：归档原型 `99-appendix/wrd_codec.py`、[docs/api/wrd-codec-library.md](../../docs/api/wrd-codec-library.md) — 输出：可导入的 codec 模块，实现 `encryptHost` / `decryptHost` / `encodeUrl` / `decodeUrl`，默认 `key = iv = wrdvpnisthebest!` 且可配置覆盖 — 依赖：无 — 验证：`python -c` 对 authserver 样本 decode 得 `authserver.swufe.edu.cn`（TC-A01）、重编码一致（TC-A02） — 关联：REQ-006 / NFR-002 / ADR-0005
+- [x] T004 建立 codec 向量测试 — 输入：T003 模块、归档样本（authserver / jwxt / 带端口） — 输出：L0 测试文件，覆盖样本 URL 解密、重编码一致、jwxt 编码可回解、`http-8080` scheme token、错误 key 失败 — 依赖：T003 — 验证：运行 L0 测试，TC-A01..TC-A05 全部通过 — 关联：REQ-006 / NFR-002 / AC-007
+- [x] T005 实现 allowlist 匹配库 — 输入：[docs/architecture/data-model.md](../../docs/architecture/data-model.md) 的匹配算法 — 输出：`match(host)` 函数：精确命中、`includeSwufeWildcard` 时匹配 apex `swufe.edu.cn` 与 `.swufe.edu.cn` 后缀、`webvpn.swufe.edu.cn`/`authserver.swufe.edu.cn` 硬编码排除 — 依赖：无 — 验证：L0 测试 TC-B02、TC-B03、TC-B04 通过 — 关联：REQ-005 / REQ-008 / EC-001 / EC-003
+- [x] T006 实现 allowlist 持久化与默认值 — 输入：T005、`AllowlistConfig` 实体定义 — 输出：`userData/config.json` 读写（`hosts`、`includeSwufeWildcard`、`updatedAt`；默认 `{"hosts":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false}`）与主机名小写化/合法性校验 — 依赖：T005 — 验证：L1 测试 TC-B01（默认含 jwxt）、TC-B05（增删后重启仍在） — 关联：REQ-005 / AC-006
 
 ## Phase 3 — Bridge Sidecar（WBS 3）
 
-- [ ] T007 搭建 mitm 工程骨架 — 输入：[ADR-0002](../../docs/architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md)、[docs/api/bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md) — 输出：可启动的 mitmdump sidecar 入口（监听本地端口、专用 confdir、addon 加载点），开发模式使用本机 Python venv — 依赖：无 — 验证：启动 sidecar 后可经 `127.0.0.1:<bridge_port>` 代理发起一次 HTTPS 请求 — 关联：REQ-003 / NFR-001
-- [ ] T008 实现请求改写 addon — 输入：T003、T005、T007 — 输出：addon 识别 `scheme/host/port/path/query`；命中 allowlist 时生成 WebVPN URL、上游改为 `webvpn.swufe.edu.cn`、附加 WebVPN Cookie、按需最小必要调整 `Host`/`Origin`/`Referer`；未命中保持直连 — 依赖：T003、T005、T007 — 验证：L2 集成测试 TC-F01（curl 经代理访问 allowlist 主机，上游见 WebVPN 形态）、TC-F02（非 allowlist 直连且 `rewritten=false`） — 关联：REQ-006 / REQ-008 / EC-003 / EC-004
-- [ ] T009 实现响应反向改写：`Location` — 输入：T008 — 输出：响应 `Location` 由 WebVPN 形态回写为普通主机名语义 — 依赖：T008 — 验证：L1 组件测试用假上游返回 WebVPN Location，客户端跟随落到普通主机名（TC-F03） — 关联：REQ-007 / R-001
-- [ ] T010 实现响应反向改写：`Set-Cookie` 的 Domain/Path — 输入：T008 — 输出：与主机名相关的 Cookie 域/路径被改写，避免写到错误域 — 依赖：T008 — 验证：L1 组件测试断言改写后的 Cookie 属性落到真实主机域 — 关联：REQ-007 / R-001
-- [ ] T011 实现响应反向改写：HTML/JS/JSON 绝对 URL — 输入：T008 — 输出：`text/html`、`application/javascript`、`application/json` 中的校内绝对 URL 改写；其它内容类型不改写 — 依赖：T008 — 验证：L1 组件测试（录制流量/假上游）断言绝对 URL 被改写，非目标内容类型原样透传 — 关联：REQ-007 / R-001
-- [ ] T012 实现 Cookie/配置热更新通道 — 输入：T006、T008、[docs/api/bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md) — 输出：运行中可推送/重载 `{allowlist, cookies, debug}`（含 `wrdKey`/`wrdIv` 覆盖），且 Cookie 不写入日志、不出现在控制口响应 — 依赖：T006、T008 — 验证：L1 测试：改 allowlist 后无需重启生效；检查日志与控制口响应中无 Cookie — 关联：REQ-002 / REQ-005 / NFR-003 / ADR-0005
-- [ ] T013 实现控制/健康检查口（可选） — 输入：T007、[docs/api/bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md) — 输出：仅本机 `127.0.0.1` 的 `GET /health`、`POST /config`、`POST /shutdown`（若未采用该方式则实现等价的热加载通路） — 依赖：T007、T012 — 验证：curl 调 `/health` 返回存活；`/shutdown` 优雅退出 — 关联：REQ-003 / NFR-004
+- [x] T007 搭建 mitm 工程骨架 — 输入：[ADR-0002](../../docs/architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md)、[docs/api/bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md) — 输出：可启动的 mitmdump sidecar 入口（监听本地端口、专用 confdir、addon 加载点），开发模式使用本机 Python venv — 依赖：无 — 验证：启动 sidecar 后可经 `127.0.0.1:<bridge_port>` 代理发起一次 HTTPS 请求 — 关联：REQ-003 / NFR-001
+- [x] T008 实现请求改写 addon — 输入：T003、T005、T007 — 输出：addon 识别 `scheme/host/port/path/query`；命中 allowlist 时生成 WebVPN URL、上游改为 `webvpn.swufe.edu.cn`、附加 WebVPN Cookie、按需最小必要调整 `Host`/`Origin`/`Referer`；未命中保持直连 — 依赖：T003、T005、T007 — 验证：L2 集成测试 TC-F01（curl 经代理访问 allowlist 主机，上游见 WebVPN 形态）、TC-F02（非 allowlist 直连且 `rewritten=false`） — 关联：REQ-006 / REQ-008 / EC-003 / EC-004
+- [x] T009 实现响应反向改写：`Location` — 输入：T008 — 输出：响应 `Location` 由 WebVPN 形态回写为普通主机名语义 — 依赖：T008 — 验证：L1 组件测试用假上游返回 WebVPN Location，客户端跟随落到普通主机名（TC-F03） — 关联：REQ-007 / R-001
+- [x] T010 实现响应反向改写：`Set-Cookie` 的 Domain/Path — 输入：T008 — 输出：与主机名相关的 Cookie 域/路径被改写，避免写到错误域 — 依赖：T008 — 验证：L1 组件测试断言改写后的 Cookie 属性落到真实主机域 — 关联：REQ-007 / R-001
+- [x] T011 实现响应反向改写：HTML/JS/JSON 绝对 URL — 输入：T008 — 输出：`text/html`、`application/javascript`、`application/json` 中的校内绝对 URL 改写；其它内容类型不改写 — 依赖：T008 — 验证：L1 组件测试（录制流量/假上游）断言绝对 URL 被改写，非目标内容类型原样透传 — 关联：REQ-007 / R-001
+- [x] T012 实现 Cookie/配置热更新通道 — 输入：T006、T008、[docs/api/bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md) — 输出：运行中可推送/重载 `{allowlist, cookies, debug}`（含 `wrdKey`/`wrdIv` 覆盖），且 Cookie 不写入日志、不出现在控制口响应 — 依赖：T006、T008 — 验证：L1 测试：改 allowlist 后无需重启生效；检查日志与控制口响应中无 Cookie — 关联：REQ-002 / REQ-005 / NFR-003 / ADR-0005 — M1 证据：`tests/l1/test_addon_reload.py`；控制面为方案 A（配置文件 mtime 轮询），无控制口响应可查（见 [bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md)）
+- [x] T013 实现控制/健康检查口（可选） — 输入：T007、[docs/api/bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md) — 输出：仅本机 `127.0.0.1` 的 `GET /health`、`POST /config`、`POST /shutdown`（若未采用该方式则实现等价的热加载通路） — 依赖：T007、T012 — 验证：curl 调 `/health` 返回存活；`/shutdown` 优雅退出 — 关联：REQ-003 / NFR-004 — M1 证据：未采用控制口，按任务允许的「等价通路」实现：配置文件热加载 + `swufe-ready` / `swufe-error` 进程信号面 + 结束进程即优雅停止，端到端断言见 `tests/l2/test_proxy_end_to_end.py`
 
 ## Phase 4 — Electron 应用（WBS 4）
 
@@ -79,9 +79,9 @@
 
 ## Phase 6 — 测试与验收（WBS 6）
 
-- [ ] T034 接入 L0 自动化测试（CI） — 输入：T004、T005、T006 — 输出：CI 每次 PR 运行 codec 向量与 allowlist 函数测试 — 依赖：T004、T005、T006 — 验证：CI 上 L0 全部通过（TC-A01..A05、TC-B01..B04） — 关联：NFR-002
-- [ ] T035 编写 L1 组件测试（addon 对录制流量/假上游） — 输入：T008..T012 — 输出：本地 L1 测试集，覆盖请求改写决策与三类响应改写、Cookie 处理 — 依赖：T008..T012 — 验证：L1 全部通过（TC-F02、TC-F03） — 关联：REQ-006 / REQ-007
-- [ ] T036 编写 L2 集成测试（mitmdump + curl 经代理访问假 WebVPN） — 输入：T007、T008 — 输出：本地 L2 测试脚本，断言上游看到 WebVPN 形态与直连分流 — 依赖：T007、T008 — 验证：L2 通过（TC-F01） — 关联：REQ-006 / REQ-008
+- [x] T034 接入 L0 自动化测试（CI） — 输入：T004、T005、T006 — 输出：CI 每次 PR 运行 codec 向量与 allowlist 函数测试 — 依赖：T004、T005、T006 — 验证：CI 上 L0 全部通过（TC-A01..A05、TC-B01..B04） — 关联：NFR-002 — M1 证据：`.github/workflows/python-tests.yml`（`uv sync --frozen` + `uv run pytest tests/l0 -q`）
+- [x] T035 编写 L1 组件测试（addon 对录制流量/假上游） — 输入：T008..T012 — 输出：本地 L1 测试集，覆盖请求改写决策与三类响应改写、Cookie 处理 — 依赖：T008..T012 — 验证：L1 全部通过（TC-F02、TC-F03） — 关联：REQ-006 / REQ-007 — M1 证据：`tests/l1/`（请求改写、响应三类反向改写、Cookie、日志最小化、热更新）
+- [x] T036 编写 L2 集成测试（mitmdump + curl 经代理访问假 WebVPN） — 输入：T007、T008 — 输出：本地 L2 测试脚本，断言上游看到 WebVPN 形态与直连分流 — 依赖：T007、T008 — 验证：L2 通过（TC-F01） — 关联：REQ-006 / REQ-008 — M1 证据：`tests/l2/test_proxy_end_to_end.py`（真 mitmdump + curl + 假 WebVPN 上游）
 - [ ] T037 执行 macOS 教务手工验收 — 输入：T020..T028、真实账号与授权设备 — 输出：macOS 验收记录（TC-G01 打开教务首页、TC-G02 页面内导航不跳飞） — 依赖：T020..T028 — 验证：TC-G01、TC-G02 通过（不绑定 DOM，以关键路径可操作为准） — 关联：REQ-006 / REQ-007 / AC-007 / R-001
 - [ ] T038 执行 Windows 教务与进程捕获手工验收 — 输入：T032、T033、T026 — 输出：Windows 验收记录（TC-G03 教务首页；TC-G04 进程捕获） — 依赖：T032、T033、T026 — 验证：TC-G03、TC-G04 通过 — 关联：REQ-011 / AC-001 / AC-007
 - [ ] T039 缺陷修复与已知问题列表 — 输入：T034..T038 的执行记录 — 输出：P0 全部通过、P1 无未决阻断缺陷，已知问题列表（`id/title/severity/status/linked_case/owner/note`）已记录 — 依赖：T034..T038 — 验证：出口准则逐条核对（所有 P0 通过、P1 无未决阻断、教务验收至少一侧通过、已知问题已记录） — 关联：AC-001..AC-010

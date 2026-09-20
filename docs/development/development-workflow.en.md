@@ -1,6 +1,6 @@
 # Development Workflow
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [development-workflow.md](development-workflow.md)
 
@@ -78,12 +78,13 @@ Requirements:
 ## 5. Branches and commits
 
 ```text
-Default branch: main
-Branch naming:  TBD (to be decided before implementation starts)
-Commit message: existing commits all use `chore: <description>` (2 commits, 2026-09-20); the formal convention is TBD (to be decided before implementation starts)
+Default branch: main (development happens directly on main as of M1)
+Branch naming:  TBD (naming rules to be decided once parallel branches are needed; not enforced yet)
+Commit message: Conventional Commits: `feat|fix|docs|test|chore(scope): <description>`
+                (scope optional; consistent with the existing `chore: <description>` commits)
 ```
 
-The documentation-check CI is [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml) (CI currently runs documentation checks only).
+CI currently has two workflows: documentation checks [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml) and Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml).
 
 ## 6. Relationship to agents
 

@@ -1,6 +1,6 @@
 # 项目总览
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 **用途**：本文件回答「这个项目是什么、为谁解决什么问题、边界在哪里」。
 它是所有 Agent 与新人进入项目后第一份应读的文档，也是 [AGENTS.md](../../AGENTS.md) 中 Project Identity 的展开版本。
@@ -47,10 +47,10 @@ Out of scope: NG-001..NG-008，详见 goals-and-non-goals.md
 ## 交付形态
 
 ```text
-Repository type:  Documentation-first（docs/ + specs/）；实现代码待加入本仓库
-Primary language: Python 3（bridge sidecar / Addon、WRD codec 权威实现）
-                  + TypeScript（Electron 应用，IPC 以 TS 声明）
-                  本仓库当前本体为 Markdown + Node 文档检查脚本
+Repository type:  Documentation-first（docs/ + specs/）+ M1 桥实现（swufe_bridge/、tests/）
+Primary language: Python 3（bridge sidecar / Addon、WRD codec 权威实现，见 swufe_bridge/）
+                  + TypeScript（Electron 应用，IPC 以 TS 声明；M2 起）
+                  文档为 Markdown + Node 文档检查脚本
 License:          MIT
 Owner:            cherrchen
 ```

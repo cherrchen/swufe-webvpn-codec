@@ -1,6 +1,6 @@
 # 开发流程
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 **用途**：定义从想法到合并的标准流程，人与 Coding Agent 使用同一套流程。
 **不写**：具体任务清单（→ 对应 Spec 的 `tasks.md`）、测试实现细节（→ [testing-strategy.md](testing-strategy.md)）。
@@ -77,12 +77,13 @@ Bug → Reproduce → Root Cause → Fix → Test → Documentation Impact
 ## 5. 分支与提交
 
 ```text
-Default branch: main
-Branch naming:  TBD（实现开始前确定）
-Commit message: 既有提交为 `chore: <说明>` 形式（2 条，2026-09-20）；正式约定 TBD（实现开始前确定）
+Default branch: main（M1 起直接在 main 上开发）
+Branch naming:  TBD（需要并行分支时再定命名规则；当前不强制）
+Commit message: Conventional Commits：`feat|fix|docs|test|chore(scope): 说明`
+                （范围可省略；与既有 `chore: <说明>` 提交一致）
 ```
 
-文档检查 CI 见 [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml)（当前 CI 只跑文档检查）。
+CI 现有两个工作流：文档检查 [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml) 与 Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml)。
 
 ## 6. 与 Agent 的关系
 

@@ -1,6 +1,6 @@
 # 里程碑（Milestones）
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 **用途**：定义「到达某个节点」的判定标准，使进度可被外部复核。
 **不写**：需求、设计、任务拆解（分别见 [requirements/](../../requirements/README.md)、[architecture/](../../architecture/README.md)、`specs/<id>/tasks.md`）。
@@ -24,7 +24,7 @@ docs/planning/milestones/<MILESTONE_ID>-<short-name>.md
 | 里程碑 | 文件 | Status | 关联 Spec | 目标一句话 |
 | ------ | ---- | ------ | --------- | ---------- |
 | M0 预研 | [M0-pre-research.md](M0-pre-research.md) | Done | —（M0 交付文档包与需求规格，未归属 Spec） | WRD codec 验证、Phase 1 需求规格与文档包完成并归档 |
-| M1 桥核心 | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon 请求改写 + Cookie 注入 + 单测/集成测 |
+| M1 桥核心 | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon 请求改写 + Cookie 注入 + 单测/集成测 |
 | M2 桌面编排 | [M2-desktop-orchestration.md](M2-desktop-orchestration.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Electron 可登录、开桥、设置系统代理、安装 CA |
 | M3 体验打磨 | [M3-experience-polish.md](M3-experience-polish.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI、调试日志、进程捕获、文案可用 |
 | M4 验收 | [M4-acceptance.md](M4-acceptance.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | 双平台 P0 用例通过并完成教务浏览器验收 |

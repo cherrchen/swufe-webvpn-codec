@@ -1,6 +1,6 @@
 # WrdCodec 库 API
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 ## 范围
 
@@ -97,6 +97,27 @@ decodeUrl(webvpnUrl: string): string
 - 端口：仅当端口存在且不等于该 scheme 的默认端口（`http` 80 / `https` 443）时才写入 `-{port}`。
 - path 为空时按 `/` 处理；输入 URL 若带 fragment，输出在 query 之后保留 `#fragment`。
 
+## Python 实现映射
+
+权威实现：`swufe_bridge/wrd_codec.py`（M1 落地）。
+
+```python
+class WrdCodec:
+    def __init__(self, key: str | bytes = "wrdvpnisthebest!", iv: str | bytes = "wrdvpnisthebest!",
+                 webvpn_host: str = "webvpn.swufe.edu.cn") -> None: ...
+    def encrypt_host(self, host: str) -> str: ...
+    def decrypt_host(self, token: str) -> str: ...
+    def encode_url(self, ordinary_url: str, webvpn_base: str | None = None) -> str: ...
+    def decode_url(self, webvpn_url: str) -> str: ...
+```
+
+- 方法对应：`encryptHost` → `encrypt_host`、`decryptHost` → `decrypt_host`、`encodeUrl` → `encode_url`（第二参数为 `webvpn_base`，缺省 `https://{webvpn_host}`）、`decodeUrl` → `decode_url`。
+- `key` / `iv` 接受 `str`（按 UTF-8 编码）或 `bytes`，长度必须为 16 字节；默认值来自模块常量 `DEFAULT_KEY` / `DEFAULT_IV` / `DEFAULT_WEBVPN_HOST`。
+- AES 实现：`cryptography` 的 `Cipher(algorithms.AES(key), CFB(iv))`（即 CFB128，与原型 `segment_size=128` 等价；TC-A02 为门禁向量）；不引入 pycryptodome（见 [dependency-policy.md](../development/dependency-policy.md)）。
+- 错误统一抛 `WrdCodecError`（`ValueError` 子类），消息沿用原型：`WRD AES-128 key must be 16 bytes`、`WRD AES-128 IV must be 16 bytes`、`unsupported scheme: ...`、`missing hostname`、`host token too short or not hex`、`invalid WebVPN path`、`WebVPN path missing scheme or host token`、`bad scheme token: ...`；此外 token 解出的字节不是合法 UTF-8 时同样抛 `WrdCodecError`（错误 key 的常见结果）。
+- CLI：`uv run python -m swufe_bridge.wrd_codec encode <ordinary-url>` / `decode <webvpn-url>`（可选 `--key` / `--iv` / `--webvpn-host`；失败打印 `error: <message>` 并返回 `2`）。
+- 测试：`tests/l0/test_wrd_codec.py`（TC-A01..TC-A05 与错误分支）。
+
 ## 错误与边界
 
 | 条件 | 行为 |
@@ -134,3 +155,4 @@ decodeUrl(webvpnUrl: string): string
 | 日期 | 变更 | 兼容性 | 关联 Spec / ADR |
 | ---- | ---- | ------ | --------------- |
 | 2026-09-20 | 首版：4 个方法、算法事实、错误与边界、测试向量归属 | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0005](../architecture/adr/ADR-0005-builtin-wrd-key-with-override.md) |
+| 2026-09-21 | 增「Python 实现映射」：模块与方法签名、`cryptography` CFB128 实现、`WrdCodecError` 错误面、CLI 与测试位置 | 兼容（新增实现映射小节，未改接口语义） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0005](../architecture/adr/ADR-0005-builtin-wrd-key-with-override.md) |

@@ -1,6 +1,6 @@
 # 运维文档
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 **用途**：记录运行环境、配置、部署、可观测性、备份与事故响应的长期事实。
 **范围**：SWUFE WebVPN Bridge Phase 1 —— **本应用为单机桌面工具**（Electron 应用 + 本机 mitmproxy sidecar），面向 macOS 与 Windows，无服务器端。
@@ -44,8 +44,8 @@
              开发等效方式：本机 Node + Python venv + mitmdump
 分发形态:    TBD —— 嵌入式 Python 运行时与外置 mitmproxy 可执行文件两种方案
              尚未选定（体积与签名取舍见 ADR-0002，实现阶段决定）
-发布流程:    TBD —— 第一期实现未开始，尚无发布流水线；当前 CI 只做文档检查
-             （npm run docs:check）
+发布流程:    TBD —— 尚无发布流水线；当前 CI 做文档检查（npm run docs:check）与
+             Python L0 测试（.github/workflows/python-tests.yml），打包与分发属 M4
 回滚方式:    关闭桥 → 确认系统代理已清除 → 卸载本机 MITM CA；
              必要时回退到上一版应用安装包
 ```

@@ -1,6 +1,6 @@
 # Components
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [components.md](components.md)
 
@@ -11,7 +11,8 @@
 
 ## Component list
 
-> This repository is currently a documentation repository with no implementation code; "Code location" is always `TBD（实现首个任务确定）`.
+> "Code location" is the real path of landed implementations; components that are not implemented yet stay `TBD（实现首个任务确定）`.
+> M1 (bridge core) has implemented WRD Codec, Bridge Addon (including the config surface and the sidecar entry) and the library layer of Allowlist Store; the Electron-side components land from M2 onwards.
 
 | Component | Type | Responsibility (one line) | Code location | Status |
 | --------- | ---- | ------------------------- | ------------- | ------ |
@@ -19,11 +20,11 @@
 | Login WebView | In-process module (Electron Renderer / BrowserWindow) | Hosts the official WebVPN / CAS login and guarantees anti-loop | TBD（实现首个任务确定） | Planned |
 | Session Broker | In-process module (Electron Main) | Cookie extraction, storage and expiry detection | TBD（实现首个任务确定） | Planned |
 | Proxy Orchestrator | In-process module (Electron Main) | Start/stop the mitm sidecar, set/clear the system proxy, manage process capture, detect proxy conflicts | TBD（实现首个任务确定） | Planned |
-| WRD Codec | In-process library (shared by the App and the sidecar) | Hostname encryption/decryption and URL conversion (pure functions, no IO) | TBD（实现首个任务确定） | Planned |
-| Bridge Addon | Separate process (addon inside the mitmproxy sidecar) | Request rewrite, response reverse-rewrite and Cookie injection | TBD（实现首个任务确定） | Planned |
-| Cert Manager | In-process module (Electron Main) | Install/uninstall and query the local MITM CA | TBD（实现首个任务确定） | Planned |
-| Allowlist Store | In-process module (Electron Main) | Read/write host list and wildcard option (single source for routing decisions) | TBD（实现首个任务确定） | Planned |
-| Telemetry UI | In-process module (Electron Renderer) | Status display and debug log panel | TBD（实现首个任务确定） | Planned |
+| WRD Codec | In-process library (shared by the App and the sidecar) | Hostname encryption/decryption and URL conversion (pure functions, no IO) | `swufe_bridge/wrd_codec.py` | Implemented (M1) |
+| Bridge Addon | Separate process (addon inside the mitmproxy sidecar) | Request rewrite, response reverse-rewrite and Cookie injection | `swufe_bridge/addon.py` (pure reverse-rewrite functions in `swufe_bridge/rewrite.py`; config surface in `swufe_bridge/config.py`; process entry `swufe_bridge/sidecar.py`) | Implemented (M1) |
+| Cert Manager | In-process module (Electron Main) | Install/uninstall and query the local MITM CA | TBD（实现首个任务确定；from M1 the sidecar's `--confdir` hosts mitmproxy CA generation） | Planned |
+| Allowlist Store | In-process module (Electron Main) | Read/write host list and wildcard option (single source for routing decisions) | `swufe_bridge/allowlist.py` (matching semantics and validation) + `swufe_bridge/config.py` (`AllowlistStore` persistence) | Partial (M1: library; M2: IPC) |
+| Telemetry UI | In-process module (Electron Renderer) | Status display and debug log panel | TBD（实现首个任务确定；M1's `swufe-debug` stderr lines are its data source） | Planned |
 
 ## Component relationships
 

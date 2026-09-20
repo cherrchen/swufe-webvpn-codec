@@ -8,15 +8,15 @@
 
 | 项 | 值 |
 | --- | --- |
-| 阶段 | Phase 1（第一期）文档已对齐（2026-09-20），实现未开始 |
-| 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)，实现代码待加入 |
+| 阶段 | Phase 1 进行中：文档已对齐（2026-09-20）；M1 桥核心已实现并通过 L0/L1/L2（2026-09-21）；M2–M4 未开始 |
+| 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)；含 M1 交付的 Python 桥实现（[swufe_bridge/](swufe_bridge/wrd_codec.py)、[tests/](tests/l0/test_wrd_codec.py)） |
 | 第一期 Feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |
 | License | [MIT](LICENSE) |
 | 文档版本 | 1.0 |
 | 初始化日期 | 2026-09-20 |
 
-本仓库当前**只有文档**，没有可运行的应用：`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程。
+本仓库以**文档为主体**（`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程），并含 M1 交付的桥核心实现：无桌面壳时可用 `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` 直接起桥（见 [桥控制协议](docs/api/bridge-control-protocol.md)）。
 
 ## 1. 它解决什么问题
 
@@ -75,6 +75,8 @@ flowchart TD
 │   ├── verification/      #   验证策略与完成标准
 │   ├── security/  operations/  planning/
 │   └── archive/           #   归档的历史设计资料（不是当前事实来源）
+├── swufe_bridge/          # M1 桥实现：WRD codec、allowlist、配置、响应反向改写、mitmproxy addon、sidecar 入口
+├── tests/                 #   L0/L1/L2 测试（codec/allowlist/config、addon 行为、真 sidecar + 假上游）
 ├── specs/                 # Layer 3：Feature Spec
 │   ├── 001-phase1-local-bridge/   # 第一期本机桥：spec/design/plan/tasks/verification
 │   └── _template/         #   Spec 模板骨架

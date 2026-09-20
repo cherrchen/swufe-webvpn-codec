@@ -1,7 +1,7 @@
 # Feature: Phase 1 本机桥（001-phase1-local-bridge）
 
 > Spec ID: 001
-> Status: Draft
+> Status: In Progress
 > Owner: cherrchen
 > Created: 2026-09-20
 > Related: REQ-001..REQ-011 / NFR-001..NFR-007 / ADR-0001..ADR-0005
@@ -10,7 +10,7 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 `Draft`（2026-09-20）：文档已对齐，实现未开始。
+当前为 `In Progress`（2026-09-21）：M1（桥核心）已实现并通过 L0/L1/L2——桥 sidecar、WRD codec、allowlist 匹配与持久化、请求改写与响应反向改写、配置热更新、L0 CI；M2–M4（Electron 壳、系统代理与 CA、进程捕获、双平台教务验收）未开始。证据见 [verification.md](verification.md) 与 [M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md)。
 
 ## Background
 

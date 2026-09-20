@@ -8,15 +8,15 @@
 
 | Item | Value |
 | --- | --- |
-| Stage | Phase 1 documentation aligned (2026-09-20); implementation not started |
-| Repository type | Documentation-first: [docs/](docs/README.en.md) + [specs/](specs/README.en.md); implementation code to be added |
+| Stage | Phase 1 in progress: documentation aligned (2026-09-20); the M1 bridge core is implemented and passing L0/L1/L2 (2026-09-21); M2–M4 not started |
+| Repository type | Documentation-first: [docs/](docs/README.en.md) + [specs/](specs/README.en.md); plus the Python bridge implementation delivered in M1 ([swufe_bridge/](swufe_bridge/wrd_codec.py), [tests/](tests/l0/test_wrd_codec.py)) |
 | Phase 1 feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |
 | License | [MIT](LICENSE) |
 | Documentation version | 1.0 |
 | Initialised | 2026-09-20 |
 
-The repository currently contains **documentation only** — there is no runnable application yet: `docs/` holds long-lived project facts and `specs/` records individual features end to end.
+The repository is **documentation-first** (`docs/` holds long-lived project facts, `specs/` records individual features end to end) and already contains the M1 bridge core: without any desktop shell you can start the bridge with `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` (see the [bridge control protocol](docs/api/bridge-control-protocol.en.md)).
 
 ## 1. What problem it solves
 
@@ -75,6 +75,8 @@ flowchart TD
 │   ├── verification/      #   verification strategy and definition of done
 │   ├── security/  operations/  planning/
 │   └── archive/           #   archived historical design material (not a source of truth)
+├── swufe_bridge/          # M1 bridge implementation: WRD codec, allowlist, config, response reverse rewriting, mitmproxy addon, sidecar entry
+├── tests/                 #   L0/L1/L2 tests (codec/allowlist/config, addon behaviour, real sidecar + fake upstream)
 ├── specs/                 # Layer 3: feature specs
 │   ├── 001-phase1-local-bridge/   # Phase 1 local bridge: spec/design/plan/tasks/verification
 │   └── _template/         #   spec skeleton

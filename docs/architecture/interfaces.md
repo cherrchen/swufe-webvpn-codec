@@ -1,6 +1,6 @@
 # 接口
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 **用途**：定义模块之间、系统与外部之间的**边界**：谁提供、谁消费、契约是什么、兼容性如何保证。
 **不写**：具体字段级 API 定义（→ [docs/api/](../api/README.md)）、数据实体（→ [data-model.md](data-model.md)）。
@@ -54,13 +54,13 @@ flowchart LR
 
 - 提供方：Bridge Addon（mitmproxy sidecar）。
 - 消费方：Proxy Orchestrator（Main）。
-- 稳定性：Internal / Evolving（仅供本 App 内部消费；原包列出两种可选实现，尚未定稿，因此在此之前不作稳定性承诺）。
-- 输入：子进程生命周期 + 配置文件热加载（方式 A）；或本地控制口 `127.0.0.1:control` 的 `GET /health`、`POST /config`（body `{allowlist, cookies, debug}`）、`POST /shutdown`（方式 B）。
-- 输出：健康状态；配置生效结果；优雅退出结果。
-- 错误模型：TBD（原包未定义控制口错误体；方式 A 以进程退出码与日志为信号）。
-- 幂等性：`GET /health` 幂等；`POST /shutdown` 幂等；`POST /config` 以「最后一次配置生效」为幂等语义。
-- 版本策略：sidecar 与 App 同发布；控制方式（A/B）切换视为实现变更而非契约变更。
-- 兼容性承诺：Cookie 禁止进日志与控制口响应（INV-001）；`/health` 与 `/shutdown` 语义稳定。
+- 稳定性：Internal / Evolving（仅供本 App 内部消费；第一期已采用方案 A「子进程生命周期 + 配置文件热加载」，不再承诺其它控制面形态）。
+- 输入：子进程生命周期（spawn / 结束）；配置文件整体覆盖写入（`allowlist` / `cookies` / `debug` / `webvpnBase` / `wrdKey` / `wrdIv`，路径与字段见 [api/bridge-control-protocol.md](../api/bridge-control-protocol.md)）。
+- 输出：stderr 上的就绪与诊断行（`swufe-ready` / `swufe-error <CODE> <message>`）、进程退出码（正常 `0`，启动校验失败 `2`）；配置生效结果（热加载，失败保留上次可用配置）。
+- 错误模型：sidecar 级诊断 `swufe-error <CODE> <message>` + 退出码 `2`（`CONFIG_INVALID`、`ALLOWLIST_EMPTY`、`LISTEN_NOT_LOOPBACK`）；运行期配置重载失败不退出，保留上次可用配置并重复上报同一消息前只打印一次；M2 将 sidecar 非预期退出映射为 `BRIDGE_CRASH`。
+- 幂等性：配置文件为整体覆盖式写入，以「最后一次生效」为幂等语义；结束进程重复调用收敛到已停止状态。
+- 版本策略：sidecar 与 App 同发布；控制面能力变更（如启用方案 B）视为实现变更而非契约变更。
+- 兼容性承诺：Cookie 禁止进日志与诊断行（INV-001）；`swufe-ready` / `swufe-error` 行格式与退出码语义稳定；监听地址恒为 `127.0.0.1`。
 - 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
 
 ### IF-003 Bridge Addon ↔ WRD Codec 库
@@ -120,7 +120,7 @@ flowchart LR
 | 接口 | 允许的变更 | 需要 ADR 的变更 | 弃用流程 |
 | ---- | ---------- | --------------- | -------- |
 | IF-001 | 新增可选方法/字段、新增错误码 | 删除或改签名；改变 `BridgeStatus` 状态机取值 | TBD |
-| IF-002 | 新增端点/字段；控制方式 A ↔ B 切换 | 改变已选控制方式；移除 `/health` 或 `/shutdown` | TBD |
+| IF-002 | 新增配置字段与诊断行 | 改变已选控制方式（方案 A → 方案 B）；改变配置文件字段语义或退出码 | TBD |
 | IF-003 | 新增可选参数 | 改签名或改变默认 key/iv 语义 | TBD |
 | IF-004 | 适配新的 OS API 版本 | 改变代理清除策略（INV-002） | TBD |
 | IF-005 | 适配新的 OS 信任库 API | 改变 CA / 信任模型（ADR-0002、REQ-010） | TBD |
@@ -131,7 +131,7 @@ flowchart LR
 | 接口 | 测试位置 | 覆盖内容 |
 | ---- | -------- | -------- |
 | IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-D01、TC-D02、TC-C01–C04、TC-E01–E03、TC-B05、TC-H01） | 会话/桥控/allowlist/CA/进程捕获 IPC 的行为与错误码 |
-| IF-002 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-F01、TC-F02）+ [api/bridge-control-protocol.md](../api/bridge-control-protocol.md) | `/health`、`/config`、`/shutdown` 与配置热更新 |
+| IF-002 | L1 `tests/l1/test_addon_reload.py`（配置热更新与失败回退）+ L2 `tests/l2/test_proxy_end_to_end.py`（`swufe-ready` 行、退出码 `2`、回环监听） | 配置文件热加载语义、就绪/诊断行格式与启动失败退出码 |
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-A01–A05） | codec 向量与 URL 互转一致 |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-C01–C04） | 冲突拒绝、设置与清除代理 |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-E01–E03） | 安装、卸载与未安装提示 |

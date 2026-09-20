@@ -1,6 +1,6 @@
 # Interfaces
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [interfaces.md](interfaces.md)
 
@@ -56,13 +56,13 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 
 - Provider: Bridge Addon (mitmproxy sidecar).
 - Consumer: Proxy Orchestrator (Main).
-- Stability: Internal / Evolving (consumed only inside this app; two options are listed and not finalised, so no stability promise is made until then).
-- Input: child-process lifecycle + config hot reload (option A); or the local control port `127.0.0.1:control` with `GET /health`, `POST /config` (body `{allowlist, cookies, debug}`), `POST /shutdown` (option B).
-- Output: health status; config application result; graceful shutdown result.
-- Error model: TBD (the error body is undefined; option A signals via exit code and logs).
-- Idempotency: `GET /health` is idempotent; `POST /shutdown` is idempotent; `POST /config` is idempotent with "last config wins" semantics.
-- Versioning: the sidecar ships with the App; switching the control option (A/B) is an implementation change, not a contract change.
-- Compatibility commitment: Cookies never enter logs or control-port responses (INV-001); `/health` and `/shutdown` semantics are stable.
+- Stability: Internal / Evolving (consumed only inside this app; Phase 1 has adopted option A — "child-process lifecycle + config-file hot reload" — and no other control-plane shape is promised).
+- Input: child-process lifecycle (spawn / terminate); whole-file overwrite of the config file (`allowlist` / `cookies` / `debug` / `webvpnBase` / `wrdKey` / `wrdIv`; path and fields in [api/bridge-control-protocol.md](../api/bridge-control-protocol.md)).
+- Output: readiness and diagnostic lines on stderr (`swufe-ready` / `swufe-error <CODE> <message>`), the process exit code (normal `0`, startup validation failure `2`); and the config-application result (hot reload; on failure the last usable config is kept).
+- Error model: sidecar-level diagnostics `swufe-error <CODE> <message>` + exit code `2` (`CONFIG_INVALID`, `ALLOWLIST_EMPTY`, `LISTEN_NOT_LOOPBACK`); a runtime config-reload failure does not exit — it keeps the last usable config and prints the same message only once; M2 maps an unexpected sidecar exit to `BRIDGE_CRASH`.
+- Idempotency: the config file is written as a whole-file overwrite, with "last one wins" as the idempotency semantics; repeated terminate calls converge to the stopped state.
+- Versioning: the sidecar ships with the App; control-plane capability changes (e.g. enabling option B) count as implementation changes rather than contract changes.
+- Compatibility commitment: Cookies never enter logs or diagnostic lines (INV-001); the `swufe-ready` / `swufe-error` line formats and the exit-code semantics are stable; the listen address is always `127.0.0.1`.
 - Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md).
 
 ### IF-003 Bridge Addon ↔ WRD Codec library
@@ -122,7 +122,7 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 | Interface | Allowed changes | Changes requiring an ADR | Deprecation process |
 | --------- | --------------- | ------------------------ | ------------------- |
 | IF-001 | added optional methods/fields, added error codes | removing or changing signatures; changing `BridgeStatus` state-machine values | TBD |
-| IF-002 | added endpoints/fields; switching control option A ↔ B | changing the chosen control option; removing `/health` or `/shutdown` | TBD |
+| IF-002 | added config fields and diagnostic lines | changing the chosen control approach (option A → option B); changing config-file field semantics or exit codes | TBD |
 | IF-003 | added optional parameters | changing signatures or the default key/iv semantics | TBD |
 | IF-004 | adapting to new OS API versions | changing the proxy-clearing policy (INV-002) | TBD |
 | IF-005 | adapting to new OS trust-store APIs | changing the CA / trust model (ADR-0002, REQ-010) | TBD |
@@ -133,7 +133,7 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 | Interface | Test location | Coverage |
 | --------- | ------------- | -------- |
 | IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-D01, TC-D02, TC-C01–C04, TC-E01–E03, TC-B05, TC-H01) | Session / bridge-control / allowlist / CA / process-capture IPC behaviour and error codes |
-| IF-002 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-F01, TC-F02) + [api/bridge-control-protocol.md](../api/bridge-control-protocol.md) | `/health`, `/config`, `/shutdown` and config hot reload |
+| IF-002 | L1 `tests/l1/test_addon_reload.py` (config hot reload and failure fallback) + L2 `tests/l2/test_proxy_end_to_end.py` (`swufe-ready` line, exit code `2`, loopback listener) | config-file hot-reload semantics, readiness/diagnostic line formats and startup-failure exit code |
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-A01–A05) | codec vectors and URL conversion consistency |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-C01–C04) | conflict refusal, proxy set and clear |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-E01–E03) | install, uninstall and missing-CA prompt |

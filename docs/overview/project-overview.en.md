@@ -1,6 +1,6 @@
 # Project Overview
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [project-overview.md](project-overview.md)
 
@@ -51,10 +51,10 @@ Out of scope: NG-001..NG-008, see goals-and-non-goals.md
 ## Delivery shape
 
 ```text
-Repository type:  Documentation-first (docs/ + specs/); implementation code to be added later
-Primary language: Python 3 (bridge sidecar / addon, authoritative WRD codec)
-                  + TypeScript (Electron app, IPC declared in TS)
-                  This repository currently holds Markdown plus Node documentation checks
+Repository type:  Documentation-first (docs/ + specs/) + the M1 bridge implementation (swufe_bridge/, tests/)
+Primary language: Python 3 (bridge sidecar / addon, authoritative WRD codec, see swufe_bridge/)
+                  + TypeScript (Electron app, IPC declared in TS; from M2)
+                  Docs are Markdown plus Node documentation checks
 License:          MIT
 Owner:            cherrchen
 ```

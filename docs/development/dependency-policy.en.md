@@ -1,6 +1,6 @@
 # Dependency Policy
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [dependency-policy.md](dependency-policy.md)
 
@@ -45,16 +45,16 @@ Risk:         <maintenance / security / size / transitive>
 ## 3. Versions and locking
 
 ```text
-Version policy: Node side: npm + package-lock.json (committed); Python side: TBD (implementation has not started)
-Lockfile:       Node side package-lock.json is committed; Python side TBD (implementation has not started)
+Version policy: Node side: npm + package-lock.json (committed); Python side: uv + uv.lock (committed; `uv sync` installs, `uv sync --frozen` verifies the lock is consistent)
+Lockfile:       Node side package-lock.json is committed; Python side uv.lock is committed; the interpreter version is pinned by .python-version (3.13)
 Update cadence: TBD (cadence still to be decided)
 ```
 
 ## 4. Security and compliance
 
-- Vulnerability scanning tool: `TBD` (implementation has not started);
-- Scan frequency and blocking threshold: `TBD` (implementation has not started);
-- Licence allow/deny list: `TBD` (implementation has not started; see also [security/](../security/README.md)).
+- Vulnerability scanning tool: `TBD` (not adopted this phase; both the Node devDependencies and the Python side are pinned in `uv.lock`);
+- Scan frequency and blocking threshold: `TBD` (same as above);
+- Licence allow/deny list: `TBD` (not adopted this phase; every added dependency's licence is recorded per section 2, see also [security/](../security/README.md)).
 
 The project licence is MIT (see [LICENSE](../../LICENSE)).
 
@@ -63,7 +63,39 @@ The project licence is MIT (see [LICENSE](../../LICENSE)).
 | Dependency | Purpose | Notes |
 | ---------- | ------- | ----- |
 | Electron | desktop shell | rationale and cost in [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md) |
-| mitmproxy | TLS / HTTP2 / MITM, infrastructure-level dependency | see [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md); section 2 of this policy requires an ADR for it |
-| pycryptodome | used only by the archived prototype [wrd_codec.py](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/wrd_codec.py) | not a dependency of the current implementation |
+| mitmproxy | TLS / HTTP2 / MITM, infrastructure-level dependency | see [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md); section 2 of this policy requires an ADR for it. Since M1 it is a **runtime dependency**: the sidecar drives it through `mitmproxy.tools.main.mitmdump`, and it hosts the bridge and control plane (`swufe_bridge/sidecar.py`); its dedicated confdir also carries the MITM CA |
+| cryptography | AES-128-CFB128 codec (WRD hostname token) | newly added as a direct dependency in M1; it was already pulled in transitively by mitmproxy, and declaring it directly pins the API the codec uses (`swufe_bridge/wrd_codec.py`) |
+| pytest | Python-side test framework (L0/L1/L2) | newly added in M1, dev dependency group (`[dependency-groups] dev`) |
+| hatchling | Python package build backend | newly added in M1, build-time dependency, not present at runtime |
+| pycryptodome | used only by the archived prototype [wrd_codec.py](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/wrd_codec.py) | not a dependency of the current implementation; the M1 codec uses `cryptography`'s AES-CFB128 (equivalent to the prototype's `segment_size=128`, guaranteed by the TC-A02 gate vector) |
 | sing-box | later TUN stage | not introduced in phase 1 |
 | typescript, tsx, `@types/node` | used only by this repository's documentation check scripts | Node side; no Markdown parser or framework pulled in |
+
+### Dependency records (added in M1)
+
+```text
+Dependency:   cryptography
+Version:      >=42 (uv.lock pins 48.0.1)
+Purpose:      AES-128-CFB128 (token encryption/decryption) for the WRD codec
+Alternatives: pycryptodome (used by the archived prototype; this policy forbids a second equivalent solution, and it would be an extra runtime dependency)
+License:      Apache-2.0 / BSD-3-Clause (dual-licensed)
+Risk:         no new platform binary (pulled in transitively by mitmproxy, already inside this project's dependency tree)
+```
+
+```text
+Dependency:   pytest
+Version:      >=8 (uv.lock pins 9.1.1)
+Purpose:      test runner for L0/L1/L2
+Alternatives: unittest (standard library; but parameterisation and fixture organisation cost more, and pytest is already the test stack inside mitmproxy's dependency tree)
+License:      MIT
+Risk:         dev dependency only, does not affect release artifacts
+```
+
+```text
+Dependency:   hatchling
+Version:      build backend (resolved by uv, see uv.lock)
+Purpose:      building the swufe_bridge package (editable installs and future distribution)
+Alternatives: setuptools / flit (hatchling is uv's default path with the least configuration)
+License:      MIT
+Risk:         build-time dependency only, not present at runtime
+```

@@ -75,7 +75,8 @@ const TASK_PHASE_RULE: HeadingRule = {
 };
 
 const TASK_LINE_RE = /^[ \t]*[-*][ \t]*\[[ xX]\][ \t]*T\d{2,}\b/m;
-const STATUS_LINE_RE = /^\s*(?:>\s*)?Status\s*[:：]\s*(\S+)/im;
+// Statuses are single- or two-word values ("Draft" .. "In Progress").
+const STATUS_LINE_RE = /^\s*(?:>\s*)?Status\s*[:：]\s*([A-Za-z-]+(?: [A-Za-z-]+)?)/im;
 const VALID_STATUSES: Record<string, true> = {
   draft: true,
   approved: true,

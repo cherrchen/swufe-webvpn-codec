@@ -1,6 +1,6 @@
 # Roadmap
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [roadmap.md](roadmap.md)
 
@@ -14,7 +14,7 @@
 | Phase | Goal summary | Related goal | Timeframe | Status |
 | ----- | ------------ | ------------ | --------- | ------ |
 | [M0 pre-research](milestones/M0-pre-research.md) | WRD codec verification, Phase 1 requirement specs and document package | G-001 / G-002 / G-003 | TBD | Done |
-| [M1 bridge core](milestones/M1-mitm-bridge.md) | mitm WRD addon (request rewrite), cookie injection, response reverse rewrite, unit/integration tests | G-001 | TBD | Planned |
+| [M1 bridge core](milestones/M1-mitm-bridge.md) | mitm WRD addon (request rewrite), cookie injection, response reverse rewrite, unit/integration tests | G-001 | TBD | Done |
 | [M2 desktop orchestration](milestones/M2-desktop-orchestration.md) | Electron shell, system proxy, CA, proxy conflict detection, stop-on-expiry | G-001 / G-002 / G-003 | TBD | Planned |
 | [M3 experience polish](milestones/M3-experience-polish.md) | Allowlist UI, debug logging, process capture, copy | G-002 / G-003 | TBD | Planned |
 | [M4 acceptance](milestones/M4-acceptance.md) | macOS + Windows academic-affairs browser acceptance, defect burn-down | G-001 / G-002 / G-003 | TBD | Planned |
@@ -28,7 +28,7 @@ Each feature spec is registered here with one row; details live in `specs/<id>-<
 
 | Spec | Title | Related REQ | Phase | Status | Link |
 | ---- | ----- | ----------- | ----- | ------ | ---- |
-| 001-phase1-local-bridge | Phase 1 local bridge and academic-affairs browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | M1–M4 | Draft | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
+| 001-phase1-local-bridge | Phase 1 local bridge and academic-affairs browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | M1–M4 | In Progress | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
 
 > Phase 1 is one spec; add another row here per [specs/README.md](../../specs/README.md) when a later spec is created. REQ/NFR are defined in [requirements/](../requirements/README.md); this table only references IDs.
 

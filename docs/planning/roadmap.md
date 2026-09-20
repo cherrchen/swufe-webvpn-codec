@@ -1,6 +1,6 @@
 # Roadmap
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 **用途**：给出长期方向的分阶段视图，以及 Spec 索引。
 **不写**：需求定义、技术方案、任务拆解。
@@ -12,7 +12,7 @@
 | 阶段 | 目标摘要 | 关联 Goal | 时间段 | 状态 |
 | ---- | -------- | --------- | ------ | ---- |
 | [M0 预研](milestones/M0-pre-research.md) | WRD codec 验证、Phase 1 需求规格与文档包 | G-001 / G-002 / G-003 | TBD | Done |
-| [M1 桥核心](milestones/M1-mitm-bridge.md) | mitm WRD addon（请求改写）、Cookie 注入、响应反向改写、单测/集成测 | G-001 | TBD | Planned |
+| [M1 桥核心](milestones/M1-mitm-bridge.md) | mitm WRD addon（请求改写）、Cookie 注入、响应反向改写、单测/集成测 | G-001 | TBD | Done |
 | [M2 桌面编排](milestones/M2-desktop-orchestration.md) | Electron 壳、系统代理、CA、代理冲突检测、过期停桥 | G-001 / G-002 / G-003 | TBD | Planned |
 | [M3 体验打磨](milestones/M3-experience-polish.md) | Allowlist UI、调试日志、进程捕获、文案 | G-002 / G-003 | TBD | Planned |
 | [M4 验收](milestones/M4-acceptance.md) | macOS + Windows 教务浏览器验收、缺陷收敛 | G-001 / G-002 / G-003 | TBD | Planned |
@@ -26,7 +26,7 @@
 
 | Spec | 标题 | 关联 REQ | 阶段 | Status | 链接 |
 | ---- | ---- | -------- | ---- | ------ | ---- |
-| 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | M1–M4 | Draft | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
+| 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | M1–M4 | In Progress | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
 
 > Phase 1 归属一个 Spec；建立后续 Spec 时按 [specs/README.md](../../specs/README.md) 再补一行。REQ/NFR 的规范定义在 [requirements/](../requirements/README.md)，本表只引用 ID。
 

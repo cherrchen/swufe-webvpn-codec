@@ -17,10 +17,12 @@ Purpose:          An Electron desktop app for macOS / Windows providing a local 
                   the user completes the official Wengine WebVPN (CAS/MFA) login, the local
                   browser reaches allowlisted hosts through the WebVPN automatically
                   (Phase 1 acceptance: the academic affairs site jwxt.swufe.edu.cn opens and works)
-Status:           Phase 1 documentation aligned (2026-09-20); implementation not started
-Primary language: Python 3 (bridge sidecar/Addon, WRD codec) + TypeScript (Electron app);
-                  this repository is currently a documentation repository
-Repository type:  Documentation-first (docs/ + specs/); implementation code to be added
+Status:           Phase 1 documentation aligned (2026-09-20); M1 bridge core (Python sidecar + WRD
+                  rewriting) implemented and passing L0/L1/L2 (2026-09-21); M2 (Electron shell /
+                  system proxy / CA) not started
+Primary language: Python 3 (bridge sidecar/Addon, WRD codec, see `swufe_bridge/`) + TypeScript (Electron app, from M2);
+                  Markdown docs (`docs/` + `specs/`) plus Node documentation-check scripts form the bulk
+Repository type:  Documentation-first (docs/ + specs/) + Python bridge implementation (`swufe_bridge/`, `tests/`)
 Owner:            cherrchen
 ```
 

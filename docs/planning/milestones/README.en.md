@@ -1,6 +1,6 @@
 # Milestones
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [README.md](README.md)
 
@@ -26,7 +26,7 @@ Examples: `M1-mitm-bridge.md` (numeric) or `2026-09-20-packaging.md` (date-based
 | Milestone | File | Status | Related spec | One-line goal |
 | --------- | ---- | ------ | ------------ | ------------- |
 | M0 pre-research | [M0-pre-research.md](M0-pre-research.md) | Done | — (M0 delivers the document package and requirement specs; it belongs to no spec) | WRD codec verification, Phase 1 requirement specs and document package completed and archived |
-| M1 bridge core | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon request rewrite + cookie injection + unit/integration tests |
+| M1 bridge core | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon request rewrite + cookie injection + unit/integration tests |
 | M2 desktop orchestration | [M2-desktop-orchestration.md](M2-desktop-orchestration.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Electron can log in, start the bridge, set the system proxy, install the CA |
 | M3 experience polish | [M3-experience-polish.md](M3-experience-polish.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI, debug logging, process capture and copy usable |
 | M4 acceptance | [M4-acceptance.md](M4-acceptance.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Dual-platform P0 cases pass and browser acceptance on the academic-affairs site is done |

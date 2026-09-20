@@ -1,6 +1,6 @@
 # Testing Strategy
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [testing-strategy.md](testing-strategy.md)
 
@@ -24,8 +24,8 @@
 ## 2. Coverage expectations
 
 ```text
-Coverage target: TBD (implementation not started; no numeric target set yet)
-Coverage tool:   TBD (implementation not started; tooling not chosen yet)
+Coverage target: TBD (M1 sets no numeric target; the current baseline is the 154 green L0/L1/L2 cases)
+Coverage tool:   TBD (not adopted in M1; the layers and cases are the current regression evidence)
 Exceptions:      the L3 and manual layers are excluded from coverage and
                  replaced by manual steps
 ```
@@ -44,10 +44,14 @@ Requirement acceptance criteria, reproductions of fixed bugs, and boundaries and
 ## 3. Naming and organisation
 
 ```text
-Location:  TBD (implementation not started; set by the first implementation
-           task of specs/001-phase1-local-bridge)
-Naming:    TBD (as above)
-Structure: TBD (as above; prefer arrange / act / assert)
+Location:  tests/l0 (unit: codec, allowlist, config), tests/l1 (component: addon request/response
+           rewriting, logging, hot reload), tests/l2 (integration: real mitmdump + curl + fake upstream);
+           shared fixtures: tests/conftest.py (config factory, no mitmproxy import) and
+           tests/l1/conftest.py (flow / addon factories)
+Naming:    files test_<topic>.py; functions test_<behaviour> (the case id goes into the function name,
+           e.g. test_tc_f01_allowlisted_request_is_rewritten_end_to_end);
+           parameterisation uses @pytest.mark.parametrize("input, expected", [...])
+Structure: Arrange / Act / Assert (split with comments when useful)
 ```
 
 ## 4. When tests are required
@@ -62,13 +66,14 @@ Structure: TBD (as above; prefer arrange / act / assert)
 ## 5. How to run
 
 ```text
-Run all:        TBD (implementation not started)
-Run one file:   TBD (implementation not started)
-Run with watch: TBD (implementation not started)
-CI test job:    none. The current CI only runs documentation checks
-                (npm run docs:check), see .github/workflows/docs-check.yml;
-                that workflow does not build or run any code tests and will be
-                extended once implementation starts
+Run all:        uv sync && uv run pytest (L0+L1+L2; no internet access needed)
+Run one file:   uv run pytest tests/l1/test_addon_request.py
+Run with watch: uv run pytest -f (requires the pytest-xdist plugin; not adopted this phase — when it is
+                not installed, re-run uv run pytest manually)
+CI test job:    L0: .github/workflows/python-tests.yml (runs uv sync --frozen + uv run pytest tests/l0 -q
+                on pull_request and pushes to main);
+                L1/L2 need mitmdump, curl and local ports, so they run locally only;
+                documentation checks are handled separately by .github/workflows/docs-check.yml
 ```
 
 Documentation-check workflow: [docs-check.yml](../../.github/workflows/docs-check.yml) (runs `npm run docs:check` and `npm run typecheck` on pull requests and pushes to `main`).

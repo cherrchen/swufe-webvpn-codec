@@ -1,6 +1,6 @@
 # WrdCodec Library API
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [wrd-codec-library.md](wrd-codec-library.md)
 
@@ -99,6 +99,27 @@ Defaults: `webvpnHost = webvpn.swufe.edu.cn`, `key = iv = wrdvpnisthebest!`.
 - Port: `-{port}` is written only when a port exists and differs from the scheme default (`http` 80 / `https` 443).
 - An empty path is treated as `/`; when the input URL carries a fragment, the `#fragment` is preserved after the query.
 
+## Python implementation mapping
+
+Authoritative implementation: `swufe_bridge/wrd_codec.py` (landed in M1).
+
+```python
+class WrdCodec:
+    def __init__(self, key: str | bytes = "wrdvpnisthebest!", iv: str | bytes = "wrdvpnisthebest!",
+                 webvpn_host: str = "webvpn.swufe.edu.cn") -> None: ...
+    def encrypt_host(self, host: str) -> str: ...
+    def decrypt_host(self, token: str) -> str: ...
+    def encode_url(self, ordinary_url: str, webvpn_base: str | None = None) -> str: ...
+    def decode_url(self, webvpn_url: str) -> str: ...
+```
+
+- Method mapping: `encryptHost` → `encrypt_host`, `decryptHost` → `decrypt_host`, `encodeUrl` → `encode_url` (second parameter is `webvpn_base`, defaulting to `https://{webvpn_host}`), `decodeUrl` → `decode_url`.
+- `key` / `iv` accept `str` (encoded as UTF-8) or `bytes` and must be 16 bytes long; the defaults come from the module constants `DEFAULT_KEY` / `DEFAULT_IV` / `DEFAULT_WEBVPN_HOST`.
+- AES implementation: `cryptography`'s `Cipher(algorithms.AES(key), CFB(iv))` (i.e. CFB128, equivalent to the prototype's `segment_size=128`; TC-A02 is the gate vector); pycryptodome is not used (see [dependency-policy.md](../development/dependency-policy.md)).
+- Errors uniformly raise `WrdCodecError` (a `ValueError` subclass), with messages kept from the prototype: `WRD AES-128 key must be 16 bytes`, `WRD AES-128 IV must be 16 bytes`, `unsupported scheme: ...`, `missing hostname`, `host token too short or not hex`, `invalid WebVPN path`, `WebVPN path missing scheme or host token`, `bad scheme token: ...`; in addition, when the bytes decrypted from a token are not valid UTF-8, a `WrdCodecError` is raised too (the usual outcome of a wrong key).
+- CLI: `uv run python -m swufe_bridge.wrd_codec encode <ordinary-url>` / `decode <webvpn-url>` (optional `--key` / `--iv` / `--webvpn-host`; on failure it prints `error: <message>` and returns `2`).
+- Tests: `tests/l0/test_wrd_codec.py` (TC-A01..TC-A05 plus the error branches).
+
 ## Errors and boundaries
 
 | Condition | Behaviour |
@@ -136,3 +157,4 @@ Defaults: `webvpnHost = webvpn.swufe.edu.cn`, `key = iv = wrdvpnisthebest!`.
 | Date | Change | Compatibility | Related spec / ADR |
 | ---- | ------ | ------------- | ------------------ |
 | 2026-09-20 | First version: 4 methods, algorithm facts, errors and boundaries, test vector ownership | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0005](../architecture/adr/ADR-0005-builtin-wrd-key-with-override.md) |
+| 2026-09-21 | Added "Python implementation mapping": module and method signatures, the `cryptography` CFB128 implementation, the `WrdCodecError` error surface, the CLI and the test location | Compatible (new implementation-mapping subsection, no interface semantics changed) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0005](../architecture/adr/ADR-0005-builtin-wrd-key-with-override.md) |

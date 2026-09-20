@@ -1,6 +1,6 @@
 # Operations Documentation
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 >
 > Chinese source of truth: [README.md](README.md)
 
@@ -48,9 +48,10 @@ Method:        The user installs and runs it locally; the app launches the
 Distribution:  TBD - embedded Python runtime versus an external mitmproxy
                executable is not yet chosen (size/signing trade-off, see
                ADR-0002, decided during implementation)
-Release flow:  TBD - implementation has not started and no release pipeline
-               exists; the current CI only runs documentation checks
-               (npm run docs:check)
+Release flow:  TBD - there is no release pipeline yet; the current CI runs
+               documentation checks (npm run docs:check) and the Python L0
+               tests (.github/workflows/python-tests.yml); packaging and
+               distribution belong to M4
 Rollback:      Stop the bridge -> confirm the system proxy is restored ->
                uninstall the local MITM CA; if needed, roll back to the
                previous installer

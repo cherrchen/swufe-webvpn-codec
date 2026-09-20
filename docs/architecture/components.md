@@ -1,6 +1,6 @@
 # 组件
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
 
 **用途**：列出系统的构成单元（模块、服务、包、进程、任务），说明各自职责、边界与依赖方向。
 **不写**：接口字段（→ [interfaces.md](interfaces.md)）、数据实体（→ [data-model.md](data-model.md)）。
@@ -9,7 +9,8 @@
 
 ## 组件清单
 
-> 本仓库当前为文档仓库，尚无实现代码；「代码位置」一律为 `TBD（实现首个任务确定）`。
+> 「代码位置」为已落地实现的真实路径；尚未实现的组件仍为 `TBD（实现首个任务确定）`。
+> M1（桥核心）已实现 WRD Codec、Bridge Addon（含配置面与 sidecar 入口）与 Allowlist Store 的库层；Electron 侧组件在 M2 起落地。
 
 | 组件 | 类型 | 职责（一句话） | 代码位置 | 状态 |
 | ---- | ---- | -------------- | -------- | ---- |
@@ -17,11 +18,11 @@
 | Login WebView | 进程内模块（Electron Renderer / BrowserWindow） | 承载官方 WebVPN / CAS 登录并保证防环 | TBD（实现首个任务确定） | Planned |
 | Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与失效检测 | TBD（实现首个任务确定） | Planned |
 | Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、管理进程捕获、代理冲突检测 | TBD（实现首个任务确定） | Planned |
-| WRD Codec | 进程内库（App 与 sidecar 共享） | hostname 加解密与 URL 互转（纯函数，无 IO） | TBD（实现首个任务确定） | Planned |
-| Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入 | TBD（实现首个任务确定） | Planned |
-| Cert Manager | 进程内模块（Electron Main） | 本机 MITM CA 的安装/卸载与状态查询 | TBD（实现首个任务确定） | Planned |
-| Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | TBD（实现首个任务确定） | Planned |
-| Telemetry UI | 进程内模块（Electron Renderer） | 状态展示与调试日志面板 | TBD（实现首个任务确定） | Planned |
+| WRD Codec | 进程内库（App 与 sidecar 共享） | hostname 加解密与 URL 互转（纯函数，无 IO） | `swufe_bridge/wrd_codec.py` | Implemented (M1) |
+| Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入 | `swufe_bridge/addon.py`（响应反向改写纯函数 `swufe_bridge/rewrite.py`；配置面 `swufe_bridge/config.py`；进程入口 `swufe_bridge/sidecar.py`） | Implemented (M1) |
+| Cert Manager | 进程内模块（Electron Main） | 本机 MITM CA 的安装/卸载与状态查询 | TBD（实现首个任务确定；M1 起由 sidecar 的 `--confdir` 承载 mitmproxy CA 生成） | Planned |
+| Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | `swufe_bridge/allowlist.py`（匹配语义与校验）+ `swufe_bridge/config.py`（`AllowlistStore` 持久化） | Partial (M1: 库；M2: IPC 接入) |
+| Telemetry UI | 进程内模块（Electron Renderer） | 状态展示与调试日志面板 | TBD（实现首个任务确定；M1 的 `swufe-debug` stderr 行即其数据来源） | Planned |
 
 ## 组件关系
 
