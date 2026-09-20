@@ -22,3 +22,36 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# Python / uv
+# uv.lock and .python-version are deliberately NOT ignored: both belong in version control.
+.venv/
+venv/
+.virtualenv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+site-packages/
+.uv/
+.uv-cache/
+pip-wheel-metadata/
+pip-log.txt
+MANIFEST
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+.pytest_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
