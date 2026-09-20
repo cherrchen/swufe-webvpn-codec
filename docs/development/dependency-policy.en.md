@@ -1,6 +1,6 @@
 # Dependency Policy
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [dependency-policy.md](dependency-policy.md)
 
@@ -45,18 +45,25 @@ Risk:         <maintenance / security / size / transitive>
 ## 3. Versions and locking
 
 ```text
-Version policy: TBD   (exact pinning / semver ranges / other)
-Lockfile:       TBD   (committed or not, who updates it)
-Update cadence: TBD
+Version policy: Node side: npm + package-lock.json (committed); Python side: TBD (implementation has not started)
+Lockfile:       Node side package-lock.json is committed; Python side TBD (implementation has not started)
+Update cadence: TBD (cadence still to be decided)
 ```
 
 ## 4. Security and compliance
 
-- Vulnerability scanning tool: `TBD`;
-- Scan frequency and blocking threshold: `TBD`;
-- Licence allow/deny list: `TBD` (see also [security/](../security/README.md)).
+- Vulnerability scanning tool: `TBD` (implementation has not started);
+- Scan frequency and blocking threshold: `TBD` (implementation has not started);
+- Licence allow/deny list: `TBD` (implementation has not started; see also [security/](../security/README.md)).
 
-## 5. Dependencies of this template
+The project licence is MIT (see [LICENSE](../../LICENSE)).
 
-This template (a documentation scaffold) deliberately keeps dependencies minimal: `typescript`, `tsx`, `@types/node`, used only to run the documentation checks.
-The check scripts pull in no Markdown parser and no framework.
+## 5. Existing and planned dependencies
+
+| Dependency | Purpose | Notes |
+| ---------- | ------- | ----- |
+| Electron | desktop shell | rationale and cost in [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md) |
+| mitmproxy | TLS / HTTP2 / MITM, infrastructure-level dependency | see [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md); section 2 of this policy requires an ADR for it |
+| pycryptodome | used only by the archived prototype [wrd_codec.py](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/wrd_codec.py) | not a dependency of the current implementation |
+| sing-box | later TUN stage | not introduced in phase 1 |
+| typescript, tsx, `@types/node` | used only by this repository's documentation check scripts | Node side; no Markdown parser or framework pulled in |

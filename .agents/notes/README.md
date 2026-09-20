@@ -1,6 +1,6 @@
 # Notes（临时上下文）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：存放 Agent Session 交接、调试记录、调研与实验结论等**临时上下文**。
 **中文版本是 Source of Truth**；英文版见 [README.en.md](README.en.md)。
@@ -47,7 +47,7 @@
 
    ```text
    > Migrated to: <路径>
-   > Migrated on: <DATE>
+   > Migrated on: YYYY-MM-DD
    ```
 
 3. 保持 note 原样（不改写历史结论），必要时在文件头标注 `Status: Superseded`。

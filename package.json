@@ -2,7 +2,7 @@
   "name": "swufe-webvpn-codec",
   "version": "0.0.0",
   "private": true,
-  "description": "Documentation, agent-context and process scaffold for AI-assisted projects (GitHub template repository)",
+  "description": "SWUFE WebVPN Bridge — documentation-first scaffold: project knowledge, agent context and feature specs",
   "license": "MIT",
   "type": "module",
   "engines": {

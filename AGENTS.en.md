@@ -12,15 +12,17 @@
 ## 1. Project Identity
 
 ```text
-Project:          <PROJECT_NAME>
-Purpose:          <DESCRIPTION>
-Status:           TBD
-Primary language: TBD
-Repository type:  TBD
-Owner:            <OWNER>
+Project:          SWUFE WebVPN Bridge (repository swufe-webvpn-codec)
+Purpose:          An Electron desktop app for macOS / Windows providing a local bridge: after
+                  the user completes the official Wengine WebVPN (CAS/MFA) login, the local
+                  browser reaches allowlisted hosts through the WebVPN automatically
+                  (Phase 1 acceptance: the academic affairs site jwxt.swufe.edu.cn opens and works)
+Status:           Phase 1 documentation aligned (2026-09-20); implementation not started
+Primary language: Python 3 (bridge sidecar/Addon, WRD codec) + TypeScript (Electron app);
+                  this repository is currently a documentation repository
+Repository type:  Documentation-first (docs/ + specs/); implementation code to be added
+Owner:            cherrchen
 ```
-
-> When adopting this template, replace every field above with a real fact; keep `TBD` when unknown. Never guess.
 
 ## 2. Source of truth
 
@@ -32,6 +34,7 @@ Owner:            <OWNER>
 | External / internal interface contracts | [docs/api/](docs/api/README.en.md) |
 | UI/UX conventions | [docs/ui-ux/](docs/ui-ux/README.en.md) |
 | Feature what/why/how | [specs/](specs/README.en.md) |
+| Phase 1 feature implementation and verification | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Technical decisions (why) | [docs/architecture/adr/](docs/architecture/adr/README.en.md) |
 | Testing strategy | [docs/development/testing-strategy.md](docs/development/testing-strategy.md) |
 | Documentation rules and language policy | [docs/development/documentation-rules.md](docs/development/documentation-rules.md) |
@@ -57,7 +60,7 @@ Minimum sufficient context
 
 | Task type | Required reading |
 | --------- | ---------------- |
-| New feature / behaviour change | this file, `specs/<id>-<name>/` (spec/design/plan/tasks), related `docs/requirements/`, related `docs/architecture/` |
+| New feature / behaviour change | this file, `specs/001-phase1-local-bridge/` (spec/design/plan/tasks), related `docs/requirements/`, related `docs/architecture/` |
 | Bug fix | this file, the related spec or [docs/architecture/components.md](docs/architecture/components.md), [testing-strategy](docs/development/testing-strategy.md) |
 | Architecture change | [docs/architecture/overview.md](docs/architecture/overview.md), [components](docs/architecture/components.md), [ADR](docs/architecture/adr/README.en.md), related spec |
 | API change | [docs/api/](docs/api/README.en.md), [docs/architecture/interfaces.md](docs/architecture/interfaces.md), related spec |
@@ -127,7 +130,7 @@ See [docs/verification/verification-strategy.md](docs/verification/verification-
 
 ## 9. Related entry points
 
-- [README.md](README.md) — template overview
+- [README.md](README.md) — project overview (positioning, scope, documentation system)
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contribution flow and review requirements
 - [docs/README.md](docs/README.md) — documentation index
 - [specs/README.md](specs/README.md) — spec system

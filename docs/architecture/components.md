@@ -1,6 +1,6 @@
 # 组件
 
-> Status: TBD ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：列出系统的构成单元（模块、服务、包、进程、任务），说明各自职责、边界与依赖方向。
 **不写**：接口字段（→ [interfaces.md](interfaces.md)）、数据实体（→ [data-model.md](data-model.md)）。
@@ -9,43 +9,174 @@
 
 ## 组件清单
 
+> 本仓库当前为文档仓库，尚无实现代码；「代码位置」一律为 `TBD（实现首个任务确定）`。
+
 | 组件 | 类型 | 职责（一句话） | 代码位置 | 状态 |
 | ---- | ---- | -------------- | -------- | ---- |
-| TBD | 模块 / 服务 / 包 / 进程 | TBD | TBD | TBD |
+| App Shell | 进程内模块（Electron Main） | 窗口/托盘（可选）、配置持久化，并作为 Main 侧编排入口暴露 preload IPC | TBD（实现首个任务确定） | Planned |
+| Login WebView | 进程内模块（Electron Renderer / BrowserWindow） | 承载官方 WebVPN / CAS 登录并保证防环 | TBD（实现首个任务确定） | Planned |
+| Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与失效检测 | TBD（实现首个任务确定） | Planned |
+| Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、管理进程捕获、代理冲突检测 | TBD（实现首个任务确定） | Planned |
+| WRD Codec | 进程内库（App 与 sidecar 共享） | hostname 加解密与 URL 互转（纯函数，无 IO） | TBD（实现首个任务确定） | Planned |
+| Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入 | TBD（实现首个任务确定） | Planned |
+| Cert Manager | 进程内模块（Electron Main） | 本机 MITM CA 的安装/卸载与状态查询 | TBD（实现首个任务确定） | Planned |
+| Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | TBD（实现首个任务确定） | Planned |
+| Telemetry UI | 进程内模块（Electron Renderer） | 状态展示与调试日志面板 | TBD（实现首个任务确定） | Planned |
 
 ## 组件关系
 
+箭头方向表示「依赖 / 调用」方向；依赖严格单向，图中不存在反向依赖。
+
 ```mermaid
 flowchart TD
-    A["组件 A"] --> B["组件 B"]
+    Telemetry["Telemetry UI"] -->|"IF-001"| Shell["App Shell"]
+    Shell --> LoginWV["Login WebView"]
+    Shell --> SessionBroker["Session Broker"]
+    Shell --> ProxyOrch["Proxy Orchestrator"]
+    Shell --> CertMgr["Cert Manager"]
+    Shell --> AllowStore["Allowlist Store"]
+    Shell --> Codec["WRD Codec"]
+    SessionBroker --> LoginWV
+    ProxyOrch --> AllowStore
+    ProxyOrch -->|"IF-002"| Addon["Bridge Addon（sidecar）"]
+    ProxyOrch -->|"IF-004"| OSProxy["OS 代理 API"]
+    CertMgr -->|"IF-005"| OSTrust["OS 信任库"]
+    Addon -->|"IF-003"| Codec
 ```
 
-> 依赖方向必须与下方「依赖规则」一致；图中不允许出现反向依赖。
+说明：Telemetry UI 是叶子（只经 preload IPC 调用 App Shell），App Shell 是 Main 侧的组合根；Session Broker 读取 Login WebView 的 session，是 Cookie 的唯一读取点；Proxy Orchestrator 依赖 Allowlist Store 作为路由数据源，并经本地控制口驱动 sidecar 内的 Bridge Addon；WrdCodec 无 IO、不被任何组件反向依赖，由 Bridge Addon 与 App Shell 共同使用。
 
-## 组件详情模板
+## 组件详情
 
-```markdown
-### <组件名>
+### App Shell
 
-- 职责：……
-- 不负责：……
-- 输入：……
-- 输出：……
-- 依赖：……
-- 被谁依赖：……
-- 关键不变式：……
-- 相关测试：……
-- 相关 Spec / ADR：……
-```
+- 职责：窗口与托盘（托盘非必须）生命周期、配置持久化、Main 侧编排入口，并暴露 preload 接口 `window.swufeBridge`。
+- 不负责：不做流量改写（Bridge Addon）；不实现 allowlist 匹配逻辑（Allowlist Store）；不直接调用 OS 专有 API（集中在 Cert Manager 与 Proxy Orchestrator）。
+- 输入：Renderer 经 `window.swufeBridge` 的 IPC 调用；启动参数与用户数据目录。
+- 输出：IPC 响应（`BridgeStatus`、`AllowlistConfig`、CA 状态等）；`onDebugLog` 事件。
+- 依赖：Session Broker、Proxy Orchestrator、Cert Manager、Allowlist Store、WrdCodec、Login WebView。
+- 被谁依赖：Telemetry UI、Login WebView（经 preload）。
+- 关键不变式：应用退出必须触发系统代理清除（见 [data-model.md](data-model.md) INV-002）。
+- 相关测试：TC-H01、TC-D02。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)。
+
+### Login WebView
+
+- 职责：承载官方 WebVPN / CAS 登录流程（含 MFA），把登录后的 session 暴露给 Session Broker。
+- 不负责：不解析或自动填写密码；不参与流量改写；不做 allowlist 判定。
+- 输入：`webvpnBase`；用户交互。
+- 输出：登录后的会话（Cookie）与登录状态。
+- 依赖：App Shell（窗口宿主）。
+- 被谁依赖：App Shell、Session Broker。
+- 关键不变式：登录流量必须 bypass 本桥，`webvpn.swufe.edu.cn` / `authserver.swufe.edu.cn` 不得被二次包装（防环，见 INV-004）。
+- 相关测试：TC-D01、TC-D04。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)。
+
+### Session Broker
+
+- 职责：Cookie 的提取、存储与失效检测。
+- 不负责：不做 URL 改写；不持有学号/密码；不做 allowlist 判定。
+- 输入：登录 WebView 的 session partition；探测 URL 的响应（失效信号）。
+- 输出：`SessionState`（Cookie 集合）、登录/过期状态；供 Proxy Orchestrator 推送 sidecar。
+- 依赖：Login WebView 的 session。
+- 被谁依赖：App Shell、Proxy Orchestrator。
+- 关键不变式：Cookie 的唯一读取点；Cookie 不得进入日志（见 INV-001）。
+- 相关测试：TC-D01、TC-D02、TC-D03、TC-D04。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)。
+
+### Proxy Orchestrator
+
+- 职责：启停 mitm sidecar、设置/清除系统代理、管理进程捕获（local capture）、代理冲突检测。
+- 不负责：不做流量改写；不管理 CA（Cert Manager）；不直接读取 Cookie（经 Session Broker）。
+- 输入：`startBridge` / `stopBridge` IPC；OS 当前代理设置；`capturePids`。
+- 输出：`BridgeStatus`；系统代理指向；推送给 sidecar 的 `{allowlist, cookies, debug}` 配置。
+- 依赖：Allowlist Store、OS 代理 API（IF-004）、mitm sidecar 控制口（IF-002）。
+- 被谁依赖：App Shell。
+- 关键不变式：仅在「由本 App 设置」标记存在时清除系统代理（INV-002）；桥状态机固定为 `idle → starting → running`，`running → stopping → idle`，`starting → error → idle`。
+- 相关测试：TC-C01、TC-C02、TC-C03、TC-C04、TC-D03。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0004](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
+
+### WRD Codec
+
+- 职责：hostname 加解密与普通 URL ↔ WebVPN URL 互转（AES-128-CFB，`segment_size=128`）。
+- 不负责：不做 IO；不做 allowlist 判定；不做 HTTP 层改写。
+- 输入：host、普通/WebVPN URL、可选 `key`/`iv`。
+- 输出：加密 token、WebVPN URL、普通 URL。
+- 依赖：无。
+- 被谁依赖：Bridge Addon、App Shell。
+- 关键不变式：仅加密 hostname，path/query 明文；实现必须与已验证原型 `wrd_codec.py` 的向量一致（NFR-002）。
+- 相关测试：TC-A01、TC-A02、TC-A03、TC-A04、TC-A05。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)、[ADR-0005](adr/ADR-0005-builtin-wrd-key-with-override.md)。
+
+### Bridge Addon
+
+- 职责：对命中 allowlist 的请求做 WRD 改写与 Cookie 注入；对响应做反向改写；产出调试日志事件。
+- 不负责：不做 UI；不直接读写用户配置（只接受下发的配置）；不依赖 Renderer/UI；不做会话采集。
+- 输入：经本机桥的 HTTP/HTTPS 请求与响应；下发的 `{allowlist, cookies, debug}`。
+- 输出：改写到 WebVPN 形态的上行请求；反向改写后的响应；调试日志事件（域名 + 是否改写成功）。
+- 依赖：WrdCodec。
+- 被谁依赖：Proxy Orchestrator（经控制口）。
+- 关键不变式：非 allowlist 流量直连不改写（C-004）；`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 硬编码排除（INV-004）；日志不含 Cookie 与正文（INV-001）。
+- 相关测试：TC-F01、TC-F02、TC-F03、TC-F04、TC-D04。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)、[ADR-0005](adr/ADR-0005-builtin-wrd-key-with-override.md)。
+
+### Cert Manager
+
+- 职责：本机 MITM CA 的生成/安装/卸载与状态查询。
+- 不负责：不自研 PKI（复用 mitmproxy 的 CA 机制）；不做系统代理设置。
+- 输入：`installCa` / `uninstallCa` / `getCaStatus` IPC；mitmproxy 专用 confdir。
+- 输出：`{ok, message}`、CA 状态（installed / trusted）。
+- 依赖：OS 信任库（IF-005）。
+- 被谁依赖：App Shell、Proxy Orchestrator（开桥前检查 CA 可用性）。
+- 关键不变式：CA 私钥仅本机、不上传（REQ-010、NFR-003）。
+- 相关测试：TC-E01、TC-E02、TC-E03。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
+
+### Allowlist Store
+
+- 职责：主机列表与 `*.swufe.edu.cn` 通配选项的读写，并提供路由判定所需的匹配语义。
+- 不负责：不做 HTTP 层改写；不做系统代理或 CA 管理。
+- 输入：`setAllowlist` IPC 与匹配查询。
+- 输出：`AllowlistConfig`；匹配结果。
+- 依赖：无（本地 JSON）。
+- 被谁依赖：App Shell、Proxy Orchestrator。
+- 关键不变式：主机以小写存储、精确匹配；默认必含 `jwxt.swufe.edu.cn`（INV-003）。
+- 相关测试：TC-B01、TC-B02、TC-B03、TC-B04、TC-B05。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)。
+
+### Telemetry UI
+
+- 职责：状态条、日志面板、allowlist / CA / 进程捕获 / 调试日志开关等界面（Renderer）。
+- 不负责：不直接调用 OS API；不做改写；不持有 Cookie 明文。
+- 输入：`BridgeStatus`、`DebugLogEvent`、`AllowlistConfig`、CA 状态。
+- 输出：用户操作对应的 IPC 调用。
+- 依赖：App Shell（经 preload IPC）。
+- 被谁依赖：无（叶子）。
+- 关键不变式：错误不得仅靠颜色表达（无障碍）；日志面板默认不展示正文与 Cookie。
+- 相关测试：TC-H01、TC-H02、TC-F04。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)。
 
 ## 依赖规则
 
 | 规则 | 说明 |
 | ---- | ---- |
-| TBD | 例如：上层可依赖下层，反向依赖禁止 |
+| WRD Codec 为纯函数、无 IO | 被 Bridge Addon 与 App（App Shell）共同使用；不依赖任何其它组件，也不做网络/文件访问 |
+| Bridge Addon 不得依赖 Renderer/UI | addon 只依赖 WrdCodec 与下发配置；不得引用 Electron/界面代码，保证 sidecar 可独立运行 |
+| Session Broker 是 Cookie 唯一读取点 | 其它组件（含 Bridge Addon）只能通过 Orchestrator 下发的 Cookie 使用会话，不得自行读取登录 session |
+| OS 差异集中在 Cert Manager 与 Proxy Orchestrator | 其余组件不得直接调用 OS 专有 API（代理、信任库、进程枚举） |
+| Allowlist Store 是路由判定的唯一数据源 | 请求改写与否只由它（及其匹配语义）决定，禁止在 addon/UI 中另建主机名单 |
+| 单向依赖 | Renderer/UI 只能经 preload IPC 调用 Main；Main 不得反向依赖 Renderer；组件图中不允许反向依赖 |
 
 ## 边界与所有权
 
 | 组件 | 负责人 | 修改前必须确认 |
 | ---- | ------ | -------------- |
-| TBD | <OWNER> | TBD |
+| App Shell | cherrchen | IPC 边界与 [interfaces.md](interfaces.md)、[api/electron-ipc.md](../api/electron-ipc.md) 是否同步 |
+| Login WebView | cherrchen | 防环策略（INV-004）是否仍成立 |
+| Session Broker | cherrchen | Cookie 策略与「唯一读取点」约束是否保持 |
+| Proxy Orchestrator | cherrchen | 代理冲突与清除策略（ADR-0004、INV-002）是否改变 |
+| WRD Codec | cherrchen | codec 向量（NFR-002）与默认 key/iv 语义（ADR-0005）是否受影响 |
+| Bridge Addon | cherrchen | 改写策略、allowlist 语义与日志最小化（C-004、INV-001、INV-004）是否受影响 |
+| Cert Manager | cherrchen | CA / 信任模型（ADR-0002、REQ-010）是否改变 |
+| Allowlist Store | cherrchen | 默认值与通配语义（INV-003）是否改变 |
+| Telemetry UI | cherrchen | 是否引入新的 IPC 或展示敏感数据 |

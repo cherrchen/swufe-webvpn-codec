@@ -1,26 +1,26 @@
 # UI / UX 文档
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：记录界面结构、交互约定、状态与可访问性要求。
 **不写**：实现细节（框架、组件库、样式方案 → 属于 Spec 或 ADR）、接口字段（→ [docs/api/](../api/README.md)）。
 
-## 何时使用
-
-- 项目没有用户界面 ⇒ 保留本 README，说明 `无 UI（原因：TBD）`，不创建其它文件。
-- 项目有用户界面 ⇒ 按下表拆分文件，避免单文件膨胀。
+## 界面清单
 
 | 文件 | 内容 |
 | ---- | ---- |
-| `docs/ui-ux/<surface>.md` | 单个界面 / 页面的结构、状态、交互 |
-| `docs/ui-ux/design-system.md` | 通用组件与视觉约定 |
+| [main-window.md](main-window.md) | 主窗口（第一期唯一界面）：结构、状态、交互、文案 |
+
+第一期只有主窗口一个界面；托盘图标非必须，是否实现未定（见 [main-window.md](main-window.md) 的开放问题）。设计系统/视觉规范文档 `TBD`（第一期未定义）。
+
+> 新增界面时在上表补一行，并按下方「界面文档模板」新建 `docs/ui-ux/<surface>.md`。
 
 ## 界面文档模板
 
 ```markdown
 # <界面名称>
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 ## 目标
 
@@ -70,5 +70,5 @@ flowchart TD
 ## 维护规则
 
 1. 影响用户可见行为的改动，必须检查 [requirements/](../requirements/README.md) 与对应 Spec 的 `ui-ux.md`。
-2. 设计稿或原型必须通过 `<LINK>` 引用（不要复制到仓库，除非有明确理由）。
+2. 设计稿或原型以完整 URL（或仓库内相对路径）引用，不要复制到仓库，除非有明确理由。
 3. 未定的视觉细节标 `TBD`；不要编造设计系统。

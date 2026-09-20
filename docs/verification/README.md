@@ -1,6 +1,6 @@
 # 验证（Verification）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：本目录定义「什么算已验证」，以及需求与验证的映射要求。
 它是完成标准（Definition of Done）的 Source of Truth 之一；测试实现细节见 [testing-strategy.md](../development/testing-strategy.md)。

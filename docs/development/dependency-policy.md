@@ -1,6 +1,6 @@
 # 依赖策略
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：规定引入外部依赖前的评估要求。目标是**降低长期风险**，不是禁止依赖。
 
@@ -43,18 +43,25 @@ Risk:         <maintenance / security / size / transitive>
 ## 3. 版本与锁定
 
 ```text
-Version policy: TBD   （精确锁定 / 语义化范围 / 其他）
-Lockfile:       TBD   （是否提交、由谁更新）
-Update cadence: TBD
+Version policy: Node 侧：npm + package-lock.json（已提交）；Python 侧：TBD（实现未开始）
+Lockfile:       Node 侧 package-lock.json 已提交；Python 侧 TBD（实现未开始）
+Update cadence: TBD（更新节奏待决策）
 ```
 
 ## 4. 安全与合规
 
-- 依赖漏洞扫描工具：`TBD`；
-- 扫描频率与阻断阈值：`TBD`；
-- 许可证白名单 / 黑名单：`TBD`（可参考 [security/](../security/README.md)）。
+- 依赖漏洞扫描工具：`TBD`（实现未开始）；
+- 扫描频率与阻断阈值：`TBD`（实现未开始）；
+- 许可证白名单 / 黑名单：`TBD`（实现未开始；可参考 [security/](../security/README.md)）。
 
-## 5. 本模板自身的依赖
+项目许可为 MIT（见 [LICENSE](../../LICENSE)）。
 
-本模板（文档脚手架）刻意保持最小依赖：`typescript`、`tsx`、`@types/node`，仅用于运行文档检查脚本。
-检查脚本不引入 Markdown parser 或框架。
+## 5. 本项目既有与计划依赖
+
+| 依赖 | 用途 | 说明 |
+| ---- | ---- | ---- |
+| Electron | 桌面壳 | 理由与代价见 [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md) |
+| mitmproxy | TLS / HTTP2 / MITM 基础设施级依赖 | 见 [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md)；按本策略第 2 节须记 ADR |
+| pycryptodome | 仅归档原型 [wrd_codec.py](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/wrd_codec.py) 使用 | 不作为当前实现依赖 |
+| sing-box | 后续 TUN 阶段 | 第一期不引入 |
+| typescript、tsx、`@types/node` | 仅用于本仓库文档检查脚本 | Node 侧，不引入 Markdown parser 或框架 |

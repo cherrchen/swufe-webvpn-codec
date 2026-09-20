@@ -1,6 +1,6 @@
 # 开发（Development）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：本目录是**开发实践规范**（Level B — Guidance）的集合：流程、编码规范、测试策略、文档规则、依赖策略。
 它约束「怎么做」，不定义「做什么」（→ [requirements/](../requirements/README.md)）或「是什么」（→ [architecture/](../architecture/README.md)）。

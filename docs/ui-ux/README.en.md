@@ -1,28 +1,28 @@
 # UI / UX Documentation
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [README.md](README.md)
 
 **Purpose**: record interface structure, interaction conventions, states and accessibility requirements.
 **Do not write**: implementation detail (framework, component library, styling approach → spec or ADR), interface fields (→ [docs/api/](../api/README.md)).
 
-## When to use this directory
-
-- No user interface ⇒ keep this README and state `No UI (reason: TBD)`; create no other files.
-- User interface exists ⇒ split files as below instead of growing one document.
+## Screen inventory
 
 | File | Content |
 | ---- | ------- |
-| `docs/ui-ux/<surface>.md` | structure, states and interactions of one screen |
-| `docs/ui-ux/design-system.md` | shared components and visual conventions |
+| [main-window.md](main-window.md) | Main window (the only Phase 1 screen): structure, states, interactions, copy |
+
+Phase 1 has exactly one screen, the main window; the tray icon is optional and whether it ships is undecided (see the open questions in [main-window.md](main-window.md)). The design-system / visual-conventions document is `TBD` (not defined for Phase 1).
+
+> When adding a screen, add a row above and create `docs/ui-ux/<surface>.md` from the template below.
 
 ## Screen document template
 
 ```markdown
 # <screen name>
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 ## Goal
 
@@ -72,5 +72,5 @@ flowchart TD
 ## Maintenance rules
 
 1. Changes affecting user-visible behaviour must check [requirements/](../requirements/README.md) and the spec's `ui-ux.md`.
-2. Reference design files or prototypes by `<LINK>` rather than copying them into the repository unless there is a stated reason.
+2. Reference design files or prototypes by full URL (or a repository-relative path) rather than copying them into the repository, unless there is a stated reason.
 3. Undecided visual detail stays `TBD`; never invent a design system.

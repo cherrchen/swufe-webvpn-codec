@@ -1,6 +1,6 @@
 # Verification Strategy
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [verification-strategy.md](verification-strategy.md)
 
@@ -83,13 +83,25 @@ A feature must consider at least:
 ## 6. Project override
 
 ```text
-Additional checks:     TBD
-Exemptions:            TBD
-Required reviewers:    TBD
-Release gate:          TBD
+Additional checks:     Every PR: L0 (codec vectors TC-A01..TC-A05 + allowlist unit tests TC-B01..TC-B03)
+                       Every PR: L1 components and L2 local integration (addon against a fake upstream /
+                       mitmdump + curl)
+                       Before release: L3 acceptance on real hardware (TC-G01..TC-G04, requires the
+                       tester's own account)
+Exemptions:            CI currently runs documentation checks only (npm run docs:check) and no code
+                       tests; code tests join CI once the implementation repository exists
+Required reviewers:    cherrchen
+Release gate:          all P0 cases pass;
+                       registrar browser acceptance passes on at least one desktop OS
+                       (target: both macOS and Windows);
+                       no open blocking defects;
+                       no system proxy left behind after stop or session expiry
 ```
 
-> Adopting projects tighten or extend the requirements here. **Overrides belong in this section**, never scattered across specs.
+- Level definitions, the case inventory and how to run things are in [testing-strategy.md](../development/testing-strategy.md);
+- The phase 1 case set, priorities and exit criteria are in [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md).
+
+> This project's coverage requirements are sourced from the `Project override` block above: tighten or extend them here only, never scattered across specs.
 
 ## 7. When to re-verify
 

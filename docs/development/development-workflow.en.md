@@ -1,6 +1,6 @@
 # Development Workflow
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [development-workflow.md](development-workflow.md)
 
@@ -78,11 +78,12 @@ Requirements:
 ## 5. Branches and commits
 
 ```text
-Branch naming:  TBD
-Commit message: TBD
+Default branch: main
+Branch naming:  TBD (to be decided before implementation starts)
+Commit message: existing commits all use `chore: <description>` (2 commits, 2026-09-20); the formal convention is TBD (to be decided before implementation starts)
 ```
 
-> Adopting projects must replace or delete this section.
+The documentation-check CI is [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml) (CI currently runs documentation checks only).
 
 ## 6. Relationship to agents
 

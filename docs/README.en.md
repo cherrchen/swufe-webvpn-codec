@@ -1,6 +1,6 @@
 # Documentation Index
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > The Chinese version is the source of truth: [README.md](README.md).
 
@@ -24,7 +24,7 @@ Nothing here is deleted when a single feature ships; temporary content belongs i
 | [planning/](planning/README.md) | Roadmap and milestones |
 | [archive/](archive/README.md) | Archived historical design material |
 
-Other repository entry points: [AGENTS.md](../AGENTS.md) (first entry point for agents), [README.md](../README.md) (template overview), [CONTRIBUTING.md](../CONTRIBUTING.md) (contribution flow), [specs/](../specs/README.md) (feature specs).
+Other repository entry points: [AGENTS.md](../AGENTS.md) (first entry point for agents), [README.md](../README.md) (project positioning, scope and document system), [CONTRIBUTING.md](../CONTRIBUTING.md) (contribution flow), [specs/](../specs/README.md) (feature specs).
 
 ## Reading principle
 

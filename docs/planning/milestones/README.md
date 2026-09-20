@@ -1,6 +1,6 @@
 # 里程碑（Milestones）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：定义「到达某个节点」的判定标准，使进度可被外部复核。
 **不写**：需求、设计、任务拆解（分别见 [requirements/](../../requirements/README.md)、[architecture/](../../architecture/README.md)、`specs/<id>/tasks.md`）。
@@ -17,11 +17,24 @@
 docs/planning/milestones/<MILESTONE_ID>-<short-name>.md
 ```
 
-例如：`M1-<short-name>.md` 或 `<DATE>-<short-name>.md`（按项目习惯二选一，保持统一）。
+例如：`M1-mitm-bridge.md`（编号式）或 `2026-09-20-packaging.md`（日期式）；按项目习惯二选一，并保持统一。
 
-> 目前没有里程碑文件；第一个里程碑确定后再创建，并同步更新 [roadmap.md](../roadmap.md)。
+## 里程碑清单
+
+| 里程碑 | 文件 | Status | 关联 Spec | 目标一句话 |
+| ------ | ---- | ------ | --------- | ---------- |
+| M0 预研 | [M0-pre-research.md](M0-pre-research.md) | Done | —（M0 交付文档包与需求规格，未归属 Spec） | WRD codec 验证、Phase 1 需求规格与文档包完成并归档 |
+| M1 桥核心 | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon 请求改写 + Cookie 注入 + 单测/集成测 |
+| M2 桌面编排 | [M2-desktop-orchestration.md](M2-desktop-orchestration.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Electron 可登录、开桥、设置系统代理、安装 CA |
+| M3 体验打磨 | [M3-experience-polish.md](M3-experience-polish.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI、调试日志、进程捕获、文案可用 |
+| M4 验收 | [M4-acceptance.md](M4-acceptance.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | 双平台 P0 用例通过并完成教务浏览器验收 |
+| M5 开源准备（可选） | 未建文件 | Candidate | — | Candidate，首个开源准备工作确定后再建文件 |
+
+> 阶段划分、依赖与 Spec 索引见 [roadmap.md](../roadmap.md)；M5 只有 roadmap 中的候选行，尚未建文件。
 
 ## 里程碑模板
+
+> 以下代码块是**模板示例**（占位符保持原样），新建里程碑文件时复制并按实际内容替换。
 
 ```markdown
 # <里程碑 ID>: <名称>

@@ -1,6 +1,6 @@
 # 文档规则
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：定义文档层级、语言要求、同步义务与防污染规则，是所有文档类变更的 Source of Truth。
 本文件回答的是一句话：**什么信息应该写在哪里，以及代码变更后必须同步什么。**
@@ -56,8 +56,8 @@ flowchart LR
 
 ```text
 > Status: Draft | TBD
-> Owner: <OWNER>
-> Last Reviewed: <DATE>
+> Owner: cherrchen
+> Last Reviewed: 2026-09-20
 ```
 
 普通 README、索引类文档**不需要**元数据。状态取值见 [glossary.md](../overview/glossary.md)。

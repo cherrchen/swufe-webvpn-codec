@@ -1,6 +1,6 @@
 # Agent 文档
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：本目录是 **Layer 2 — Agent Context** 的详细部分，规定 Coding Agent 如何工作、读什么、Session 结束时如何交接。
 根目录 [AGENTS.md](../../AGENTS.md) 是入口 Router；本目录是其展开说明。

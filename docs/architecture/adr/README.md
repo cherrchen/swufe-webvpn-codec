@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADR)
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：记录**为什么**这样设计。需求说明「做什么」，架构说明「是什么」，ADR 说明「为什么选它、放弃了什么、代价是什么」。
 本目录是技术决策的 Source of Truth。
@@ -41,11 +41,13 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 
 ## 索引
 
-> 尚未产生任何 ADR。建立第一条 ADR 时，在此处添加一行。
-
 | ADR | 标题 | Status | Date | 取代关系 |
 | --- | ---- | ------ | ---- | -------- |
-| — | — | — | — | — |
+| [ADR-0001](ADR-0001-wrd-rewrite-in-mitm-layer.md) | 不在 sing-box / mihomo 内核内实现 WRD 改写 | Accepted | 2026-09-20 | — |
+| [ADR-0002](ADR-0002-reuse-mitmproxy-for-tls.md) | 复用 mitmproxy 而非自研 TLS / MITM 栈 | Accepted | 2026-09-20 | — |
+| [ADR-0003](ADR-0003-electron-gui-for-phase-1.md) | Phase 1 采用 Electron 而非纯 CLI | Accepted | 2026-09-20 | — |
+| [ADR-0004](ADR-0004-refuse-start-when-system-proxy-in-use.md) | 系统代理被占用时拒绝启动 | Accepted | 2026-09-20 | — |
+| [ADR-0005](ADR-0005-builtin-wrd-key-with-override.md) | WRD 默认密钥内置并保留配置覆盖 | Accepted | 2026-09-20 | — |
 
 ## 规则
 

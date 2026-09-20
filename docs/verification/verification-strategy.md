@@ -1,6 +1,6 @@
 # 验证策略
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：定义验证的层次、证据要求、Feature 生命周期与完成标准（Definition of Done）。
 这是「完成」定义的 Source of Truth；具体项目的覆盖方式见本文件第 6 节。
@@ -81,13 +81,22 @@ Feature 至少需要考虑：
 ## 6. 项目覆盖（Project Override）
 
 ```text
-Additional checks:     TBD
-Exemptions:            TBD
-Required reviewers:    TBD
-Release gate:          TBD
+Additional checks:     每次 PR：L0（codec 向量 TC-A01..TC-A05 + allowlist 单测 TC-B01..TC-B03）
+                       每次 PR：L1 组件与 L2 本地集成（addon 对假上游 / mitmdump + curl）
+                       发版前：L3 真机教务验收（TC-G01..TC-G04，需测试者自有账号）
+Exemptions:            当前 CI 仅做文档检查（npm run docs:check），不运行代码测试；
+                       代码测试在实现仓库建立后接入 CI
+Required reviewers:    cherrchen
+Release gate:          所有 P0 用例通过；
+                       至少一侧桌面 OS 的教务浏览器验收通过（目标 macOS 与 Windows 双侧）；
+                       无未决阻断缺陷；
+                       关闭或会话过期后无残留系统代理
 ```
 
-> 使用本模板的项目在此补充或收紧要求；**覆盖必须写在这里**，而不是散落在各 Spec 中。
+- 层次定义、用例清单与运行方式见 [testing-strategy.md](../development/testing-strategy.md)；
+- Phase 1 的用例集、优先级与出口准则见 [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)。
+
+> 本项目的覆盖要求以本节的 `Project Override` 为 Source of Truth：新增或收紧要求只改这里，不散落到各 Spec。
 
 ## 7. 何时重新验证
 

@@ -35,7 +35,7 @@
 
 ```text
 Context Summary
-- Project:            <PROJECT_NAME / <DESCRIPTION>
+- Project:            <PROJECT_NAME>（<DESCRIPTION>）
 - Status:             当前阶段与依据（文件路径）
 - Current work:       相关 Spec 路径与状态
 - Task type:          <分类>

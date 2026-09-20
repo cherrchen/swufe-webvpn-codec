@@ -1,6 +1,6 @@
 # .agents —— Agent Skills 与临时 Notes
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：存放与具体 AI 平台无关的 Agent 指令（Skills）和临时上下文（Notes）。
 **中文版本是 Source of Truth**；英文版见各自 `.en.md`（`.agents/notes/**` 不强制双语，见 [documentation-rules.md](../docs/development/documentation-rules.md)）。

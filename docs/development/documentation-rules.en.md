@@ -1,6 +1,6 @@
 # Documentation Rules
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [documentation-rules.md](documentation-rules.md)
 
@@ -58,8 +58,8 @@ Long-lived design documents (Level A) should start with:
 
 ```text
 > Status: Draft | TBD
-> Owner: <OWNER>
-> Last Reviewed: <DATE>
+> Owner: cherrchen
+> Last Reviewed: 2026-09-20
 ```
 
 Plain READMEs and index documents do **not** need metadata. Status values are defined in [glossary.md](../overview/glossary.md).

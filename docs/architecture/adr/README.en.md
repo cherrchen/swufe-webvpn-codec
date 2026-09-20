@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADR)
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [README.md](README.md)
 
@@ -43,11 +43,13 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 
 ## Index
 
-> No ADRs exist yet. Add a row here when the first one is created.
-
 | ADR | Title | Status | Date | Supersedes |
 | --- | ----- | ------ | ---- | ---------- |
-| — | — | — | — | — |
+| [ADR-0001](ADR-0001-wrd-rewrite-in-mitm-layer.en.md) | Do not implement WRD rewriting inside the sing-box / mihomo kernel | Accepted | 2026-09-20 | — |
+| [ADR-0002](ADR-0002-reuse-mitmproxy-for-tls.en.md) | Reuse mitmproxy instead of building a custom TLS / MITM stack | Accepted | 2026-09-20 | — |
+| [ADR-0003](ADR-0003-electron-gui-for-phase-1.en.md) | Use Electron for Phase 1 instead of a CLI-only tool | Accepted | 2026-09-20 | — |
+| [ADR-0004](ADR-0004-refuse-start-when-system-proxy-in-use.en.md) | Refuse to start when the system proxy is already in use | Accepted | 2026-09-20 | — |
+| [ADR-0005](ADR-0005-builtin-wrd-key-with-override.en.md) | Ship a built-in default WRD key with a configuration override | Accepted | 2026-09-20 | — |
 
 ## Rules
 

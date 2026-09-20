@@ -1,6 +1,6 @@
 # 计划（Planning）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：记录长期计划与里程碑，回答「先做什么、什么时候算到达某个节点」。
 **不写**：目标本身（→ [goals-and-non-goals.md](../overview/goals-and-non-goals.md)）、需求内容（→ [requirements/](../requirements/README.md)）、单个 Feature 的详细计划（→ `specs/<id>/plan.md`）。

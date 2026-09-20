@@ -12,15 +12,16 @@
 ## 1. Project Identity
 
 ```text
-Project:          <PROJECT_NAME>
-Purpose:          <DESCRIPTION>
-Status:           TBD
-Primary language: TBD
-Repository type:  TBD
-Owner:            <OWNER>
+Project:          SWUFE WebVPN Bridge（仓库 swufe-webvpn-codec）
+Purpose:          在 macOS / Windows 上以 Electron 桌面应用提供本机桥：用户完成官方网瑞达
+                  WebVPN（CAS/MFA）登录后，本机浏览器对 allowlist 内主机自动经 WebVPN 访问
+                  （第一期验收：教务 jwxt.swufe.edu.cn 可打开并操作）
+Status:           Phase 1 文档已对齐（2026-09-20）；实现未开始
+Primary language: Python 3（bridge sidecar/Addon、WRD codec）+ TypeScript（Electron 应用）；
+                  本仓库当前为文档仓库
+Repository type:  Documentation-first（docs/ + specs/），实现代码待加入
+Owner:            cherrchen
 ```
-
-> 首次使用本模板时，以上字段必须替换为真实事实；未知就保留 `TBD`，不要猜测。
 
 ## 2. Source of Truth
 
@@ -32,6 +33,7 @@ Owner:            <OWNER>
 | 外部 / 内部接口契约 | [docs/api/](docs/api/README.md) |
 | UI/UX 规范 | [docs/ui-ux/](docs/ui-ux/README.md) |
 | Feature 的 What/Why/How | [specs/](specs/README.md) |
+| 第一期 Feature 实现与验证 | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | 技术决策（为什么这样设计） | [docs/architecture/adr/](docs/architecture/adr/README.md) |
 | 测试策略 | [docs/development/testing-strategy.md](docs/development/testing-strategy.md) |
 | 文档规则与语言要求 | [docs/development/documentation-rules.md](docs/development/documentation-rules.md) |
@@ -57,7 +59,7 @@ Minimum sufficient context
 
 | 任务类型 | 必读 |
 | -------- | ---- |
-| 新 Feature / 功能变更 | 本文件、`specs/<id>-<name>/`（spec/design/plan/tasks）、相关 `docs/requirements/`、相关 `docs/architecture/` |
+| 新 Feature / 功能变更 | 本文件、`specs/001-phase1-local-bridge/`（spec/design/plan/tasks）、相关 `docs/requirements/`、相关 `docs/architecture/` |
 | Bug 修复 | 本文件、相关 spec 或 [docs/architecture/components.md](docs/architecture/components.md)、[testing-strategy](docs/development/testing-strategy.md) |
 | 架构变更 | [docs/architecture/overview.md](docs/architecture/overview.md)、[components](docs/architecture/components.md)、[ADR](docs/architecture/adr/README.md)、相关 spec |
 | API 变更 | [docs/api/](docs/api/README.md)、[docs/architecture/interfaces.md](docs/architecture/interfaces.md)、对应 spec |
@@ -127,7 +129,7 @@ Coding Agent 不得：
 
 ## 9. 相关入口
 
-- [README.md](README.md) —— 本模板仓库的整体说明
+- [README.md](README.md) —— 项目整体说明（定位、范围、文档体系）
 - [CONTRIBUTING.md](CONTRIBUTING.md) —— 贡献流程与评审要求
 - [docs/README.md](docs/README.md) —— 文档索引
 - [specs/README.md](specs/README.md) —— Spec 系统说明

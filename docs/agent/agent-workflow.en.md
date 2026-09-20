@@ -1,6 +1,6 @@
 # Agent Workflow
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [agent-workflow.md](agent-workflow.md)
 

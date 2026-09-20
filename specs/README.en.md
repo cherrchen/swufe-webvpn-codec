@@ -1,6 +1,6 @@
 # Feature Specs
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [README.md](README.md)
 
@@ -12,12 +12,20 @@ Spec-driven development turns `Prompt → Code` into
 
 ```text
 specs/<id>-<feature-name>/
-specs/001-user-authentication/     ← the shape, not a feature of this project
+specs/001-phase1-local-bridge/     ← the first spec of this project (phase 1 local bridge and academic-system browser acceptance)
 ```
 
 - `<id>` increments in steps of one (`001`, `002`, …) and is never reused;
 - `<feature-name>` is lower-case with hyphens;
 - the template directory `specs/_template/` is excluded from checks and takes no number.
+
+## Spec index
+
+| Spec | Title | Related REQs | Status | Link |
+| ---- | ----- | ------------ | ------ | ---- |
+| 001-phase1-local-bridge | phase 1 local bridge and academic-system browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | Draft | [spec.md](001-phase1-local-bridge/spec.md) |
+
+> Register one row per spec here, and mirror it in [roadmap.md](../docs/planning/roadmap.md); long-lived facts never live in a spec.
 
 ## Required files
 

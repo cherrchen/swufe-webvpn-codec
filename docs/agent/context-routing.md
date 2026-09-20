@@ -1,6 +1,6 @@
 # 上下文路由（Context Routing）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：定义「什么任务读什么文档」，替代「每次读取整个 docs」。
 本文件是 Agent 上下文加载策略的 Source of Truth；[AGENTS.md](../../AGENTS.md) 中的路由表是本文件的摘要版本。

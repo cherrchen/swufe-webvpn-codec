@@ -1,28 +1,30 @@
 # API Documentation
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [README.md](README.md)
 
 **Purpose**: this directory is the source of truth for **interface contracts**: fields, errors, versions, compatibility promises.
 Boundaries and stability policy: [architecture/interfaces.md](../architecture/interfaces.md). Data entities: [architecture/data-model.md](../architecture/data-model.md).
 
-## When to create files
+This repository has **no public HTTP API**: every Phase 1 interface is either in-process (Electron IPC), local inter-process (Electron Main ↔ mitm sidecar) or library-level.
 
-| Situation | File |
-| --------- | ---- |
-| Network interface exists (public or internal) | `docs/api/<surface>.md` (name by service or resource) |
-| Only a library-level public API exists | `docs/api/library-api.md` |
-| No interfaces yet | keep this README only |
+## Interface surface inventory
 
-> This template defines no interfaces. Do not create empty interface documents just to look complete.
+| File | Surface | Provider → Consumer | Form | Stability |
+| ---- | ------- | ------------------- | ---- | --------- |
+| [electron-ipc.md](electron-ipc.md) | Electron IPC, preload namespace `window.swufeBridge` | Electron Main → Renderer | in-process | Internal |
+| [bridge-control-protocol.md](bridge-control-protocol.md) | Bridge control protocol | Electron Main → mitm sidecar | inter-process (local only) | Internal / Evolving (two candidate implementations, undecided — see that document) |
+| [wrd-codec-library.md](wrd-codec-library.md) | WrdCodec library API (host encrypt/decrypt and URL conversion) | WrdCodec library → callers (bridge addon, app) | library-level | Evolving |
+
+> When adding a surface, add a row above and create `docs/api/<surface>.md` from the template below.
 
 ## Interface document template
 
 ```markdown
 # <surface name>
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 ## Scope
 

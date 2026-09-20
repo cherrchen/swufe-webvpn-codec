@@ -1,6 +1,6 @@
 # Session 交接（Session Handoff）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：定义 Session 结束、中断或转交时如何记录状态，使下一个 Agent 或人能在不读聊天记录的前提下继续工作。
 对应技能：[.agents/skills/session-handoff/SKILL.md](../../.agents/skills/session-handoff/SKILL.md)。

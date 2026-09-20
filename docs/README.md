@@ -1,6 +1,6 @@
 # 文档索引（Documentation Index）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > 中文版本是 Source of Truth；英文版本见 [README.en.md](README.en.md)。
 
@@ -24,7 +24,7 @@
 | [planning/](planning/README.md) | Roadmap 与里程碑 |
 | [archive/](archive/README.md) | 已归档的历史设计资料 |
 
-仓库根部的其它入口：[AGENTS.md](../AGENTS.md)（Agent 第一入口）、[README.md](../README.md)（模板说明）、[CONTRIBUTING.md](../CONTRIBUTING.md)（贡献流程）、[specs/](../specs/README.md)（Feature Spec）。
+仓库根部的其它入口：[AGENTS.md](../AGENTS.md)（Agent 第一入口）、[README.md](../README.md)（项目定位、范围与文档体系）、[CONTRIBUTING.md](../CONTRIBUTING.md)（贡献流程）、[specs/](../specs/README.md)（Feature Spec）。
 
 ## 阅读原则
 

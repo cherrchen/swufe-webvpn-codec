@@ -1,6 +1,6 @@
 # 需求（Requirements）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：本目录是项目**需求事实**的 Source of Truth。
 需求描述「做什么、为什么、达到什么标准」，**不描述如何实现**（实现见 [architecture/](../architecture/README.md) 与 [specs/](../../specs/README.md)）。

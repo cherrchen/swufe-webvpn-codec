@@ -1,6 +1,6 @@
 # 开发流程
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：定义从想法到合并的标准流程，人与 Coding Agent 使用同一套流程。
 **不写**：具体任务清单（→ 对应 Spec 的 `tasks.md`）、测试实现细节（→ [testing-strategy.md](testing-strategy.md)）。
@@ -77,11 +77,12 @@ Bug → Reproduce → Root Cause → Fix → Test → Documentation Impact
 ## 5. 分支与提交
 
 ```text
-Branch naming:  TBD
-Commit message: TBD
+Default branch: main
+Branch naming:  TBD（实现开始前确定）
+Commit message: 既有提交为 `chore: <说明>` 形式（2 条，2026-09-20）；正式约定 TBD（实现开始前确定）
 ```
 
-> 使用本模板的项目必须替换或删除。
+文档检查 CI 见 [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml)（当前 CI 只跑文档检查）。
 
 ## 6. 与 Agent 的关系
 

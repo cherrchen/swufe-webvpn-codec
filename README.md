@@ -1,50 +1,57 @@
-# <PROJECT_NAME>
+# SWUFE WebVPN Bridge
 
-> **AI Coding / Vibe Coding 项目文档与协作脚手架（GitHub Template Repository）**
+> macOS / Windows 上的 Electron 桌面应用：用户在 App 内完成官方网瑞达 WebVPN（CAS/MFA）登录后，本机 HTTP/HTTPS 流量中命中 allowlist 的请求由**本机桥**改写为 WebVPN URL 并携带会话，使本机浏览器能打开并操作教务 `jwxt.swufe.edu.cn`。它不是真 VPN。
 >
 > 中文版本是 Source of Truth；英文版本见 [README.en.md](README.en.md)。
 
-本仓库是一个**文档与协作模板**，不是可运行的应用。它让「人类开发者 + Coding Agent」在进入一个项目后，能够快速重建项目的意图、约束、架构、当前工作与验证策略，而不依赖聊天记录。
+## 现状
 
-> 设计理念：**Chat 是过程，Repository 才是长期记忆。**
+| 项 | 值 |
+| --- | --- |
+| 阶段 | Phase 1（第一期）文档已对齐（2026-09-20），实现未开始 |
+| 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)，实现代码待加入 |
+| 第一期 Feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
+| Owner | cherrchen |
+| License | [MIT](LICENSE) |
+| 文档版本 | 1.0 |
+| 初始化日期 | 2026-09-20 |
 
-模板中所有 `<PROJECT_NAME>`、`<DESCRIPTION>`、`<OWNER>`、`<DATE>`、`<LINK>`、`TBD` 都必须由真实项目事实替换。
-**不要为了让文档看起来完整而编造项目事实**，强制规则见 [AGENTS.md](AGENTS.md)。
+本仓库当前**只有文档**，没有可运行的应用：`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程。
 
----
+## 1. 它解决什么问题
 
-## 1. 这是什么
+校外访问校内 Web 资源依赖网瑞达（Wengine）WebVPN `webvpn.swufe.edu.cn`；统一身份认证经 `authserver.swufe.edu.cn`（CAS，可含 MFA）。
 
-**Documentation + Agent Context + Development Process Template。**
+WebVPN 是**应用层反向代理**，不是 SSLVPN/TUN，因此用户无法让本机普通浏览器或应用以「真实内网主机名」透明访问校内 HTTP/HTTPS 服务。
 
-它同时解决四类问题：
+本机桥补上的就是这一段：用户先完成官方登录，之后本机浏览器对 allowlist 内主机的请求由本机桥改写为 WebVPN URL 并携带 WebVPN 会话（**WRD 请求改写**，由 WrdCodec 实现）；响应中的 `Location`、`Set-Cookie` 以及 HTML/JS/JSON 里的校内绝对 URL 再经**响应反向改写**还原。客户端侧始终使用真实主机名，只有上行流量改走 WebVPN。
 
-1. **Project Knowledge Base** —— 长期存在的项目知识：目标、边界、需求、架构、数据模型、API、UI/UX、安全、测试、规范、运维、发布、Roadmap、ADR、Glossary。
-2. **Agent Runtime Context** —— 根目录 [AGENTS.md](AGENTS.md) 作为所有 Coding Agent 的第一入口。它是 **Router，不是 Documentation Dump**。
-3. **Spec-driven Development** —— 单个 Feature 走 `Idea → Requirement → Spec → Design → Plan → Tasks → Implementation → Verification → Documentation Update → Archive`，产物落在 [specs/](specs/README.md)。
-4. **Governance / Verification** —— `scripts/` 检查 + GitHub Actions + ADR + Verification 矩阵，防止文档漂移。
+相关事实见[项目概览](docs/overview/project-overview.md)、[目标与非目标](docs/overview/goals-and-non-goals.md)、[术语表](docs/overview/glossary.md)、[架构总览](docs/architecture/overview.md)。
 
-## 2. 这不是什么
+## 2. 第一期范围与验收
 
-- 不是 Framework、Runtime 或语言脚手架；
-- 不是 Application Template（不含业务代码、数据库、API、部署方案）；
-- 不是 Documentation Website / Docusaurus / MkDocs；
-- 不是 Agent Runtime / MCP Server / RAG / 编排器；
-- 不自动生成业务文档，也不自动修改业务代码。
+- **平台**：macOS 与 Windows 优先；Linux 不在第一期范围。
+- **验收**：本机浏览器能打开并操作教务 `jwxt.swufe.edu.cn` 页面。
+- **体验目标**：从「已登录」到「浏览器打开教务」≤ 3 次点击（不含 CAS 本身）。
+- **安全目标**：不存密码；MITM CA 可一键卸载；关闭后不留残留系统代理。
 
-## 3. 四层模型
+第一期明确不做：SSH / 数据库 / SMB / 任意 TCP·UDP；替代学校 SSLVPN 或 TUN 级真 VPN（TUN / sing-box 属后续阶段）；与 Clash / mihomo / sing-box 等对系统代理的链式共存（启动前检测到系统代理已被占用即拒绝启动并提示）；Linux。
+
+完整非目标清单（NG-001..NG-008）与目标（G-001..G-004）、需求（PR-001..PR-005、REQ-001..REQ-011、NFR-001..NFR-007）只在[目标与非目标](docs/overview/goals-and-non-goals.md)与 [docs/requirements/](docs/requirements/README.md) 定义，其它文档只引用 ID。
+
+## 3. 文档体系
 
 | Layer | 名称 | 位置 | 职责 |
 | ----- | ---- | ---- | ---- |
-| 1 | Project Knowledge | [`docs/`](docs/README.md) | 长期事实：目标、需求、架构、API、规范 |
+| 1 | Project Knowledge | [docs/](docs/README.md) | 长期事实：目标、需求、架构、API、规范 |
 | 2 | Agent Context | [AGENTS.md](AGENTS.md)、[docs/agent/](docs/agent/README.md)、[.agents/](.agents/README.md) | 告诉 Agent 读什么、能改什么、禁止什么 |
-| 3 | Feature Specs | [`specs/`](specs/README.md) | 单个 Feature 的 What/Why/How/Plan/Tasks/Verification |
-| 4 | Governance / Verification | [`scripts/`](scripts)、[.github/](.github)、[ADR](docs/architecture/adr/README.md)、[verification](docs/verification/README.md) | 检查、评审、决策记录、完成标准 |
+| 3 | Feature Specs | [specs/](specs/README.md) | 单个 Feature 的 What/Why/How/Plan/Tasks/Verification |
+| 4 | Governance / Verification | [scripts/](scripts)、[.github/](.github)、[ADR](docs/architecture/adr/README.md)、[verification](docs/verification/README.md) | 检查、评审、决策记录、完成标准 |
 
 ```mermaid
 flowchart TD
     A["Project Knowledge<br/>docs/"] --> B["Agent Context<br/>AGENTS.md + docs/agent/ + .agents/"]
-    B --> C["Feature Spec<br/>specs/&lt;id&gt;-&lt;name&gt;/"]
+    B --> C["Feature Spec<br/>specs/001-phase1-local-bridge/"]
     C --> D["Implementation"]
     D --> E["Verification"]
     E --> F["Documentation Update"]
@@ -55,19 +62,22 @@ flowchart TD
 
 ```text
 .
-├── AGENTS.md              # Coding Agent 第一入口（Router）
+├── AGENTS.md              # Layer 2：Coding Agent 第一入口（Router）
+├── README.md              # 本文件：项目定位、范围与文档体系
 ├── CONTRIBUTING.md        # 人类与 Agent 共用的贡献流程
 ├── docs/                  # Layer 1：长期项目知识库
 │   ├── overview/          #   项目是什么、目标与非目标、术语
-│   ├── requirements/      #   产品/功能/非功能需求
+│   ├── requirements/      #   产品 / 功能 / 非功能需求
 │   ├── architecture/      #   架构、组件、数据流、数据模型、接口、ADR
 │   ├── api/  ui-ux/       #   接口契约与界面规范
 │   ├── development/       #   流程、编码规范、测试策略、文档规则、依赖策略
 │   ├── agent/             #   Agent 工作流、上下文路由、Session 交接
 │   ├── verification/      #   验证策略与完成标准
-│   ├── security/  operations/  planning/  archive/
+│   ├── security/  operations/  planning/
+│   └── archive/           #   归档的历史设计资料（不是当前事实来源）
 ├── specs/                 # Layer 3：Feature Spec
-│   └── _template/         #   spec/design/plan/tasks/verification 模板
+│   ├── 001-phase1-local-bridge/   # 第一期本机桥：spec/design/plan/tasks/verification
+│   └── _template/         #   Spec 模板骨架
 ├── .agents/               # Layer 2：Agent Skills 与临时 Notes
 │   ├── skills/            #   平台无关的 Markdown 技能指令
 │   └── notes/             #   临时上下文（不是 Source of Truth）
@@ -75,50 +85,50 @@ flowchart TD
 └── .github/               # CI、PR 模板、Issue 模板
 ```
 
-## 5. 如何使用这个模板
+## 5. 新 Session / 新 Agent 从哪读起
 
-1. 在 GitHub 上点击 **Use this template**（或直接复制本仓库目录结构）。
-2. 全局替换 `<PROJECT_NAME>`、`<OWNER>`、`<DATE>`、`<LINK>` 等占位符。
-3. 填写 [docs/overview/project-overview.md](docs/overview/project-overview.md)。
-4. 填写 [docs/overview/goals-and-non-goals.md](docs/overview/goals-and-non-goals.md)。
-5. 填写 [docs/requirements/](docs/requirements/README.md) 下的需求文档。
-6. 填写 [docs/architecture/overview.md](docs/architecture/overview.md)。
-7. 按项目实际情况改写 [AGENTS.md](AGENTS.md)（尤其是 Project Identity 与 Context Routing）。
-8. 从 [specs/_template/](specs/_template/README.md) 复制出第一个 `specs/001-<feature-name>/`，开始第一个 Feature。
+```text
+AGENTS.md
+  ↓
+docs/overview/project-overview.md
+  ↓
+按任务分类读取（docs/agent/context-routing.md）
+```
 
-模板自身使用 Node.js + TypeScript 做文档检查，但**目标项目不必是 Node 项目**；检查脚本只读取 Markdown 文件。
+| 任务 | 从哪读起 |
+| ---- | -------- |
+| 第一期 Feature（实现 / 验证） | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md)（spec → design → plan → tasks → verification） |
+| 需求 | [docs/requirements/](docs/requirements/README.md)、[目标与非目标](docs/overview/goals-and-non-goals.md) |
+| 架构 / 组件 / 数据流 / 数据模型 | [docs/architecture/](docs/architecture/README.md) |
+| 接口契约 | [docs/api/](docs/api/README.md) |
+| 界面与交互 | [docs/ui-ux/](docs/ui-ux/README.md) |
+| 测试与验收 | [testing-strategy](docs/development/testing-strategy.md)、[docs/verification/](docs/verification/README.md) |
+| 安全 | [docs/security/](docs/security/README.md) |
+| 计划与里程碑 | [roadmap](docs/planning/roadmap.md)、[milestones](docs/planning/milestones/README.md) |
+| 接手他人工作 | [session-handoff](docs/agent/session-handoff.md)、[.agents/notes/](.agents/notes/README.md) |
 
-## 6. 语言规则（中英双语）
+**不要默认加载整个 `docs/`**：先分类任务，再读最小充分上下文。
 
-- `foo.md` 为中文主版本，是 **Source of Truth**；
-- `foo.en.md` 为英文对应版本，必须与中文版**语义同步**（不要求逐字翻译，但结构、结论、约束不得冲突）；
-- 模板文件同样成对存在；例外（不强制双语）：`**/_template/**`、`**/template.md`、`.agents/notes/**`、`docs/archive/**`、`.github/**`、session notes、自动生成报告。
-
-规则细节见 [docs/development/documentation-rules.md](docs/development/documentation-rules.md)。
-
-## 7. 本地校验
+## 6. 本地校验
 
 ```bash
 npm install
 npm run docs:check   # 链接 + 双语配对 + spec 结构，一次跑完
 ```
 
-单项命令：`npm run docs:links`、`npm run docs:i18n`、`npm run spec:check`、`npm run typecheck`。
-CI 配置见 [.github/workflows/docs-check.yml](.github/workflows/docs-check.yml)，仅在 `pull_request` 与 `push` 到 `main` 时执行文档检查，不做部署与发布。
+单项命令：`npm run docs:links`、`npm run docs:i18n`、`npm run spec:check`、`npm run typecheck`（各自只读 Markdown / TypeScript，不构建应用）。
 
-## 8. 设计原则
+CI 配置见 [.github/workflows/docs-check.yml](.github/workflows/docs-check.yml)：仅在 `pull_request` 与 push 到 `main` 时执行文档检查，不做部署与发布。
 
-- **Git-native**：只用 `Git + Markdown + Node.js + GitHub Actions`，不依赖任何 SaaS；Notion / Linear / Jira / Confluence 只能是可选集成。
-- **Markdown-first**：核心知识是普通 Markdown，可 diff、可迁移、对人可读、对 Agent 友好。
-- **AI Vendor Neutral**：文档只使用「Coding Agent」这一通用概念，不绑定 Claude Code / Codex / Cursor / Copilot 等任一工具。
-- **One Fact, One Source of Truth**：同一事实只在一个文档中定义，其它文档引用而非复制。
-- **Read the minimum sufficient context**：Agent 先分类任务，再读相关文档，而不是加载整个 `docs/`。
-- **Simple first**：不使用复杂 parser、AST compiler、数据库或 CLI 框架。
+## 7. 语言规则
 
-## 9. 非目标（当前）
+- `foo.md` 是中文主文档，也是 **Source of Truth**；
+- `foo.en.md` 是英文对应版本，必须与中文版**语义同步**：结构、结论、约束不得冲突（不要求逐字翻译）；
+- 不强制配对的例外：`specs/_template/`、`**/template.md`、`.agents/notes/` 下的 session notes 与调研记录、`docs/archive/`、`.github/`、自动生成报告；
+- `specs/001-phase1-local-bridge/` 的 Feature Spec 是交付记录，默认中文，不强制 `.en.md`。
 
-项目生成 CLI、Web UI、Documentation Website、Docusaurus、MkDocs、AI Agent Runtime、MCP Server、Vector Database、RAG、Agent Orchestrator、自动生成业务文档、自动修改代码、自动发布 Release —— 均**不在本次范围内**，未来可能追加。
+规则细节见 [documentation-rules.md](docs/development/documentation-rules.md)。
 
-## 10. License
+## 8. License
 
-[MIT](LICENSE)，版权与作者信息使用 `<OWNER>` 占位符。
+[MIT](LICENSE) © 2026 cherrchen。

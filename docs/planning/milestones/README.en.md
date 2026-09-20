@@ -1,6 +1,6 @@
 # Milestones
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [README.md](README.md)
 
@@ -19,11 +19,24 @@
 docs/planning/milestones/<MILESTONE_ID>-<short-name>.md
 ```
 
-Examples: `M1-<short-name>.md` or `<DATE>-<short-name>.md` — pick one convention per project and stay consistent.
+Examples: `M1-mitm-bridge.md` (numeric) or `2026-09-20-packaging.md` (date-based) — pick one convention per project and stay consistent.
 
-> No milestone files exist yet. Create the first one once it is defined, and update [roadmap.md](../roadmap.md) at the same time.
+## Milestone list
+
+| Milestone | File | Status | Related spec | One-line goal |
+| --------- | ---- | ------ | ------------ | ------------- |
+| M0 pre-research | [M0-pre-research.md](M0-pre-research.md) | Done | — (M0 delivers the document package and requirement specs; it belongs to no spec) | WRD codec verification, Phase 1 requirement specs and document package completed and archived |
+| M1 bridge core | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon request rewrite + cookie injection + unit/integration tests |
+| M2 desktop orchestration | [M2-desktop-orchestration.md](M2-desktop-orchestration.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Electron can log in, start the bridge, set the system proxy, install the CA |
+| M3 experience polish | [M3-experience-polish.md](M3-experience-polish.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI, debug logging, process capture and copy usable |
+| M4 acceptance | [M4-acceptance.md](M4-acceptance.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Dual-platform P0 cases pass and browser acceptance on the academic-affairs site is done |
+| M5 open-source preparation (optional) | no file yet | Candidate | — | Candidate; create the file once the first open-source preparation task is decided |
+
+> Phase breakdown, dependencies and the spec index live in [roadmap.md](../roadmap.md); M5 is only a candidate row in the roadmap and has no file yet.
 
 ## Milestone template
+
+> The block below is a **template example** (placeholders stay as-is); copy it when creating a milestone file and replace the placeholders with real content.
 
 ```markdown
 # <milestone id>: <name>

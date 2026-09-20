@@ -1,6 +1,6 @@
 # Notes (temporary context)
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 >
 > Chinese source of truth: [README.md](README.md)
 
@@ -47,7 +47,7 @@ When a note yields a long-lived conclusion:
 
    ```text
    > Migrated to: <path>
-   > Migrated on: <DATE>
+   > Migrated on: YYYY-MM-DD
    ```
 
 3. Leave the note unchanged (never rewrite history); mark `Status: Superseded` when useful.

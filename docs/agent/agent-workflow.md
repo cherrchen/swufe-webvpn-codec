@@ -1,6 +1,6 @@
 # Agent 工作流
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：定义 Coding Agent 的完整工作循环。人类流程见 [development-workflow.md](../development/development-workflow.md)；两者使用同一套产物，Agent 额外受本文件约束。
 

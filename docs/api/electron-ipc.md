@@ -1,0 +1,310 @@
+# Electron IPC（`window.swufeBridge`）
+
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+
+## 范围
+
+- 提供方：Electron Main 进程（Login WebView / Session Broker / Proxy Orchestrator / Cert Manager / Allowlist Store 的对外收口）。
+- 消费方：Renderer（主窗口 UI，见 [../ui-ux/main-window.md](../ui-ux/main-window.md)）。
+- 形态：进程内 IPC；preload 脚本暴露命名空间 `window.swufeBridge`（示例名）。
+- 稳定性：Internal —— 仅供本 App 内部消费，不对外承诺；破坏性变更需同步本文件 + [architecture/interfaces.md](../architecture/interfaces.md) + 相关 Spec。
+- 关联 Spec：[specs/001-phase1-local-bridge/spec.md](../../specs/001-phase1-local-bridge/spec.md)
+
+## 认证与授权
+
+不适用。调用双方是同一台机器上同一个应用的两个进程（Renderer 的命名空间由本 App 的 preload 注入），不存在网络边界、无外部调用方，也没有独立的用户身份或令牌概念；隔离由 Electron 的上下文隔离与 preload 白名单保证，故不引入认证与授权层。
+
+## 通用约定
+
+- 编码：字符串 UTF-8；签名与类型用 TypeScript 声明（见「类型定义」）。
+- 时间格式：ISO8601 字符串（如 `getSession().expiresAt`、`DebugLogEvent.ts`）。
+- 分页：无（返回集合均为本机小列表）。
+- 限流：无（本机进程内调用）。
+- 幂等：逐方法标注（见下表）；「是」表示以相同参数重复调用与调用一次结果等价。
+- 错误：方法可以 reject 一个携带错误码的错误，或通过 `BridgeStatus.error` 返回 `{ code, message }`；错误码全集与用户动作见 [错误模型](#错误模型)。
+
+| 方法 | 幂等 |
+| ---- | ---- |
+| `login` | 否（打开登录 WebView，属交互式流程） |
+| `logout` | 是 |
+| `getSession` | 是（只读） |
+| `startBridge` | 是（已在运行时保持 `running`） |
+| `stopBridge` | 是 |
+| `getStatus` | 是（只读） |
+| `getAllowlist` | 是（只读） |
+| `setAllowlist` | 是（整体覆盖写入） |
+| `installCa` / `uninstallCa` | 是 |
+| `getCaStatus` | 是（只读） |
+| `listCaptureCandidates` | 是（只读） |
+| `setCapturePids` | 是（整体覆盖写入） |
+| `setDebugLogging` | 是 |
+| `onDebugLog` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
+
+> 原包未逐条规定幂等性；上表是本文档对实现的约定。
+
+## 类型定义
+
+以下类型逐字取自归档原包的接口定义。
+
+```ts
+interface BridgeStatus {
+  state: 'idle' | 'starting' | 'running' | 'stopping' | 'error'
+  loggedIn: boolean
+  systemProxyEnabled: boolean
+  localCaptureEnabled: boolean
+  bridgePort?: number
+  error?: { code: string; message: string }
+}
+```
+
+```ts
+interface AllowlistConfig {
+  hosts: string[]           // 精确主机名
+  includeSwufeWildcard: boolean  // *.swufe.edu.cn
+}
+```
+
+```ts
+interface CaStatus {
+  installed: boolean
+  trusted: boolean
+}
+```
+
+```ts
+interface DebugLogEvent {
+  ts: string
+  host: string
+  rewritten: boolean
+  direction: 'request' | 'response'
+  detail?: string   // 短信息，无 body
+}
+```
+
+持久化实体（`AllowlistConfig` 的 `updatedAt`、`SessionState`、`AppSettings`）以 [architecture/data-model.md](../architecture/data-model.md) 为准；本文件只定义 IPC 表面类型。
+
+## 方法
+
+### `login(): Promise<void>`
+
+```ts
+login(): Promise<void>           // 打开登录 WebView
+```
+
+- 用途：打开登录 WebView，由用户在官方门户完成 CAS/MFA 认证，取得可用 WebVPN 会话（Session Broker）。
+- 输入：无。
+- 输出：`Promise<void>`；登录成功即「稳定取得可用 WebVPN 会话」（Cookie 名以实机为准），随后 `getStatus()` 的 `loggedIn` 为 `true`。
+- 错误：见 [错误模型](#错误模型)（未登录时启动桥会返回 `NOT_LOGGED_IN`）。
+
+### `logout(): Promise<void>`
+
+```ts
+logout(): Promise<void>          // 清 Cookie，若桥开启则停桥
+```
+
+- 用途：清除会话 Cookie；若桥正在运行则先停桥。
+- 输入：无。
+- 输出：`Promise<void>`。
+- 错误：见 [错误模型](#错误模型)（停桥失败时为 `BRIDGE_CRASH`）。
+
+### `getSession(): Promise<{ loggedIn: boolean; expiresAt?: string | null }>`
+
+```ts
+getSession(): Promise<{
+  loggedIn: boolean
+  expiresAt?: string | null      // 若可得
+}>
+```
+
+- 用途：查询当前会话状态。
+- 输入：无。
+- 输出：
+
+  | 字段 | 类型 | 必填 | 约束 | 说明 |
+  | ---- | ---- | ---- | ---- | ---- |
+  | `loggedIn` | `boolean` | 是 | — | 是否存在可用 WebVPN 会话 |
+  | `expiresAt` | `string \| null` | 否 | ISO8601 | 会话过期时间；若可得 |
+
+- 错误：见 [错误模型](#错误模型)。
+
+### `startBridge(): Promise<BridgeStatus>`
+
+```ts
+startBridge(): Promise<BridgeStatus>
+```
+
+- 用途：开启本机桥：启动 mitm sidecar、按需设置系统代理与进程捕获。
+- 输入：无（桥端口、allowlist、webvpnBase 等来自 `AppSettings` 与 Allowlist Store）。
+- 输出：`BridgeStatus`（见「类型定义」）；成功路径 `state` 由 `idle → starting → running`。
+- 错误：见 [错误模型](#错误模型)；开桥前若系统代理已被占用则以 `PROXY_CONFLICT` 拒绝启动（ADR-0004）。
+
+### `stopBridge(): Promise<BridgeStatus>`
+
+```ts
+stopBridge(): Promise<BridgeStatus>
+```
+
+- 用途：关闭本机桥：停 sidecar、停进程捕获，并清除由本 App 设置的系统代理。
+- 输入：无。
+- 输出：`BridgeStatus`；成功路径 `state` 经 `stopping` 回到 `idle`。
+- 错误：见 [错误模型](#错误模型)。
+
+### `getStatus(): Promise<BridgeStatus>`
+
+```ts
+getStatus(): Promise<BridgeStatus>
+```
+
+- 用途：读取桥的运行时状态（不持久化）。
+- 输入：无。
+- 输出：`BridgeStatus`；`error` 非空时表示处于错误态（如 `SESSION_EXPIRED`、`BRIDGE_CRASH`）。
+- 错误：见 [错误模型](#错误模型)。
+
+### `getAllowlist(): Promise<AllowlistConfig>`
+
+```ts
+getAllowlist(): Promise<AllowlistConfig>
+```
+
+- 用途：读取 allowlist（仅这些主机经 WebVPN 改写，其余直连）。
+- 输入：无。
+- 输出：`AllowlistConfig`；默认 `{"hosts":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false}`。
+- 错误：见 [错误模型](#错误模型)。
+
+### `setAllowlist(cfg: AllowlistConfig): Promise<void>`
+
+```ts
+setAllowlist(cfg: AllowlistConfig): Promise<void>
+```
+
+- 用途：整体覆盖写入 allowlist。
+- 输入：
+
+  | 字段 | 类型 | 必填 | 约束 | 说明 |
+  | ---- | ---- | ---- | ---- | ---- |
+  | `hosts` | `string[]` | 是 | 每项为合法 hostname，小写存储 | 精确匹配 |
+  | `includeSwufeWildcard` | `boolean` | 是 | 默认 `false` | 勾选后匹配 `swufe.edu.cn` 及 `.swufe.edu.cn` 后缀 |
+
+- 输出：`Promise<void>`。
+- 错误：见 [错误模型](#错误模型)（`hosts` 为空且未开通配时启动桥返回 `ALLOWLIST_EMPTY`）。
+
+### `installCa(): Promise<{ ok: boolean; message?: string }>`
+
+```ts
+installCa(): Promise<{ ok: boolean; message?: string }>
+```
+
+- 用途：把本机生成的 MITM CA 安装到系统信任库（复用 mitmproxy CA 机制）。
+- 输入：无。
+- 输出：`ok` 表示安装是否成功；`message` 为可选补充信息。
+- 错误：见 [错误模型](#错误模型)（未安装/未信任时为 `CA_MISSING`）。
+
+### `uninstallCa(): Promise<{ ok: boolean; message?: string }>`
+
+```ts
+uninstallCa(): Promise<{ ok: boolean; message?: string }>
+```
+
+- 用途：从系统信任库卸载本机 CA（一键可逆）。
+- 输入：无。
+- 输出：`ok` + 可选 `message`。
+- 错误：见 [错误模型](#错误模型)。
+
+### `getCaStatus(): Promise<CaStatus>`
+
+```ts
+getCaStatus(): Promise<{ installed: boolean; trusted: boolean }>
+```
+
+- 用途：查询 CA 是否已安装、是否被系统信任。
+- 输入：无。
+- 输出：`CaStatus`（见「类型定义」）。
+- 错误：见 [错误模型](#错误模型)。
+
+### `listCaptureCandidates(): Promise<Array<{ pid: number; name: string }>>`
+
+```ts
+listCaptureCandidates(): Promise<Array<{ pid: number; name: string }>>
+```
+
+- 用途：列出可供「进程捕获」（mitmproxy local mode）选择的进程（如 Chrome）。
+- 输入：无。
+- 输出：进程数组，每项含 `pid` 与 `name`。
+- 错误：见 [错误模型](#错误模型)。
+
+### `setCapturePids(pids: number[]): Promise<void>`
+
+```ts
+setCapturePids(pids: number[]): Promise<void>
+```
+
+- 用途：设置要捕获的进程集合（与系统代理可同时启用）。
+- 输入：
+
+  | 字段 | 类型 | 必填 | 约束 | 说明 |
+  | ---- | ---- | ---- | ---- | ---- |
+  | `pids` | `number[]` | 是 | 取值须来自 `listCaptureCandidates()`；空数组表示不启用进程捕获 | 整体覆盖写入 |
+
+- 输出：`Promise<void>`。
+- 错误：见 [错误模型](#错误模型)。
+
+### `setDebugLogging(enabled: boolean): Promise<void>`
+
+```ts
+setDebugLogging(enabled: boolean): Promise<void>
+```
+
+- 用途：开关调试日志（默认关；开启也只记录「域名 + 是否改写成功」，不记正文/请求体/Cookie）。
+- 输入：
+
+  | 字段 | 类型 | 必填 | 约束 | 说明 |
+  | ---- | ---- | ---- | ---- | ---- |
+  | `enabled` | `boolean` | 是 | 默认 `false` | 对应 `AppSettings.debugLogging` |
+
+- 输出：`Promise<void>`。
+- 错误：见 [错误模型](#错误模型)。
+
+### `onDebugLog(cb: (e: DebugLogEvent) => void): () => void`
+
+```ts
+// Main → Renderer 事件
+onDebugLog(cb: (e: DebugLogEvent) => void): () => void
+```
+
+- 用途：订阅 Main → Renderer 的调试日志事件（日志面板：域名 | 改写结果 | 时间）。
+- 输入：
+
+  | 字段 | 类型 | 必填 | 约束 | 说明 |
+  | ---- | ---- | ---- | ---- | ---- |
+  | `cb` | `(e: DebugLogEvent) => void` | 是 | — | 事件回调 |
+
+- 输出：取消订阅函数 `() => void`。
+- 事件负载：`DebugLogEvent`（见「类型定义」）；`detail` 允许短信息、禁止 body 与 Cookie。
+- 错误：见 [错误模型](#错误模型)。
+
+## 错误模型
+
+错误码全集（含义与用户动作）；`message` 为面向用户的原因描述。
+
+| 错误码 | 含义 | 用户动作 |
+| ------ | ---- | -------- |
+| `PROXY_CONFLICT` | 系统代理已占用 | 关闭其它代理 |
+| `CA_MISSING` | 未安装/未信任 CA | 去安装 |
+| `NOT_LOGGED_IN` | 无会话 | 去登录 |
+| `SESSION_EXPIRED` | 会话失效 | 重登 |
+| `BRIDGE_CRASH` | mitm 进程退出 | 查看日志/重启桥 |
+| `ALLOWLIST_EMPTY` | 无主机 | 添加主机 |
+
+会话失效处理后（停桥 → 清系统代理 → 停进程捕获 → 提示重登）的完整流程见 [../ui-ux/main-window.md](../ui-ux/main-window.md)。
+
+## 版本与兼容性
+
+- 版本策略：无独立版本号；稳定性为 Internal。
+- 破坏性变更流程：同一次变更内更新本文件 + [architecture/interfaces.md](../architecture/interfaces.md) + [specs/001-phase1-local-bridge/spec.md](../../specs/001-phase1-local-bridge/spec.md)，并在 PR 的 Breaking Changes 中说明。
+- 弃用流程：先在本文件标注 `Deprecated` 与替代方法，待 Renderer 全部迁移后删除。
+
+## 变更记录
+
+| 日期 | 变更 | 兼容性 | 关联 Spec / ADR |
+| ---- | ---- | ------ | --------------- |
+| 2026-09-20 | 首版：会话、桥控制、allowlist、证书、进程捕获、调试日志共 15 个方法/事件 | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |

@@ -1,26 +1,28 @@
 # API 文档
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：本目录是**接口契约**的 Source of Truth：字段、错误、版本、兼容性承诺。
 边界与稳定性策略见 [architecture/interfaces.md](../architecture/interfaces.md)；数据实体见 [architecture/data-model.md](../architecture/data-model.md)。
 
-## 何时创建文件
+本仓库**没有公网 HTTP API**：第一期全部接口都是本机进程内接口（Electron IPC）、本机进程间接口（Electron Main ↔ mitm sidecar）与库级 API。
 
-| 场景 | 文件 |
-| ---- | ---- |
-| 存在对外/对内网络接口 | `docs/api/<surface>.md`（例如按服务或按资源命名） |
-| 仅存在库级公共 API | `docs/api/library-api.md` |
-| 无接口 | 保留本 README，不创建其它文件 |
+## 接口面清单
 
-> 当前模板未定义任何接口；不要为了「看起来完整」而创建空接口文档。
+| 文件 | 接口面 | 提供方 → 消费方 | 形态 | 稳定性 |
+| ---- | ------ | --------------- | ---- | ------ |
+| [electron-ipc.md](electron-ipc.md) | Electron IPC，preload 暴露命名空间 `window.swufeBridge` | Electron Main → Renderer | 进程内 | Internal |
+| [bridge-control-protocol.md](bridge-control-protocol.md) | 桥控制协议 | Electron Main → mitm sidecar | 进程间（仅本机） | Internal / Evolving（两种实现方式未定，见该文档） |
+| [wrd-codec-library.md](wrd-codec-library.md) | WrdCodec 库 API（主机名加解密与 URL 互转） | WrdCodec 库 → 调用方（桥 addon、App） | 库级 | Evolving |
+
+> 新增接口面时在上表补一行，并按下方「接口文档模板」新建 `docs/api/<surface>.md`。
 
 ## 接口文档模板
 
 ```markdown
 # <接口面名称>
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 ## 范围
 

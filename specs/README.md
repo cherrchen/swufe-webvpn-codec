@@ -1,6 +1,6 @@
 # Feature Specs
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：本目录是 **Layer 3 — Feature Specs**：每个 Feature 从需求到实现与验证的完整记录。
 Spec-driven Development 的目的：把 `Prompt → Code` 变成
@@ -12,12 +12,20 @@ Spec-driven Development 的目的：把 `Prompt → Code` 变成
 
 ```text
 specs/<id>-<feature-name>/
-specs/001-user-authentication/     ← 示例形式（本项目尚未创建任何 Spec）
+specs/001-phase1-local-bridge/     ← 本项目第一个 Spec（Phase 1 本机桥与教务浏览器验收）
 ```
 
 - `<id>` 三位递增（`001`、`002`……），分配后不复用；
 - `<feature-name>` 使用小写短横线命名；
 - 模板目录 `specs/_template/` 不参与校验，也不占用编号。
+
+## Spec 索引
+
+| Spec | 标题 | 关联 REQ | Status | 链接 |
+| ---- | ---- | -------- | ------ | ---- |
+| 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | Draft | [spec.md](001-phase1-local-bridge/spec.md) |
+
+> 每个 Spec 在此登记一行，并在 [roadmap.md](../docs/planning/roadmap.md) 同步注册；长期事实不属于 Spec。
 
 ## 必含文件
 

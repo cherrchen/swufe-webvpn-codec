@@ -1,6 +1,6 @@
 # 架构（Architecture）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：本目录是系统**结构与技术事实**的 Source of Truth：系统由什么组成、如何协作、数据如何流动、接口边界在哪里、为什么这样决策。
 **不写**：需求（→ [requirements/](../requirements/README.md)）、单个 Feature 的实现计划（→ [specs/](../../specs/README.md)）、临时调研（→ [.agents/notes/](../../.agents/notes/README.md)）。

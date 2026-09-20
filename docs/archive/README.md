@@ -1,6 +1,6 @@
 # 归档（Archive）
 
-> Status: Draft ｜ Owner: <OWNER> ｜ Last Reviewed: <DATE>
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
 
 **用途**：保存已失效但仍具历史价值的设计资料、被取代的文档与已完成的 Spec。
 **原则**：**不直接删除**重要历史资料；归档内容不再作为当前事实来源。
@@ -38,9 +38,7 @@ docs/archive/<YYYY-MM-DD>-<original-name>.md
 
 | 归档对象 | 原位置 | 归档日期 | 原因 | 取代者 |
 | -------- | ------ | -------- | ---- | ------ |
-| — | — | — | — | — |
-
-> 目前没有归档内容。
+| [2026-09-20-swufe-webvpn-bridge-docs-v1.0/](2026-09-20-swufe-webvpn-bridge-docs-v1.0/README.md) | 仓库外文档包 `SWUFE-WebVPN-Bridge-Docs-v1.0.zip` | 2026-09-20 | 原包将需求/设计/测试/项目文档混在一处，未按本仓库分层；内容已重新分配 | [docs/overview/](../overview/project-overview.md)、[docs/requirements/](../requirements/README.md)、[docs/architecture/](../architecture/README.md)、[specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/spec.md) |
 
 ## 规则
 
