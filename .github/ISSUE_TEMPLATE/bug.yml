@@ -1,0 +1,75 @@
+name: Bug report
+description: 报告一个与预期行为不符的缺陷。Issue 只用于跟踪与讨论，不替代文档或 Spec。
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告问题。填写前请先阅读 [AGENTS.md](../blob/main/AGENTS.md) 与
+        [docs/development/development-workflow.md](../blob/main/docs/development/development-workflow.md) 中的 Bug 流程。
+
+        > Issue 用于 **Tracking / Discussion**；不影响内容判断。真正批准的功能变更必须进入 `specs/`。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 现象
+      description: 发生了什么？期望什么？请写事实，不要写猜测。
+      placeholder: |
+        实际行为：
+        期望行为：
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 可执行的最小复现步骤（或失败测试）。无法复现时说明已知信息。
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: 版本、平台、配置等与问题相关的信息。
+      placeholder: |
+        version:
+        platform:
+        configuration:
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据
+      description: 日志、报错、截图链接。不要粘贴密钥或真实个人数据。
+    validations:
+      required: false
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影响范围
+      description: 影响谁、影响程度、是否有绕过方式。
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 已确认这不是需求变更（需求变更请使用 Feature request，并进入 Spec 流程）
+          required: true
+        - label: 已检查是否存在同类 Issue
+          required: true
+        - label: 已确认内容中不含密钥、令牌或真实个人数据
+          required: true

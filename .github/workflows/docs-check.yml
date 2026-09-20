@@ -1,0 +1,39 @@
+name: docs-check
+
+# Documentation quality gate only.
+# This workflow does not build, deploy, release or publish anything.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-check:
+    name: Documentation checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run documentation checks
+        run: npm run docs:check
+
+      - name: Type-check the check scripts
+        run: npm run typecheck

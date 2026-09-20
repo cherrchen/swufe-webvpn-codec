@@ -1,0 +1,23 @@
+{
+  "name": "swufe-webvpn-codec",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Documentation, agent-context and process scaffold for AI-assisted projects (GitHub template repository)",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "docs:check": "tsx scripts/docs-check.ts",
+    "docs:links": "tsx scripts/docs-links-check.ts",
+    "docs:i18n": "tsx scripts/docs-i18n-check.ts",
+    "spec:check": "tsx scripts/spec-check.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

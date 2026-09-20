@@ -1,0 +1,69 @@
+name: Documentation issue
+description: 报告文档问题：缺失、过时、冲突、链接失效、双语不同步。
+title: '[Docs] '
+labels: ['documentation']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        文档规则见 [documentation-rules.md](../blob/main/docs/development/documentation-rules.md)。
+        本地可用 `npm run docs:check` 复现链接与配对问题。
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 问题类型
+      options:
+        - 内容缺失（应写而未写）
+        - 内容过时（与代码/决策不符）
+        - Source of Truth 冲突（同一事实出现在多处）
+        - 链接失效或路径错误
+        - 中英双语不同步
+        - 结构/索引问题（未登记到索引、命名不符）
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: 位置
+      description: 文件路径（含行号更佳）。多个文件用逗号分隔。
+      placeholder: docs/architecture/overview.md:12
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题说明
+      description: 现在写的是什么、为什么是问题。请引用具体内容。
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望
+      description: 期望的正确内容或指向正确 Source of Truth 的路径。不确定时写 TBD。
+    validations:
+      required: false
+
+  - type: input
+    id: command
+    attributes:
+      label: 复现命令
+      description: 若由检查脚本发现，请给出命令与输出摘要。
+      placeholder: npm run docs:check
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 已确认该问题不是「未经确认的结论被写入正式文档」（此类内容应放入 Open Questions 或 .agents/notes/）
+          required: true
+        - label: 已确认不涉及密钥、令牌或真实个人数据
+          required: true
