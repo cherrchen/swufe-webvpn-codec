@@ -44,7 +44,8 @@ export const ERROR_MESSAGES = {
   NOT_LOGGED_IN: '尚未登录 WebVPN：请先点击「登录 WebVPN」完成统一身份认证。',
   ALLOWLIST_EMPTY: 'allowlist 为空：请在配置文件中添加主机或启用 *.swufe.edu.cn。',
   CA_MISSING: '需要安装本机证书才能处理 HTTPS：请先点击「安装本机 CA」。',
-  PROXY_CONFLICT: '检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。',
+  PROXY_CONFLICT:
+    '检测到代理环境冲突：系统代理已启用，或存在 VPN / 代理工具的 TUN（虚拟网卡）模式。请先关闭 Clash / mihomo / 其它 VPN 的系统代理与 TUN 模式后再试。',
   BRIDGE_CRASH: '桥接进程异常退出：请查看日志后重新开启桥接。',
   SESSION_EXPIRED: 'WebVPN 会话已失效。桥接已停止并已清除系统代理。',
 } as const

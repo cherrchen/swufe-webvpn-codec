@@ -18,7 +18,10 @@ test('a proxy used by something else refuses the start without touching the OS',
 
   assert.equal(status.state, 'error')
   assert.equal(status.error?.code, 'PROXY_CONFLICT')
-  assert.equal(status.error?.message, '检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。')
+  assert.equal(
+    status.error?.message,
+    '检测到代理环境冲突：系统代理已启用，或存在 VPN / 代理工具的 TUN（虚拟网卡）模式。请先关闭 Clash / mihomo / 其它 VPN 的系统代理与 TUN 模式后再试。',
+  )
   assert.equal(h.calls.includes('proxy.enable'), false)
   assert.equal(h.sidecars.length, 0)
   assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
@@ -42,6 +45,39 @@ test('preconditions are checked in a fixed order: login → allowlist → CA →
   noCa.systemProxy.entries = [conflictEntry(7890)]
   assert.equal((await noCa.orchestrator.start()).error?.code, 'CA_MISSING')
   assert.equal(noCa.calls.includes('proxy.enable'), false)
+})
+
+test('a fake-ip upstream refuses the start so the bridge cannot hang', async () => {
+  const h = harness({ resolveUpstream: async () => ['198.18.0.12'] })
+
+  const status = await h.orchestrator.start()
+
+  assert.equal(status.state, 'error')
+  assert.equal(status.error?.code, 'PROXY_CONFLICT')
+  assert.match(status.error?.message ?? '', /TUN/)
+  assert.equal(h.calls.includes('proxy.enable'), false)
+  assert.equal(h.sidecars.length, 0)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+})
+
+test('the fake-ip preflight runs after the proxy conflict and before the port probe', async () => {
+  const h = harness({
+    resolveUpstream: async () => ['198.18.0.12'],
+    portProbe: async () => false,
+  })
+
+  // A busy port would be BRIDGE_CRASH: the conflict check wins because it comes first.
+  assert.equal((await h.orchestrator.start()).error?.code, 'PROXY_CONFLICT')
+})
+
+test('a resolver failure never blocks an otherwise valid start', async () => {
+  const h = harness({
+    resolveUpstream: async () => {
+      throw new Error('getaddrinfo ENOTFOUND')
+    },
+  })
+
+  assert.equal((await h.orchestrator.start()).state, 'running')
 })
 
 test('a wildcard allowlist with no explicit hosts is accepted', async () => {
@@ -411,7 +447,7 @@ test('selecting apps is refused while another tool owns the system proxy', async
   }
 
   assert.equal(failure?.code, 'PROXY_CONFLICT')
-  assert.equal(failure?.message, '检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。')
+  assert.match(failure?.message ?? '', /^检测到代理环境冲突：.*TUN/)
   assert.equal(h.store.getSettings().captureMode, 'system-proxy')
   assert.equal(h.calls.includes('proxy.disable'), false)
   assert.deepEqual(runtimeCapture(h.userDataDir), { processes: [] })

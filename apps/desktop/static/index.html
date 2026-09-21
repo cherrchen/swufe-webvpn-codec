@@ -141,8 +141,8 @@
     </dialog>
 
     <dialog id="proxy-conflict-modal" aria-labelledby="proxy-conflict-title">
-      <h2 id="proxy-conflict-title">系统代理已占用</h2>
-      <p>检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。</p>
+      <h2 id="proxy-conflict-title">检测到代理环境冲突</h2>
+      <p>系统代理已启用，或存在 VPN / 代理工具的 TUN（虚拟网卡）模式。请先关闭 Clash / mihomo / 其它 VPN 的系统代理与 TUN 模式后再试。</p>
       <form method="dialog">
         <button type="submit">知道了</button>
       </form>

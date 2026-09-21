@@ -188,6 +188,8 @@ export function harness(
     },
     userDataDir,
     portProbe: async () => true,
+    // The real DNS is never part of a unit test: default to a routable address.
+    resolveUpstream: async () => ['125.69.85.81'],
     ...overrides,
   }
   return {

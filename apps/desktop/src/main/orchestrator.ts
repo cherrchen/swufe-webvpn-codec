@@ -7,6 +7,7 @@
  */
 
 import { chmodSync, closeSync, mkdirSync, openSync, writeSync } from 'node:fs'
+import { lookup } from 'node:dns/promises'
 import { createServer } from 'node:net'
 import { dirname, join } from 'node:path'
 
@@ -16,6 +17,7 @@ import {
   RUNTIME_CONFIG_FILENAME,
   STATUS_CACHE_TTL_MS,
 } from './constants'
+import { isFakeIpAddress } from './fake-ip'
 import { isConflict, shouldClear } from './platform/parse'
 import type { CertManager, SystemProxy } from './platform/types'
 import { mapSidecarError, type Sidecar } from './sidecar'
@@ -34,11 +36,18 @@ export interface OrchestratorDeps {
   userDataDir: string
   /** Returns true when the port is free (default: bind test on 127.0.0.1). */
   portProbe?: (port: number) => Promise<boolean>
+  /** IPv4 addresses of a host (default: the OS resolver via `dns.lookup`). */
+  resolveUpstream?: (host: string) => Promise<string[]>
   now?: () => number
 }
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+async function defaultResolveUpstream(host: string): Promise<string[]> {
+  const addresses = await lookup(host, { all: true, family: 4 })
+  return addresses.map((entry) => entry.address)
 }
 
 function defaultPortProbe(port: number): Promise<boolean> {
@@ -280,6 +289,23 @@ export class ProxyOrchestrator {
       return this.fail('BRIDGE_CRASH', describe(error))
     }
 
+    // Fake-ip DNS (Clash / mihomo TUN, `198.18.0.0/15`) never reaches the gateway:
+    // the upstream connection hangs instead of failing, so refuse it up front with
+    // the same conflict semantics as an occupied system proxy (KI-013).
+    const upstreamHost = this.upstreamHost()
+    if (upstreamHost) {
+      const resolveUpstream = this.deps.resolveUpstream ?? defaultResolveUpstream
+      try {
+        if ((await resolveUpstream(upstreamHost)).some(isFakeIpAddress)) {
+          console.warn(`swufe-proxy ${upstreamHost} 解析到 fake-ip 地址（198.18.0.0/15）：拒绝开桥`)
+          return this.fail('PROXY_CONFLICT', ERROR_MESSAGES.PROXY_CONFLICT)
+        }
+      } catch (error) {
+        // Best effort: a resolver hiccup must not block an otherwise valid start.
+        console.warn(`swufe-proxy ${upstreamHost} 解析失败，跳过 fake-ip 预检：${describe(error)}`)
+      }
+    }
+
     const portProbe = this.deps.portProbe ?? defaultPortProbe
     if (!(await portProbe(port))) {
       return this.fail(
@@ -417,6 +443,16 @@ export class ProxyOrchestrator {
 
   private settings(): AppSettings {
     return this.deps.store.getSettings()
+  }
+
+  /** Host of the configured gateway; `null` when the setting is not a usable URL. */
+  private upstreamHost(): string | null {
+    try {
+      const host = new URL(this.settings().webvpnBase).hostname
+      return host || null
+    } catch {
+      return null
+    }
   }
 
   private async systemProxyEnabled(): Promise<boolean> {
