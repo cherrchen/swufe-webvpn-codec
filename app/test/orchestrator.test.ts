@@ -321,3 +321,123 @@ test('an unmanaged leftover proxy is not reported as ours', async () => {
   assert.equal(status.systemProxyEnabled, false)
   assert.equal(status.localCaptureEnabled, false)
 })
+
+function runtimeCapture(userDataDir: string): unknown {
+  const payload = JSON.parse(readFileSync(join(userDataDir, 'bridge-config.json'), 'utf-8')) as {
+    capture: unknown
+  }
+  return payload.capture
+}
+
+test('starting in selected-apps mode captures apps instead of setting a system proxy', async () => {
+  const h = harness()
+  h.store.updateSettings({
+    captureMode: 'selected-apps',
+    captureProcesses: ['/Applications/Google Chrome.app/'],
+  })
+
+  const status = await h.orchestrator.start()
+
+  assert.equal(status.state, 'running')
+  assert.equal(status.systemProxyEnabled, false)
+  assert.equal(status.localCaptureEnabled, false)
+  assert.equal(h.calls.includes('proxy.enable'), false)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+  assert.deepEqual(runtimeCapture(h.userDataDir), {
+    processes: ['/Applications/Google Chrome.app/'],
+  })
+})
+
+test('system-proxy mode never writes capture patterns to the sidecar', async () => {
+  const h = harness()
+  h.store.updateSettings({ captureProcesses: ['/usr/bin/curl'] })
+
+  await h.orchestrator.start()
+
+  assert.deepEqual(runtimeCapture(h.userDataDir), { processes: [] })
+})
+
+test('switching to selected-apps while running revokes the system proxy', async () => {
+  const h = harness()
+  await h.orchestrator.start()
+  h.calls.length = 0
+
+  await h.orchestrator.setCaptureMode('selected-apps')
+
+  assert.equal(h.calls.includes('proxy.disable'), true)
+  assert.equal(h.calls.includes('proxy.enable'), false)
+  assert.equal(h.store.getSettings().captureMode, 'selected-apps')
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+  const before = await h.orchestrator.status()
+  assert.equal(before.systemProxyEnabled, false)
+  assert.equal(before.localCaptureEnabled, false)
+
+  h.sidecars[0]?.reportCapture({
+    enabled: true,
+    processes: ['/Applications/Google Chrome.app/'],
+    error: null,
+  })
+
+  const after = await h.orchestrator.status()
+  assert.equal(after.localCaptureEnabled, true)
+  assert.equal(after.captureError, undefined)
+})
+
+test('switching back to system-proxy restores the proxy and the marker', async () => {
+  const h = harness()
+  h.store.updateSettings({ captureMode: 'selected-apps' })
+  await h.orchestrator.start()
+  h.calls.length = 0
+
+  await h.orchestrator.setCaptureMode('system-proxy')
+
+  assert.equal(h.calls.includes('proxy.enable'), true)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+  assert.equal((await h.orchestrator.status()).systemProxyEnabled, true)
+  assert.deepEqual(runtimeCapture(h.userDataDir), { processes: [] })
+})
+
+test('selecting apps is refused while another tool owns the system proxy', async () => {
+  const h = harness()
+  await h.orchestrator.start()
+  h.systemProxy.entries = [conflictEntry(7890)]
+  h.calls.length = 0
+
+  let failure: { code?: string; message?: string } | null = null
+  try {
+    await h.orchestrator.setCaptureMode('selected-apps')
+  } catch (error) {
+    failure = error as { code?: string; message?: string }
+  }
+
+  assert.equal(failure?.code, 'PROXY_CONFLICT')
+  assert.equal(failure?.message, '检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。')
+  assert.equal(h.store.getSettings().captureMode, 'system-proxy')
+  assert.equal(h.calls.includes('proxy.disable'), false)
+  assert.deepEqual(runtimeCapture(h.userDataDir), { processes: [] })
+})
+
+test('a capture failure is reported as a status field, not a bridge error', async () => {
+  const h = harness()
+  h.store.updateSettings({ captureMode: 'selected-apps', captureProcesses: ['/usr/bin/curl'] })
+  await h.orchestrator.start()
+
+  h.sidecars[0]?.reportCapture({ enabled: false, processes: [], error: 'macOS 系统扩展未授权' })
+
+  const status = await h.orchestrator.status()
+  assert.equal(status.state, 'running')
+  assert.equal(status.localCaptureEnabled, false)
+  assert.equal(status.captureError, 'macOS 系统扩展未授权')
+  assert.equal(status.error, undefined)
+})
+
+test('a capture failure is cleared by the next stop', async () => {
+  const h = harness()
+  h.store.updateSettings({ captureMode: 'selected-apps', captureProcesses: ['/usr/bin/curl'] })
+  await h.orchestrator.start()
+  h.sidecars[0]?.reportCapture({ enabled: false, processes: [], error: 'boom' })
+
+  await h.orchestrator.stop()
+
+  assert.equal((await h.orchestrator.status()).captureError, undefined)
+})

@@ -2,6 +2,9 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
+  captureName,
+  capturePattern,
+  groupCaptureCandidates,
   isConflict,
   parseNetworkServices,
   parseNetworksetupProxy,
@@ -118,7 +121,7 @@ test('windows per-protocol proxy values conflict unless every entry is ours', ()
   assert.equal(shouldClear(disabled, 8080), false)
 })
 
-test('process listings map onto pid/name pairs', () => {
+test('process listings yield raw pid/name rows', () => {
   const ps = `    1 /sbin/launchd
   622 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
  3312 (sh)
@@ -135,5 +138,44 @@ test('process listings map onto pid/name pairs', () => {
   assert.deepEqual(parseTasklistOutput(tasklist), [
     { pid: 622, name: 'chrome.exe' },
     { pid: 3312, name: 'tasklist.exe' },
+  ])
+})
+
+test('an app bundle is captured by its bundle path, anything else by its path', () => {
+  // Chrome's helper processes live inside the bundle, so one pattern covers both
+  // (a short name like `Safari` could hit an unrelated process instead).
+  assert.equal(
+    capturePattern('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
+    '/Applications/Google Chrome.app/',
+  )
+  assert.equal(
+    capturePattern('/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper'),
+    '/Applications/Google Chrome.app/',
+  )
+  assert.equal(capturePattern('/sbin/launchd'), '/sbin/launchd')
+  assert.equal(capturePattern('  /usr/bin/curl '), '/usr/bin/curl')
+  assert.equal(capturePattern('chrome.exe'), 'chrome.exe')
+})
+
+test('display names drop the bundle directory and the .app suffix', () => {
+  assert.equal(captureName('/Applications/Google Chrome.app/'), 'Google Chrome')
+  assert.equal(captureName('/Applications/Utilities/Terminal.app/'), 'Terminal')
+  assert.equal(captureName('/sbin/launchd'), 'launchd')
+  assert.equal(captureName('/usr/bin/curl'), 'curl')
+  assert.equal(captureName('chrome.exe'), 'chrome.exe')
+})
+
+test('candidate grouping keeps one row per application', () => {
+  const rows = [
+    { pid: 900, name: '/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper' },
+    { pid: 1, name: '/sbin/launchd' },
+    { pid: 622, name: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' },
+    { pid: 700, name: '/usr/bin/curl' },
+  ]
+
+  assert.deepEqual(groupCaptureCandidates(rows), [
+    { pid: 622, name: 'Google Chrome', pattern: '/Applications/Google Chrome.app/' },
+    { pid: 700, name: 'curl', pattern: '/usr/bin/curl' },
+    { pid: 1, name: 'launchd', pattern: '/sbin/launchd' },
   ])
 })

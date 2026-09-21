@@ -7,7 +7,7 @@ import { createConnection } from 'node:net'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 
-import type { BridgeErrorCode, DebugLogEvent } from '../shared/types'
+import type { BridgeErrorCode, CaptureReport, DebugLogEvent } from '../shared/types'
 import {
   BRIDGE_READY_TIMEOUT_MS,
   CONFDIR_NAME,
@@ -20,12 +20,14 @@ export type SidecarEvent =
   | { kind: 'ready'; payload: Record<string, unknown> }
   | { kind: 'error'; code: string; message: string }
   | { kind: 'debug'; event: DebugLogEvent }
+  | { kind: 'capture'; report: CaptureReport }
 
 export interface Sidecar {
   start(): Promise<void>
   stop(): Promise<void>
   onExit(cb: (code: number | null, signal: string | null) => void): void
   onDebug(cb: (event: DebugLogEvent) => void): void
+  onCapture(cb: (report: CaptureReport) => void): void
 }
 
 export interface SidecarOptions {
@@ -35,6 +37,7 @@ export interface SidecarOptions {
 }
 
 const DEBUG_KEYS = ['ts', 'host', 'rewritten', 'direction', 'detail'] as const
+const CAPTURE_KEYS = ['enabled', 'processes', 'error'] as const
 
 function debugEvent(payload: Record<string, unknown>): DebugLogEvent {
   const event: DebugLogEvent = {
@@ -45,6 +48,18 @@ function debugEvent(payload: Record<string, unknown>): DebugLogEvent {
   }
   if (typeof payload.detail === 'string') event.detail = payload.detail
   return event
+}
+
+/** Reduce a `swufe-capture` payload to the three documented keys (INV-001). */
+function captureReport(payload: Record<string, unknown>): CaptureReport {
+  const processes = Array.isArray(payload.processes)
+    ? payload.processes.filter((entry): entry is string => typeof entry === 'string')
+    : []
+  return {
+    enabled: payload.enabled === true,
+    processes,
+    error: typeof payload.error === 'string' ? payload.error : null,
+  }
 }
 
 /**
@@ -77,6 +92,18 @@ export function parseSidecarLine(line: string): SidecarEvent | null {
       const reduced: Record<string, unknown> = {}
       for (const key of DEBUG_KEYS) reduced[key] = source[key]
       return { kind: 'debug', event: debugEvent(reduced) }
+    } catch {
+      return null
+    }
+  }
+  if (text.startsWith('swufe-capture ')) {
+    try {
+      const payload = JSON.parse(text.slice('swufe-capture '.length)) as unknown
+      if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return null
+      const source = payload as Record<string, unknown>
+      const reduced: Record<string, unknown> = {}
+      for (const key of CAPTURE_KEYS) reduced[key] = source[key]
+      return { kind: 'capture', report: captureReport(reduced) }
     } catch {
       return null
     }
@@ -141,6 +168,7 @@ export class SidecarProcess implements Sidecar {
   private failure: { code: string; message: string } | null = null
   private readonly exitListeners: Array<(code: number | null, signal: string | null) => void> = []
   private readonly debugListeners: Array<(event: DebugLogEvent) => void> = []
+  private readonly captureListeners: Array<(report: CaptureReport) => void> = []
 
   constructor(private readonly options: SidecarOptions) {}
 
@@ -150,6 +178,10 @@ export class SidecarProcess implements Sidecar {
 
   onDebug(cb: (event: DebugLogEvent) => void): void {
     this.debugListeners.push(cb)
+  }
+
+  onCapture(cb: (report: CaptureReport) => void): void {
+    this.captureListeners.push(cb)
   }
 
   async start(): Promise<void> {
@@ -179,6 +211,11 @@ export class SidecarProcess implements Sidecar {
       if (!event) return
       if (event.kind === 'debug') {
         for (const listener of this.debugListeners) listener(event.event)
+        return
+      }
+      if (event.kind === 'capture') {
+        // Capture never gates readiness: the first enable may wait for an OS prompt.
+        for (const listener of this.captureListeners) listener(event.report)
         return
       }
       if (event.kind === 'error') {

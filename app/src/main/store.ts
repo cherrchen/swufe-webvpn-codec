@@ -13,17 +13,20 @@ import { dirname, join } from 'node:path'
 import {
   CONFIG_FILENAME,
   DEFAULT_BRIDGE_PORT,
+  DEFAULT_CAPTURE_MODE,
   DEFAULT_HOSTS,
   DEFAULT_WEBVPN_BASE,
   DEFAULT_WRD_IV,
   DEFAULT_WRD_KEY,
+  MAX_CAPTURE_PROCESSES,
 } from './constants'
-import type { AllowlistConfig } from '../shared/types'
+import type { AllowlistConfig, CaptureMode } from '../shared/types'
 
 export interface AppSettings {
   bridgePort: number
   debugLogging: boolean
-  capturePids: number[]
+  captureMode: CaptureMode
+  captureProcesses: string[]
   webvpnBase: string
   wrdKey: string
   wrdIv: string
@@ -60,12 +63,34 @@ export function defaultSettings(): AppSettings {
   return {
     bridgePort: DEFAULT_BRIDGE_PORT,
     debugLogging: false,
-    capturePids: [],
+    captureMode: DEFAULT_CAPTURE_MODE,
+    captureProcesses: [],
     webvpnBase: DEFAULT_WEBVPN_BASE,
     wrdKey: DEFAULT_WRD_KEY,
     wrdIv: DEFAULT_WRD_IV,
     systemProxyManagedByApp: false,
   }
+}
+
+export function isCaptureMode(value: unknown): value is CaptureMode {
+  return value === 'system-proxy' || value === 'selected-apps'
+}
+
+/**
+ * mitmproxy intercept patterns: non-empty, comma-free (a comma separates entries
+ * in the intercept spec), trimmed and deduplicated — the same rules the sidecar
+ * enforces in `swufe_bridge.config._parse_capture_processes`.
+ */
+export function normalizeCapturePatterns(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const patterns: string[] = []
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue
+    const pattern = entry.trim()
+    if (!pattern || pattern.includes(',')) continue
+    if (!patterns.includes(pattern)) patterns.push(pattern)
+  }
+  return patterns
 }
 
 function parseSettings(raw: unknown): AppSettings {
@@ -76,9 +101,10 @@ function parseSettings(raw: unknown): AppSettings {
   return {
     bridgePort: typeof port === 'number' && Number.isInteger(port) && port > 0 && port < 65536 ? port : defaults.bridgePort,
     debugLogging: typeof record.debugLogging === 'boolean' ? record.debugLogging : defaults.debugLogging,
-    capturePids: Array.isArray(record.capturePids)
-      ? record.capturePids.filter((pid): pid is number => typeof pid === 'number' && Number.isInteger(pid))
-      : defaults.capturePids,
+    captureMode: isCaptureMode(record.captureMode) ? record.captureMode : defaults.captureMode,
+    captureProcesses: Array.isArray(record.captureProcesses)
+      ? normalizeCapturePatterns(record.captureProcesses).slice(0, MAX_CAPTURE_PROCESSES)
+      : defaults.captureProcesses,
     webvpnBase: typeof record.webvpnBase === 'string' && record.webvpnBase ? record.webvpnBase : defaults.webvpnBase,
     wrdKey: typeof record.wrdKey === 'string' ? record.wrdKey : defaults.wrdKey,
     wrdIv: typeof record.wrdIv === 'string' ? record.wrdIv : defaults.wrdIv,
@@ -122,7 +148,8 @@ export class AppStore {
   }
 
   getSettings(): AppSettings {
-    return { ...this.requireData().settings, capturePids: [...this.requireData().settings.capturePids] }
+    const settings = this.requireData().settings
+    return { ...settings, captureProcesses: [...settings.captureProcesses] }
   }
 
   updateSettings(patch: Partial<AppSettings>): AppSettings {
@@ -141,10 +168,20 @@ export class AppStore {
         throw new Error(`WRD AES-128 ${field} 必须为 16 字节：${value}`)
       }
     }
-    next.capturePids = next.capturePids.filter((pid) => Number.isInteger(pid))
+    if (!isCaptureMode(next.captureMode)) {
+      throw new Error(`捕获方式不合法：${String(next.captureMode)}`)
+    }
+    const patterns = normalizeCapturePatterns(next.captureProcesses)
+    if (patterns.length !== next.captureProcesses.length) {
+      throw new Error('捕获进程列表不合法：每一项必须是非空且不含逗号的路径，且不能重复')
+    }
+    if (patterns.length > MAX_CAPTURE_PROCESSES) {
+      throw new Error(`最多只能选择 ${MAX_CAPTURE_PROCESSES} 个应用`)
+    }
+    next.captureProcesses = patterns
     data.settings = next
     this.save()
-    return { ...next, capturePids: [...next.capturePids] }
+    return { ...next, captureProcesses: [...next.captureProcesses] }
   }
 
   private requireData(): StoreFile {

@@ -1,5 +1,7 @@
 /** Pure parsers for OS command output — the unit-testable half of the platform adapters. */
 
+import type { CaptureCandidate } from '../../shared/types'
+
 export interface NetworkService {
   name: string
   disabled: boolean
@@ -11,7 +13,8 @@ export interface ProxyState {
   port: number | null
 }
 
-export interface CaptureCandidate {
+/** One raw line of a process listing, before capture grouping. */
+export interface ProcessRow {
   pid: number
   name: string
 }
@@ -100,22 +103,22 @@ export function shouldClear(state: ProxyState, bridgePort: number): boolean {
   return state.enabled && state.server === '127.0.0.1' && state.port === bridgePort
 }
 
-/** `ps -Ao pid=,comm=` → pid + executable path (macOS capture candidates). */
-export function parsePsOutput(stdout: string): CaptureCandidate[] {
-  const candidates: CaptureCandidate[] = []
+/** `ps -Ao pid=,comm=` → pid + executable path (macOS, before grouping). */
+export function parsePsOutput(stdout: string): ProcessRow[] {
+  const rows: ProcessRow[] = []
   for (const rawLine of stdout.split('\n')) {
     const match = rawLine.trim().match(/^(\d+)\s+(.+)$/)
     if (!match) continue
     const pid = Number.parseInt(match[1] ?? '', 10)
     const name = (match[2] ?? '').trim()
-    if (Number.isFinite(pid) && name) candidates.push({ pid, name })
+    if (Number.isFinite(pid) && name) rows.push({ pid, name })
   }
-  return candidates
+  return rows
 }
 
-/** `tasklist /fo csv /nh` → pid + image name (Windows capture candidates). */
-export function parseTasklistOutput(stdout: string): CaptureCandidate[] {
-  const candidates: CaptureCandidate[] = []
+/** `tasklist /fo csv /nh` → pid + image name (Windows, before grouping). */
+export function parseTasklistOutput(stdout: string): ProcessRow[] {
+  const rows: ProcessRow[] = []
   for (const rawLine of stdout.split(/\r?\n/)) {
     const line = rawLine.trim()
     if (!line) continue
@@ -123,9 +126,49 @@ export function parseTasklistOutput(stdout: string): CaptureCandidate[] {
     if (!fields) continue
     const pid = Number.parseInt(fields[1] ?? '', 10)
     const name = fields[0] ?? ''
-    if (Number.isFinite(pid) && name) candidates.push({ pid, name })
+    if (Number.isFinite(pid) && name) rows.push({ pid, name })
   }
-  return candidates
+  return rows
+}
+
+/**
+ * mitmproxy intercept pattern for one executable path.
+ *
+ * An application is matched by its `.app` bundle path so that the main process
+ * *and* its helpers are captured (and so a short name like `Safari` cannot hit
+ * an unrelated process). Anything else is matched by its full executable path.
+ */
+export function capturePattern(executable: string): string {
+  // Non-greedy: a helper nested in another `.app` (Chrome's Helper) must still
+  // resolve to the outer application bundle.
+  const match = executable.match(/^(.*?\.app)\/Contents\//)
+  if (match) return `${match[1]}/`
+  return executable.trim()
+}
+
+/** Display name for a pattern: `…/Google Chrome.app/` → `Google Chrome`. */
+export function captureName(pattern: string): string {
+  if (pattern.endsWith('.app/')) {
+    const bundle = pattern.slice(0, -1)
+    return bundle.slice(bundle.lastIndexOf('/') + 1).replace(/\.app$/, '')
+  }
+  const trimmed = pattern.replace(/\/+$/, '')
+  return trimmed.slice(trimmed.lastIndexOf('/') + 1)
+}
+
+/**
+ * Collapse processes onto one row per capture pattern (one application, one row),
+ * keeping the lowest pid and ordering by display name.
+ */
+export function groupCaptureCandidates(rows: ProcessRow[]): CaptureCandidate[] {
+  const groups = new Map<string, CaptureCandidate>()
+  for (const row of rows) {
+    const pattern = capturePattern(row.name)
+    const existing = groups.get(pattern)
+    if (existing && existing.pid <= row.pid) continue
+    groups.set(pattern, { pid: row.pid, name: captureName(pattern), pattern })
+  }
+  return [...groups.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 }
 
 /**

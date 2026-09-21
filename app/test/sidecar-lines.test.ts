@@ -50,6 +50,35 @@ test('debug lines are reduced to the five documented keys', () => {
   assert.equal(JSON.stringify(event).includes('<html>'), false)
 })
 
+test('capture lines are reduced to the three documented keys', () => {
+  const event = parseSidecarLine(
+    'swufe-capture {"enabled":true,"processes":["/Applications/Google Chrome.app/"],"error":null,"extra":"x","cookies":[{"value":"SECRET"}]}',
+  )
+
+  assert.deepEqual(event, {
+    kind: 'capture',
+    report: {
+      enabled: true,
+      processes: ['/Applications/Google Chrome.app/'],
+      error: null,
+    },
+  })
+  assert.equal(JSON.stringify(event).includes('SECRET'), false)
+})
+
+test('capture line edge cases default instead of throwing', () => {
+  assert.deepEqual(parseSidecarLine('swufe-capture {"enabled":true}'), {
+    kind: 'capture',
+    report: { enabled: true, processes: [], error: null },
+  })
+  assert.deepEqual(parseSidecarLine('swufe-capture {"enabled":false,"processes":[1,"a"],"error":"boom"}'), {
+    kind: 'capture',
+    report: { enabled: false, processes: ['a'], error: 'boom' },
+  })
+  assert.equal(parseSidecarLine('swufe-capture {not json'), null)
+  assert.equal(parseSidecarLine('swufe-capture [1,2]'), null)
+})
+
 test('unrelated and malformed lines are ignored', () => {
   assert.equal(parseSidecarLine('some mitmproxy log line'), null)
   assert.equal(parseSidecarLine('swufe-ready {not json'), null)

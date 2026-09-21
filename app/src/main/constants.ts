@@ -1,5 +1,7 @@
 /** Fixed ports, paths, timeouts and channel names shared by the Main process. */
 
+import type { CaptureMode } from '../shared/types'
+
 export const DEFAULT_BRIDGE_PORT = 8080
 export const DEFAULT_WEBVPN_BASE = 'https://webvpn.swufe.edu.cn'
 export const DEFAULT_WRD_KEY = 'wrdvpnisthebest!'
@@ -8,6 +10,11 @@ export const DEFAULT_HOSTS: readonly string[] = ['jwxt.swufe.edu.cn']
 
 /** Login WebView partition (persist: survives restarts, see data-model.md SessionState). */
 export const LOGIN_PARTITION = 'persist:swufe-login'
+
+/** Capture is opt-in: the system proxy is the default (REQ-003, ADR-0006). */
+export const DEFAULT_CAPTURE_MODE: CaptureMode = 'system-proxy'
+/** Upper bound on selected patterns; mirrors `capture.processes` in the runtime config. */
+export const MAX_CAPTURE_PROCESSES = 32
 
 /** Never rewritten by the bridge: the login flow itself (INV-004). */
 export const AUTH_HOST = 'authserver.swufe.edu.cn'

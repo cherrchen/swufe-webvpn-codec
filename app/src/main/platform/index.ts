@@ -4,7 +4,7 @@ import { run } from '../exec'
 import type { CaptureCandidate } from '../../shared/types'
 import { DarwinCertManager } from './darwin/cert'
 import { DarwinSystemProxy } from './darwin/system-proxy'
-import { parsePsOutput, parseTasklistOutput } from './parse'
+import { groupCaptureCandidates, parsePsOutput, parseTasklistOutput } from './parse'
 import type { CertManager, SystemProxy } from './types'
 import { Win32CertManager } from './win32/cert'
 import { Win32SystemProxy } from './win32/system-proxy'
@@ -55,20 +55,21 @@ export function createCertManager(confdir: string, repoRoot: string): CertManage
   return new UnsupportedPlatform(process.platform)
 }
 
-/**
- * Read-only process enumeration for the capture picker (M2: enumeration +
- * persistence; actual mitmproxy local-mode capture is M3).
- */
+/** Enumerate applications/processes the capture picker can offer (REQ-003). */
 export async function listCaptureCandidates(): Promise<CaptureCandidate[]> {
   if (process.platform === 'darwin') {
     const result = await run('ps', ['-Ao', 'pid=,comm='])
     if (result.code !== 0) throw new Error(`无法枚举进程：${result.stderr.trim()}`)
-    return parsePsOutput(result.stdout).filter((candidate) => candidate.pid !== process.pid)
+    return groupCaptureCandidates(
+      parsePsOutput(result.stdout).filter((candidate) => candidate.pid !== process.pid),
+    )
   }
   if (process.platform === 'win32') {
     const result = await run('tasklist', ['/fo', 'csv', '/nh'])
     if (result.code !== 0) throw new Error(`无法枚举进程：${result.stderr.trim()}`)
-    return parseTasklistOutput(result.stdout).filter((candidate) => candidate.pid !== process.pid)
+    return groupCaptureCandidates(
+      parseTasklistOutput(result.stdout).filter((candidate) => candidate.pid !== process.pid),
+    )
   }
   throw new Error(`不支持的平台：${process.platform}`)
 }

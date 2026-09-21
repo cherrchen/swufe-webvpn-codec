@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 import { ProxyOrchestrator, type OrchestratorDeps } from '../../src/main/orchestrator'
 import type { ProxyEntry, CertManager, SystemProxy } from '../../src/main/platform/types'
-import type { DebugLogEvent } from '../../src/shared/types'
+import type { CaptureReport, DebugLogEvent } from '../../src/shared/types'
 import type { Sidecar } from '../../src/main/sidecar'
 import type { ProbeResult, SessionCookie, SessionLike } from '../../src/main/session-types'
 import { AppStore } from '../../src/main/store'
@@ -116,6 +116,7 @@ export class FakeSidecar implements Sidecar {
   startGate: Promise<void> | null = null
   exitHandler: ((code: number | null, signal: string | null) => void) | null = null
   debugHandler: ((event: DebugLogEvent) => void) | null = null
+  captureHandler: ((report: CaptureReport) => void) | null = null
 
   constructor(private readonly calls: string[]) {}
 
@@ -135,6 +136,15 @@ export class FakeSidecar implements Sidecar {
 
   onDebug(cb: (event: DebugLogEvent) => void): void {
     this.debugHandler = cb
+  }
+
+  onCapture(cb: (report: CaptureReport) => void): void {
+    this.captureHandler = cb
+  }
+
+  /** Emit a `swufe-capture` line as the sidecar would. */
+  reportCapture(report: CaptureReport): void {
+    this.captureHandler?.(report)
   }
 
   crash(): void {

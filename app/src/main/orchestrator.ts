@@ -10,7 +10,7 @@ import { chmodSync, closeSync, mkdirSync, openSync, writeSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { dirname, join } from 'node:path'
 
-import type { BridgeStatus, DebugLogEvent } from '../shared/types'
+import type { BridgeStatus, CaptureMode, CaptureReport, DebugLogEvent } from '../shared/types'
 import {
   ERROR_MESSAGES,
   RUNTIME_CONFIG_FILENAME,
@@ -57,6 +57,7 @@ export class ProxyOrchestrator {
   private sidecar: Sidecar | null = null
   private activePort: number | null = null
   private proxyCache: { at: number; enabled: boolean } | null = null
+  private captureReport: CaptureReport | null = null
   private inflightStart: Promise<BridgeStatus> | null = null
   private readonly statusListeners: Array<(status: BridgeStatus) => void> = []
   private readonly sessionExpiredListeners: Array<() => void> = []
@@ -113,6 +114,7 @@ export class ProxyOrchestrator {
       cleanupFailure ??= describe(error)
     }
     this.sidecar = null
+    this.captureReport = null
     this.activePort = null
     this.deps.session.stopMonitor()
     if (this.machine.state === 'stopping') this.machine.transition('idle')
@@ -130,6 +132,7 @@ export class ProxyOrchestrator {
     if (this.machine.state !== 'running' && this.machine.state !== 'starting') return
     console.warn(`swufe-sidecar 桥接进程退出：code=${code ?? 'null'} signal=${signal ?? 'null'}`)
     this.sidecar = null
+    this.captureReport = null
     this.deps.session.stopMonitor()
     try {
       await this.deps.systemProxy.disable(this.activePort ?? this.settings().bridgePort)
@@ -161,6 +164,7 @@ export class ProxyOrchestrator {
       console.warn(`swufe-sidecar 会话过期后停止失败：${describe(error)}`)
     }
     this.sidecar = null
+    this.captureReport = null
     this.activePort = null
     this.deps.session.stopMonitor()
     this.deps.store.updateSettings({ systemProxyManagedByApp: false })
@@ -208,16 +212,39 @@ export class ProxyOrchestrator {
     }
   }
 
+  /**
+   * Switch capture mode (REQ-003). The two modes are mutually exclusive (ADR-0006):
+   * selecting apps revokes our system proxy, going back installs it again — each via
+   * the sidecar config, which the addon hot-reloads.
+   */
+  async setCaptureMode(mode: CaptureMode): Promise<void> {
+    if (mode === 'selected-apps') await this.assertNoForeignProxy()
+    this.deps.store.updateSettings({ captureMode: mode })
+    this.captureReport = null
+    await this.applyCaptureSettings()
+  }
+
+  async setCaptureProcesses(patterns: string[]): Promise<void> {
+    this.deps.store.updateSettings({ captureProcesses: patterns })
+    this.captureReport = null
+    await this.applyCaptureSettings()
+  }
+
   async status(): Promise<BridgeStatus> {
+    const settings = this.settings()
     const status: BridgeStatus = {
       state: this.machine.state,
       loggedIn: this.deps.session.loggedIn,
       systemProxyEnabled: await this.systemProxyEnabled(),
-      localCaptureEnabled: false,
-      bridgePort: this.settings().bridgePort,
+      localCaptureEnabled:
+        this.machine.state === 'running' &&
+        settings.captureMode === 'selected-apps' &&
+        this.captureReport?.enabled === true,
+      bridgePort: settings.bridgePort,
     }
     const error = this.machine.error
     if (error) status.error = { code: error.code, message: error.message }
+    if (this.captureReport?.error) status.captureError = this.captureReport.error
     return status
   }
 
@@ -261,6 +288,18 @@ export class ProxyOrchestrator {
       )
     }
 
+    // Capture mode and system proxy are mutually exclusive (ADR-0006): a captured
+    // process pointing at the system proxy would reach mitmproxy through the
+    // transparent layer and hard-fail, so we never install both.
+    const captureSelected = settings.captureMode === 'selected-apps'
+    if (captureSelected) {
+      try {
+        await this.disableSystemProxyIfManaged(port)
+      } catch (error) {
+        return this.fail('BRIDGE_CRASH', describe(error))
+      }
+    }
+
     try {
       this.writeRuntimeConfig()
     } catch (error) {
@@ -277,6 +316,7 @@ export class ProxyOrchestrator {
       void this.handleSidecarExit(code, signal)
     })
     sidecar.onDebug((event) => this.emitDebug(event))
+    sidecar.onCapture((report) => this.handleCaptureReport(report))
 
     try {
       await sidecar.start()
@@ -289,28 +329,84 @@ export class ProxyOrchestrator {
       return this.status()
     }
 
-    try {
-      await this.deps.systemProxy.enable(port)
-    } catch (error) {
-      await this.deps.systemProxy.disable(port).catch(() => undefined)
-      await sidecar.stop().catch(() => undefined)
-      this.sidecar = null
-      this.activePort = null
-      this.deps.store.updateSettings({ systemProxyManagedByApp: false })
+    if (!captureSelected) {
+      try {
+        await this.deps.systemProxy.enable(port)
+      } catch (error) {
+        await this.deps.systemProxy.disable(port).catch(() => undefined)
+        await sidecar.stop().catch(() => undefined)
+        this.sidecar = null
+        this.activePort = null
+        this.deps.store.updateSettings({ systemProxyManagedByApp: false })
+        this.invalidateProxyCache()
+        this.machine.fail('BRIDGE_CRASH', describe(error))
+        this.emitStatus()
+        return this.status()
+      }
+      this.deps.store.updateSettings({ systemProxyManagedByApp: true })
       this.invalidateProxyCache()
-      this.machine.fail('BRIDGE_CRASH', describe(error))
-      this.emitStatus()
-      return this.status()
     }
 
-    this.deps.store.updateSettings({ systemProxyManagedByApp: true })
-    this.invalidateProxyCache()
     this.machine.transition('running')
     this.deps.session.startMonitor(() => {
       void this.handleSessionExpired()
     })
     this.emitStatus()
     return this.status()
+  }
+
+  /** Capture is optional (REQ-003): its state shows up as a status field, not a failure. */
+  private handleCaptureReport(report: CaptureReport): void {
+    this.captureReport = report
+    this.emitStatus()
+  }
+
+  /** Apply the current capture settings to the OS side without restarting the bridge. */
+  private async applyCaptureSettings(): Promise<void> {
+    const settings = this.settings()
+    if (this.machine.state === 'running' || this.machine.state === 'starting') {
+      const port = this.activePort ?? settings.bridgePort
+      if (settings.captureMode === 'selected-apps') {
+        await this.disableSystemProxyIfManaged(port)
+      } else if (!settings.systemProxyManagedByApp) {
+        try {
+          await this.deps.systemProxy.enable(port)
+        } catch (error) {
+          await this.deps.systemProxy.disable(port).catch(() => undefined)
+          this.invalidateProxyCache()
+          throw error
+        }
+        this.deps.store.updateSettings({ systemProxyManagedByApp: true })
+        this.invalidateProxyCache()
+      }
+    }
+    // Capture only exists while the bridge runs: the config write below is a no-op
+    // when it does not, and `runStart` writes the config for the next start.
+    this.refreshRuntimeConfig()
+    this.emitStatus()
+  }
+
+  /** Revoke the system proxy this app installed, if any (INV-002). */
+  private async disableSystemProxyIfManaged(port: number): Promise<void> {
+    if (!this.settings().systemProxyManagedByApp) return
+    await this.deps.systemProxy.disable(port)
+    this.deps.store.updateSettings({ systemProxyManagedByApp: false })
+    this.invalidateProxyCache()
+  }
+
+  /** Selecting apps fails fast when another tool owns the system proxy (ADR-0004/0006). */
+  private async assertNoForeignProxy(): Promise<void> {
+    const port = this.activePort ?? this.settings().bridgePort
+    const entries = await this.deps.systemProxy.read()
+    if (entries.length === 0) {
+      throw Object.assign(
+        new Error('未找到可用的系统网络服务：无法检查系统代理占用情况。'),
+        { code: 'BRIDGE_CRASH' },
+      )
+    }
+    if (entries.some((entry) => isConflict(entry.web, port) || isConflict(entry.secure, port))) {
+      throw Object.assign(new Error(ERROR_MESSAGES.PROXY_CONFLICT), { code: 'PROXY_CONFLICT' })
+    }
   }
 
   private fail(code: string, message: string): Promise<BridgeStatus> {
@@ -367,6 +463,10 @@ export class ProxyOrchestrator {
       webvpnBase: settings.webvpnBase,
       wrdKey: settings.wrdKey,
       wrdIv: settings.wrdIv,
+      // Empty in system-proxy mode: capture is opt-in and the two are exclusive.
+      capture: {
+        processes: settings.captureMode === 'selected-apps' ? settings.captureProcesses : [],
+      },
     }
     const path = join(this.deps.userDataDir, RUNTIME_CONFIG_FILENAME)
     mkdirSync(dirname(path), { recursive: true })

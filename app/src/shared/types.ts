@@ -17,6 +17,8 @@ export interface BridgeStatus {
   localCaptureEnabled: boolean
   bridgePort?: number
   error?: { code: string; message: string }
+  /** Why process capture failed, if it did (capture never fails the bridge). */
+  captureError?: string
 }
 
 export interface AllowlistConfig {
@@ -42,16 +44,30 @@ export interface SessionInfo {
   expiresAt?: string | null
 }
 
+/** How the bridge takes traffic: the system proxy, or mitmproxy local mode. */
+export type CaptureMode = 'system-proxy' | 'selected-apps'
+
+/** One row of the capture picker: a deduplicated application or executable. */
 export interface CaptureCandidate {
   pid: number
   name: string
+  /** mitmproxy intercept pattern (an `.app` bundle path or an executable path). */
+  pattern: string
+}
+
+/** `swufe-capture` control line: the sidecar's process-capture state. */
+export interface CaptureReport {
+  enabled: boolean
+  processes: string[]
+  error: string | null
 }
 
 /** Renderer-visible subset of AppSettings (WRD key/IV never cross the IPC boundary). */
 export interface AppSettingsView {
   bridgePort: number
   debugLogging: boolean
-  capturePids: number[]
+  captureMode: CaptureMode
+  captureProcesses: string[]
   webvpnBase: string
 }
 
@@ -74,7 +90,8 @@ export interface SwufeBridgeApi {
   uninstallCa(): Promise<CaOperationResult>
   getCaStatus(): Promise<CaStatus>
   listCaptureCandidates(): Promise<CaptureCandidate[]>
-  setCapturePids(pids: number[]): Promise<void>
+  setCaptureMode(mode: CaptureMode): Promise<void>
+  setCaptureProcesses(patterns: string[]): Promise<void>
   setDebugLogging(enabled: boolean): Promise<void>
   onDebugLog(cb: (e: DebugLogEvent) => void): () => void
   /** Main → Renderer status pushes (see docs/api/electron-ipc.md § `onStatus`). */

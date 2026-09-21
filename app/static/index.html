@@ -28,10 +28,69 @@
         </label>
       </section>
 
+      <section aria-labelledby="capture-mode-title">
+        <h2 id="capture-mode-title">捕获方式</h2>
+        <div role="radiogroup" aria-labelledby="capture-mode-title" class="radio-row">
+          <label>
+            <input
+              id="capture-mode-system-proxy"
+              type="radio"
+              name="capture-mode"
+              value="system-proxy"
+            />
+            <span>系统代理（全部流量）</span>
+          </label>
+          <label>
+            <input
+              id="capture-mode-selected-apps"
+              type="radio"
+              name="capture-mode"
+              value="selected-apps"
+            />
+            <span>指定应用</span>
+          </label>
+        </div>
+        <p id="capture-mode-hint" class="hint">
+          系统代理：全部流量经本桥；指定应用：只有所选应用的流量经本桥，本 App 不设置系统代理（切换时会撤销本 App
+          设置过的系统代理）。
+        </p>
+        <p id="capture-state">进程捕获：未启用</p>
+        <div class="row">
+          <input
+            id="capture-filter"
+            type="search"
+            placeholder="筛选应用名…"
+            autocomplete="off"
+            aria-label="筛选应用名"
+          />
+          <button id="capture-refresh" type="button">刷新列表</button>
+        </div>
+        <div id="capture-list" role="group" aria-labelledby="capture-mode-title"></div>
+        <p id="capture-guidance" class="hint" hidden>
+          首次启用时 macOS 会安装并激活 mitmproxy 的网络扩展：请在系统设置 → 通用 → 登录项与扩展（或弹出的授权提示）中允许。未在
+          5 秒内确认会导致启用失败，授权后点「重试」。
+        </p>
+        <button id="capture-retry" type="button" hidden>重试</button>
+      </section>
+
       <section aria-labelledby="allowlist-title">
         <h2 id="allowlist-title">Allowlist</h2>
-        <p id="allowlist-hosts">读取中…</p>
-        <p class="hint">allowlist 保存在 <code>config.json</code>，本版本不提供增删界面。</p>
+        <form id="allowlist-form">
+          <input
+            id="allowlist-input"
+            type="text"
+            placeholder="host.example.com"
+            autocomplete="off"
+            aria-label="要添加的主机名"
+          />
+          <button id="allowlist-add" type="submit">添加</button>
+        </form>
+        <ul id="allowlist-list"></ul>
+        <label class="checkbox">
+          <input id="allowlist-wildcard" type="checkbox" />
+          <span>启用 *.swufe.edu.cn</span>
+        </label>
+        <p class="hint">修改后立即生效（无需重启）；开桥要求至少一个主机或勾选通配。</p>
       </section>
 
       <section aria-labelledby="certificate-title">
@@ -51,6 +110,22 @@
           <span>调试日志</span>
         </label>
         <p class="hint">调试日志只记录域名与改写结果，不含正文与 Cookie。</p>
+      </section>
+
+      <section id="log-panel" aria-labelledby="log-panel-title" hidden>
+        <h2 id="log-panel-title">调试日志</h2>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">时间</th>
+              <th scope="col">域名</th>
+              <th scope="col">结果</th>
+            </tr>
+          </thead>
+          <tbody id="log-rows"></tbody>
+        </table>
+        <p class="hint">仅记录域名与改写结果，不含正文与 Cookie；最多保留最近 200 条。</p>
+        <button id="log-clear" type="button">清空</button>
       </section>
 
       <p id="message" role="status" aria-live="polite"></p>

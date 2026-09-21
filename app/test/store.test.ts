@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { AppStore, normalizeHost } from '../src/main/store'
+import { AppStore, normalizeCapturePatterns, normalizeHost } from '../src/main/store'
 import { tempUserDataDir } from './helpers/fakes'
 
 test('first run writes the documented defaults with a settings sibling key', () => {
@@ -18,7 +18,8 @@ test('first run writes the documented defaults with a settings sibling key', () 
   assert.deepEqual(raw.settings, {
     bridgePort: 8080,
     debugLogging: false,
-    capturePids: [],
+    captureMode: 'system-proxy',
+    captureProcesses: [],
     webvpnBase: 'https://webvpn.swufe.edu.cn',
     wrdKey: 'wrdvpnisthebest!',
     wrdIv: 'wrdvpnisthebest!',
@@ -33,7 +34,12 @@ test('allowlist and settings round-trip through the same file', () => {
   store.load()
 
   store.setAllowlist({ hosts: ['Jwxt.SWUFE.edu.cn', 'portal.swufe.edu.cn', 'jwxt.swufe.edu.cn'], includeSwufeWildcard: true })
-  store.updateSettings({ debugLogging: true, systemProxyManagedByApp: true, capturePids: [42] })
+  store.updateSettings({
+    debugLogging: true,
+    systemProxyManagedByApp: true,
+    captureMode: 'selected-apps',
+    captureProcesses: ['/usr/bin/curl', '/Applications/Google Chrome.app/'],
+  })
 
   const reloaded = new AppStore(dir)
   reloaded.load()
@@ -44,7 +50,60 @@ test('allowlist and settings round-trip through the same file', () => {
   const settings = reloaded.getSettings()
   assert.equal(settings.debugLogging, true)
   assert.equal(settings.systemProxyManagedByApp, true)
-  assert.deepEqual(settings.capturePids, [42])
+  assert.equal(settings.captureMode, 'selected-apps')
+  assert.deepEqual(settings.captureProcesses, ['/usr/bin/curl', '/Applications/Google Chrome.app/'])
+})
+
+test('capture settings fall back to defaults when the file is invalid', () => {
+  const dir = tempUserDataDir()
+  const store = new AppStore(dir)
+  writeFileSync(
+    store.path,
+    JSON.stringify({
+      hosts: ['jwxt.swufe.edu.cn'],
+      includeSwufeWildcard: false,
+      settings: {
+        captureMode: 'everything',
+        captureProcesses: ['/usr/bin/curl', '/bin/a,b', '', 7, '/usr/bin/curl'],
+      },
+    }),
+  )
+
+  store.load()
+
+  const settings = store.getSettings()
+  assert.equal(settings.captureMode, 'system-proxy')
+  assert.deepEqual(settings.captureProcesses, ['/usr/bin/curl'])
+})
+
+test('invalid capture patches are rejected and the file is left untouched', () => {
+  const store = new AppStore(tempUserDataDir())
+  store.load()
+  const before = readFileSync(store.path, 'utf-8')
+
+  assert.throws(() => store.updateSettings({ captureMode: 'everything' as never }), /捕获方式不合法/)
+  assert.throws(() => store.updateSettings({ captureProcesses: ['/bin/a,b'] }), /捕获进程列表不合法/)
+  assert.throws(() => store.updateSettings({ captureProcesses: [''] }), /捕获进程列表不合法/)
+  assert.throws(
+    () => store.updateSettings({ captureProcesses: ['/usr/bin/curl', '/usr/bin/curl'] }),
+    /捕获进程列表不合法/,
+  )
+  assert.throws(
+    () =>
+      store.updateSettings({
+        captureProcesses: Array.from({ length: 33 }, (_, index) => `/usr/bin/app-${index}`),
+      }),
+    /最多只能选择 32 个应用/,
+  )
+
+  assert.equal(readFileSync(store.path, 'utf-8'), before)
+})
+
+test('capture patterns are trimmed and deduplicated by one rule', () => {
+  assert.deepEqual(normalizeCapturePatterns(['  /usr/bin/curl ', '/usr/bin/curl', '', 5, 'a,b']), [
+    '/usr/bin/curl',
+  ])
+  assert.deepEqual(normalizeCapturePatterns('not an array'), [])
 })
 
 test('invalid hosts are rejected and the file is left untouched', () => {
