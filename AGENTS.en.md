@@ -21,9 +21,9 @@ Status:           Phase 1 delivered (M1 bridge core / M2 desktop orchestration /
                   M4 acceptance): the macOS side passes everything, including the academic-affairs
                   browser acceptance (TC-G01/G02 re-verified 2026-09-21 after the KI-011 fix, see
                   ADR-0007); spec 001 is `Implemented`. Open: the Windows real-machine items are
-                  deferred (KI-001) and KI-007 (automatic CA install) / KI-013 (TUN interference) /
-                  KI-014 (CAS theme assets truncated by the server) are unresolved, so it is not
-                  `Verified` yet
+                  deferred (KI-001) and KI-013 (TUN interference) / KI-014 (CAS theme assets truncated
+                  by the server) are unresolved, so it is not `Verified` yet (KI-007, the automatic CA
+                  install, is fixed — see ADR-0008)
 Primary language: Python 3 (bridge sidecar/Addon, WRD codec, see `swufe_bridge/`) + TypeScript (Electron app, from M2);
                   Markdown docs (`docs/` + `specs/`) plus Node documentation-check scripts form the bulk
 Repository type:  Documentation-first (docs/ + specs/) + implementation (Python bridge `swufe_bridge/`,

@@ -25,12 +25,12 @@
 - [x] macOS：教务站内导航可用，不因绝对 URL 跳飞到不可达地址（TC-G02，P0）——**M5（2026-09-21）通过**：网关原生空间下首页菜单与站内「学生成绩查询」均可交互、无错误页（同一 [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）
 - [ ] Windows：重复 TC-G01 通过（TC-G03，P0）——**延期**：机器不在本轮可访问环境（`KI-001`）
 - [ ] 所有 P0 用例通过（TC-A01/A02/A03、TC-B01..TC-B03、TC-C01..TC-C04、TC-D01..TC-D04、TC-E01/E02、TC-F01/F02、TC-G01..TC-G03）——**macOS 侧已全部通过**（M5 后 TC-G01/TC-G02 转通过）；**未满足的只有 TC-G03**（Windows 真机项延期，`KI-001`）
-- [ ] P1 用例无未决阻断缺陷——**未满足**：`KI-011` 已 `Fixed`（M5），仍未决的是 `KI-007`（CA 自动安装）、`KI-013`（TUN 干扰）、`KI-014`（CAS 主题资源被服务端截断，需重载登录窗）
+- [ ] P1 用例无未决阻断缺陷——**未满足**：`KI-011` 已 `Fixed`（M5），`KI-007` 已 `Fixed`（2026-09-21，[ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)）；仍未决的是 `KI-013`（TUN 干扰）、`KI-014`（CAS 主题资源被服务端截断，需重载登录窗）
 - [x] 教务浏览器验收在至少一侧桌面 OS 通过（目标两侧都过）——**M5（2026-09-21）已满足**：macOS 侧 TC-G01/TC-G02 通过；Windows 侧仍待 `KI-001` 解除后按 [development-run.md](../../operations/development-run.md) 复跑
 - [x] 已知问题列表已记录（`id/title/severity/status/linked_case/owner/note`，含验收期新增 `KI-007`..`KI-014`；M5 后 `KI-011` 置 `Fixed`）
 - [x] 相关文档已同步（含双语配对：`development-run.md`、milestone/roadmap/testing-strategy 与 Spec 五文件）
 
-> 出口口径：macOS 侧（含教务浏览器验收）已全部通过；Windows 侧显式延期。**「至少一侧桌面 OS 通过」这一下限已在 M5（2026-09-21）达成**，但「所有 P0 通过」仍差 TC-G03（Windows，`KI-001`）、「P1 无未决阻断缺陷」仍有 `KI-007`/`KI-013`/`KI-014`，故本里程碑保持 `In Progress`，Spec 001 推进到 `Implemented`（未到 `Verified`）。
+> 出口口径：macOS 侧（含教务浏览器验收）已全部通过；Windows 侧显式延期。**「至少一侧桌面 OS 通过」这一下限已在 M5（2026-09-21）达成**，但「所有 P0 通过」仍差 TC-G03（Windows，`KI-001`）、「P1 无未决阻断缺陷」仍有 `KI-013`/`KI-014`，故本里程碑保持 `In Progress`，Spec 001 推进到 `Implemented`（未到 `Verified`）。
 
 验收环境：macOS 与 Windows 各一台测试机、Chrome/Edge、mitmproxy 与 curl；测试账号为测试者自有西财账号（不写入仓库），仅在授权设备上使用。
 本轮实测补充：**验收前必须关闭其它代理工具的 TUN / 虚拟网卡模式**（Clash/mihomo fake-ip 会让经桥的上游连接挂起，见 `KI-013`）；教务只能以 `http://jwxt.swufe.edu.cn/...` 形态经网关代理（`https` 形态网关返回 `/wengine-vpn/failed`）。
@@ -53,7 +53,7 @@
 
 **本轮新增问题**：`KI-014`（CAS 主题静态资源被服务端截断 → 登录窗样式丢失，重载可恢复；与桥无关）。
 
-**仍未完成**：Windows 全部真机项（`KI-001`）；`KI-007`（CA 自动安装）、`KI-013`（TUN 干扰）、`KI-014`。
+**仍未完成**：Windows 全部真机项（`KI-001`）；`KI-013`（TUN 干扰）、`KI-014`。（该轮记录的 `KI-007` 已于 2026-09-21 修复，见 [ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)）
 
 ## 完成记录
 
@@ -74,4 +74,4 @@
 
 **验收期修复的缺陷**：`KI-008`（会话探测未带分区 Cookie ⇒ 任何真实会话被判过期、桥被自毁；P0）、`KI-009`（登录窗初始加载 ERR_ABORTED 被判致命 ⇒ 误导报错 + 页面停在只有扫码入口的初始渲染；P1）、`KI-010`（CA 卸载缺 `-Z` ⇒ 取不到指纹、无法卸载；P1）。
 
-**遗留问题**：`KI-007`（CA 自动安装需改造提权方式，属安全模型变更 + ADR）、`KI-011`（P0 阻断教务验收）、`KI-012`（个别直连主机经 mitmproxy 无响应，环境相关）、`KI-013`（TUN 干扰需环境预检/文案补充）、`KI-006`（Q-001 另两个失效信号）。
+**遗留问题**：`KI-011`（P0 阻断教务验收）、`KI-012`（个别直连主机经 mitmproxy 无响应，环境相关）、`KI-013`（TUN 干扰需环境预检/文案补充）、`KI-006`（Q-001 另两个失效信号）。（该轮的 `KI-007` 已于 2026-09-21 修复：CA 安装改为「提权写钥匙串 + 应用进程写信任设置」，见 [ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)）

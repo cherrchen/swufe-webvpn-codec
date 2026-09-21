@@ -102,7 +102,7 @@ This project adds one hard constraint: **never build a proxy core, TLS stack or 
 
 | Operation | Risk | Constraints (who may run it, audit required?) |
 | --------- | ---- | --------------------------------------------- |
-| Install the MITM CA | Local HTTPS on that device becomes decryptable | Only the local user may trigger it explicitly; a risk warning must be shown first (personal devices only, removable at any time, NFR-005) |
+| Install the MITM CA | Local HTTPS on that device becomes decryptable | Only the local user may trigger it explicitly; a risk warning must be shown first (personal devices only, removable at any time, NFR-005); the authorization is raised by macOS inside this app's own session — the certificate is elevated into the system keychain first, and the **app process itself** then writes the trust settings ([ADR-0008](../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.en.md)), never through an osascript-administered child |
 | Uninstall the MITM CA | TLS interception fails if the bridge is still running | Explicit local user action; stopping the bridge first is recommended |
 | Set the system proxy | Affects all HTTP/HTTPS traffic on the machine | Only when no other system proxy is in use; otherwise refuse to start (ADR-0004 / `PROXY_CONFLICT`) |
 | Clear the system proxy | Accidentally clearing a proxy the user set themselves | Clear only when the "set by this app" marker exists (NFR-004); stop, expiry and quit all follow this path |

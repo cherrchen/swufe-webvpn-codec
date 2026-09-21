@@ -27,12 +27,12 @@ Complete Phase 1 acceptance on real machines against the real WebVPN, reaching "
 - [x] macOS: in-site navigation works and does not jump to an unreachable address because of absolute URLs (TC-G02, P0) - **passed in M5 (2026-09-21)**: in the gateway-native space both the home-page menu and the in-site "Student Grade Query" are interactive with no error page (same [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md))
 - [ ] Windows: TC-G01 repeated and passed (TC-G03, P0) - **deferred**: the machine is not reachable in this round (`KI-001`)
 - [ ] All P0 cases pass (TC-A01/A02/A03, TC-B01..TC-B03, TC-C01..TC-C04, TC-D01..TC-D04, TC-E01/E02, TC-F01/F02, TC-G01..TC-G03) - **everything on macOS now passes** (TC-G01/TC-G02 turned to pass after M5); **only TC-G03 is unmet** (the Windows real-machine item is deferred, `KI-001`)
-- [ ] No unresolved blocking defects in the P1 cases - **not met**: `KI-011` is `Fixed` (M5); what is still unresolved is `KI-007` (automatic CA install), `KI-013` (TUN interference) and `KI-014` (CAS theme assets truncated by the server, so the login window needs a reload)
+- [ ] No unresolved blocking defects in the P1 cases - **not met**: `KI-011` is `Fixed` (M5) and `KI-007` is `Fixed` (2026-09-21, [ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.en.md)); what is still unresolved is `KI-013` (TUN interference) and `KI-014` (CAS theme assets truncated by the server, so the login window needs a reload)
 - [x] Browser acceptance on the academic-affairs site passes on at least one desktop OS (both targeted) - **met in M5 (2026-09-21)**: TC-G01/TC-G02 pass on macOS; the Windows side still waits for `KI-001` to be lifted and then re-run per [development-run.md](../../operations/development-run.md)
 - [x] The known-issues list is recorded (`id/title/severity/status/linked_case/owner/note`, including the new `KI-007`..`KI-014`; after M5 `KI-011` is set to `Fixed`)
 - [x] Affected documents are synced (including bilingual pairs: `development-run.md`, milestone/roadmap/testing-strategy and the five spec files)
 
-> Exit floor: on macOS, including the academic-affairs browser acceptance, everything passes; Windows is explicitly deferred. **The "at least one desktop OS" floor was reached in M5 (2026-09-21)**, but "all P0 pass" still misses TC-G03 (Windows, `KI-001`) and "no unresolved blocking P1 defects" still has `KI-007`/`KI-013`/`KI-014`, so this milestone stays `In Progress` and spec 001 advances to `Implemented` (not yet `Verified`).
+> Exit floor: on macOS, including the academic-affairs browser acceptance, everything passes; Windows is explicitly deferred. **The "at least one desktop OS" floor was reached in M5 (2026-09-21)**, but "all P0 pass" still misses TC-G03 (Windows, `KI-001`) and "no unresolved blocking P1 defects" still has `KI-013`/`KI-014`, so this milestone stays `In Progress` and spec 001 advances to `Implemented` (not yet `Verified`).
 
 Acceptance environment: one macOS and one Windows test machine, Chrome/Edge, mitmproxy and curl; the test account is the tester's own SWUFE account (never committed to the repository) and is used only on authorized devices.
 Measured additions this round: **the TUN / virtual-interface mode of any other proxy tool must be off before acceptance** (Clash/mihomo fake-ip makes upstream connections through the bridge hang, see `KI-013`); the academic-affairs site is only proxyable through the gateway in its `http://jwxt.swufe.edu.cn/...` form (the `https` form returns `/wengine-vpn/failed`).
@@ -55,7 +55,7 @@ Measured additions this round: **the TUN / virtual-interface mode of any other p
 
 **New issue this round**: `KI-014` (the CAS theme's static assets are truncated by the server → the login window loses its styling; a reload recovers it; unrelated to the bridge).
 
-**Still outstanding**: every Windows real-machine item (`KI-001`); `KI-007` (automatic CA install), `KI-013` (TUN interference), `KI-014`.
+**Still outstanding**: every Windows real-machine item (`KI-001`); `KI-013` (TUN interference), `KI-014`. (`KI-007`, listed in that round, was fixed on 2026-09-21 — see [ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.en.md).)
 
 ## Completion record
 
@@ -76,4 +76,4 @@ Measured additions this round: **the TUN / virtual-interface mode of any other p
 
 **Defects fixed during acceptance**: `KI-008` (session probe omitted the partition cookies, so every real session was reported expired and the bridge self-destructed; P0), `KI-009` (an ERR_ABORTED initial load was treated as fatal: misleading error plus a page stuck in the QR-only server render; P1), `KI-010` (CA uninstall lacked `-Z`, so no fingerprint could be read and uninstall never worked; P1).
 
-**Remaining issues**: `KI-007` (automatic CA install needs a different elevation mechanism: security-model change plus ADR), `KI-011` (P0, blocks browser acceptance), `KI-012` (some direct hosts get no response through mitmproxy; environment-dependent), `KI-013` (TUN interference needs an environment pre-check / wording), `KI-006` (the other two expiry signals of Q-001).
+**Remaining issues**: `KI-011` (P0, blocks browser acceptance), `KI-012` (some direct hosts get no response through mitmproxy; environment-dependent), `KI-013` (TUN interference needs an environment pre-check / wording), `KI-006` (the other two expiry signals of Q-001). (`KI-007` from that round was fixed on 2026-09-21: the CA install became "elevated keychain write + app-process trust-settings write", see [ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.en.md).)

@@ -8,7 +8,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 阶段 | Phase 1：M1–M4 已交付，**macOS 侧验收全部通过（含教务浏览器验收）**——2026-09-21 `KI-011` 修复（[ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）后复验 TC-G01/TC-G02 通过；Spec 001 状态 `Implemented`。未完成：Windows 侧真机项延期（`KI-001`）、`KI-007`（CA 自动安装）/`KI-013`（TUN 干扰）/`KI-014`（CAS 主题资源被服务端截断）未决，故未到 `Verified`（见 [verification.md](specs/001-phase1-local-bridge/verification.md)） |
+| 阶段 | Phase 1：M1–M4 已交付，**macOS 侧验收全部通过（含教务浏览器验收）**——2026-09-21 `KI-011` 修复（[ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）后复验 TC-G01/TC-G02 通过；Spec 001 状态 `Implemented`。未完成：Windows 侧真机项延期（`KI-001`）、`KI-013`（TUN 干扰）/`KI-014`（CAS 主题资源被服务端截断）未决，故未到 `Verified`（`KI-007` 的 CA 自动安装已于 2026-09-21 修复，见 [ADR-0008](docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)；见 [verification.md](specs/001-phase1-local-bridge/verification.md)） |
 | 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)；含桥实现（[swufe_bridge/](swufe_bridge/wrd_codec.py)、[tests/](tests/l0/test_wrd_codec.py)）与桌面应用（[app/](app/README.md)） |
 | 第一期 Feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |

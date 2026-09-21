@@ -53,8 +53,8 @@ npm --prefix app start -- --user-data-dir=/tmp/swufe-dev      # isolated profile
 
 | Operation | Platform behaviour |
 | --------- | ------------------ |
-| Install the local CA | The UI shows a risk notice first; on confirmation osascript runs `do shell script … with administrator privileges` to execute `security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <caCert>`. **A system administrator password prompt appears**; cancelling aborts with no writes |
-| Uninstall the local CA | Same elevation, running `security delete-certificate -Z <sha1>` |
+| Install the local CA | The UI shows a risk notice first; on confirmation two steps run ([ADR-0008](../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)): ① osascript's `do shell script … with administrator privileges` runs `security add-certificates -k /Library/Keychains/System.keychain <caCert>` to put the certificate into the system keychain (**a system administrator authorization dialog appears**; cancelling aborts with no writes); ② the **app process itself** then runs `security add-trusted-cert -d -r trustRoot <caCert>` to write the admin-domain trust settings (no `-k`, so the keychain is untouched; macOS handles the authorization for this app's own session) |
+| Uninstall the local CA | Same elevation, running `security delete-certificate -Z <sha1>` (keychain only; an admin-domain trust entry cannot be cleared by the CLI — see the residue note in `KI-010`) |
 | Process capture ("selected apps") | On macOS, mitmproxy installs and activates a network extension on first use; the authorization prompt must be **confirmed within 5 seconds**. A timeout fails the attempt and the UI shows guidance plus a "retry" button. Windows requires UAC elevation (see [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)) |
 
 > On Windows, CA installation writes to the **current-user** Root store (`certutil -user -addstore Root <caCert>`) and shows no administrator password prompt; uninstalling is `certutil -user -delstore Root mitmproxy`.
@@ -90,7 +90,7 @@ npm run acceptance:check -- --out <dir> --user-data-dir <profile>
 | --------- | ----------------- |
 | System proxy | Read and written through the WinINET registry (`ProxyEnable` / `ProxyServer` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings`), leaving every other setting alone |
 | When it takes effect | **No `WM_SETTINGCHANGE` broadcast**: already-running browsers may keep using the previous proxy until restarted |
-| CA | Written to the current-user Root store (`certutil -user`), no administrator needed; macOS uses the system keychain and needs elevation |
+| CA | Written to the current-user Root store (`certutil -user`), no administrator needed; macOS uses the system keychain — the install elevates for the keychain write and then has the app process write the trust settings (see [ADR-0008](../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)) |
 | Process capture | Requires UAC elevation; real scope verification of "selected apps" is deferred with the Windows real-machine items |
 
 > Windows real-machine verification (TC-C02..C04, TC-E01/E02, TC-G03/G04) has not run yet; the reason and the exit conditions are in [verification.md](../../specs/001-phase1-local-bridge/verification.md) ("未验证 / 无法验证项") and in `KI-001` of [known-issues.md](../../specs/001-phase1-local-bridge/known-issues.md).

@@ -25,7 +25,7 @@
 | REQ-007 | TC-F03（L1 组件：`Location` 反向改写）；TC-G02（L3 手工：教务页面内导航不跳飞） | Passed（M5：macOS 的 TC-G02 复验通过——教务首页与站内导航均在网关原生空间可用且不跳飞；`Location` 反向改写本身在 M1/L1 与真实链路均通过；两条例外（网关自有命名空间直通、bootstrap 文档升级）见 [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）；M4 曾 `Failed`（TC-G02 因网关客户端 shim 与透明桥不兼容而失败，见 `KI-011`；`Location` 反向改写本身在真实链路上通过——经桥 `http://jwxt.swufe.edu.cn/` 的 `302` 被改写为普通主机）；M1 已通过：`Location`、`Set-Cookie` Domain/Path、HTML/JS/JSON 反向改写与内容类型边界（`tests/l1/test_rewrite.py`、`tests/l1/test_addon_response.py`） |
 | REQ-008 | TC-D04（L2 集成 / L3 手工：登录 WebView 无代理环）；TC-F02（L2 集成：非 allowlist 直连不改写） | Passed（M4：真实 CAS 会话下登录窗口 `resolveProxy(https://webvpn.swufe.edu.cn) = DIRECT`，登录期间无 webvpn/authserver 的 `swufe-debug` 行；桥运行期这两个主机均为 `not-allowlisted`，防环对照段记录到未包装的 `302 → https://webvpn.swufe.edu.cn/login`）；M2 已通过：登录分区 `setProxy({mode:'direct'})`，实机日志 `resolveProxy(...) = DIRECT` 且登录期间无 `swufe-debug` 行；M1 已通过：TC-F02 与「已是 WebVPN 形态的请求直通」 |
 | REQ-009 | TC-F04（L2 集成 + L3 手工：调试日志仅域名与改写结果）；TC-H01（L3 手工：状态可见） | Passed（M4：真实桥流量下逐条出现——累计 200 条上限、最新在前、行内只有「时间/域名/结果」，关闭开关后面板隐藏且行数归 0（TC-F04 + TC-H01））；M3 已通过：日志面板三列（时间/域名/结果）、200 条上限、最新在前、清空、随开关显示/隐藏与关闭时清空——在真实渲染层上以真实 `onDebugLog` 推流验证，且事件携带的额外字段（cookie/body）不进入界面；M2 已通过：debug 事件经 IPC 到达渲染层且只保留契约的五个键（`app/test/sidecar-lines.test.ts`、`app/test/debug-relay.test.ts`）；M1 已通过：TC-F04 的 L2 部分（键集固定、无 Cookie/正文） |
-| REQ-010 | TC-E01、TC-E02、TC-E03（L3 手工，需管理员权限：安装 CA、卸载 CA、未装 CA 提示 `CA_MISSING`） | Passed（M4：TC-E01 经应用自带的手动命令把 CA 写入系统信任库并被系统信任（自动路径失败，见 `KI-007`）、TC-E02 修复 `KI-010` 后卸载成功（钥匙串 0 字节、UI「未安装」）、TC-E03 未装 CA 时开桥返回 `CA_MISSING` 且未做任何 OS 变更）；M2 已通过：TC-E03、安装前风险提示模态、CA 生成入口（`tests/l1/test_ca.py`） |
+| REQ-010 | TC-E01、TC-E02、TC-E03（L3 手工，需管理员权限：安装 CA、卸载 CA、未装 CA 提示 `CA_MISSING`） | Passed（**2026-09-21 `KI-007` 修复后复验：TC-E01 已由应用内自动路径通过（`#message` = 「本机 CA 已安装并被系统信任。」、`getCaStatus() = {installed:true,trusted:true}`、管理域信任项含该 CA、`verify-cert` 退出码 0），安装改为「提权写系统钥匙串 + 应用进程写信任设置」，见 [ADR-0008](../../docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)**；M4：TC-E01 经应用自带的手动命令把 CA 写入系统信任库并被系统信任（自动路径失败，见 `KI-007`）、TC-E02 修复 `KI-010` 后卸载成功（钥匙串 0 字节、UI「未安装」）、TC-E03 未装 CA 时开桥返回 `CA_MISSING` 且未做任何 OS 变更）；M2 已通过：TC-E03、安装前风险提示模态、CA 生成入口（`tests/l1/test_ca.py`） |
 | REQ-011 | TC-G01（L3 手工：macOS 教务验收）；TC-G03（L3 手工：Windows 教务验收） | Passed（M5：macOS 侧（TC-G01）通过；TC-G03 延 Windows，见 `KI-001`）；M4 曾 `Failed`（macOS 的 TC-G01/TC-G02 失败，根因见 `KI-011`；TC-G03 延 Windows，见 `KI-001`） |
 | NFR-001 | 代码审查（TLS/HTTP2/证书签发实现来自 mitmproxy，无自研 PKI）；TC-E01（L3 手工：CA 生成于 mitmproxy 专用 confdir） | Passed（M2：CA 生成入口 `swufe_bridge/ca.py` 复用 mitmproxy `CertStore`，App 与 sidecar 使用同一 `<userData>/mitmproxy/` confdir，实机开桥即在该目录生成 CA）；M1 已通过：TLS/HTTP2/证书签发全部来自 mitmproxy（无自研 PKI） |
 | NFR-002 | TC-A01..A05（L0 单元：与 `wrd_codec.py` 向量一致，含 authserver / jwxt 样本） | Passed（M1） |
@@ -45,7 +45,7 @@ Status 取值：`Pending` / `Passed` / `Failed` / `N/A`（`N/A` 必须写明理�
 | AC-002 | TC-D01（L1/L3：登录后 `loggedIn=true`）+ TC-F04（日志检查无 Cookie/密码） | Passed（M4：真实 CAS/MFA 会话下 `loggedIn = true`（`expiresAt` 有值）、状态条「已登录」、profile 内无密码文件；日志面板与 `swufe-debug` 行只含域名/结果（TC-F04））；M2 已通过：桩上游下「登录 → `loggedIn=true` → 状态条已登录」，过程无密码文件；M1 已通过：日志检查部分 |
 | AC-003 | TC-C01（L1/L2：系统代理已占用时拒绝启动并提示） | Passed（M2：实机模态提示 + OS 设置未变 + 未启动 sidecar） |
 | AC-004 | TC-C02 / TC-C03 / TC-C04（L1/L2：开桥设代理、关桥清代理、退出清代理）+ TC-G04（M3：指定应用时不设置系统代理） | Passed（M2：实机 `networksetup` 三态证据；M3：捕获方式为「指定应用」时编排层不调用 `enable` 并在切换时撤销本 App 设置过的代理（`app/test/orchestrator.test.ts`），实机切换捕获方式后 `networksetup` 仍为 `Enabled: No`。M4：TC-G04 的真实范围已通过——捕获态下系统代理为 `Enabled: No`、被选中的 Chrome 经桥、未选中的 curl 不经桥、切回「系统代理」即恢复（`KI-002` 置 `Fixed`）；M2/M4 的 TC-C02/C03/C04 实机三态证据见结果表） |
-| AC-005 | TC-E01 / TC-E02（L3 手工：CA 安装与卸载在系统信任库生效） | Passed（M4：TC-E01 的信任库写入以应用自带的手动命令完成（自动路径失败见 `KI-007`），`security verify-cert` 退出码 0、`getCaStatus() = {installed:true,trusted:true}`；TC-E02 修复 `KI-010` 后卸载成功（系统钥匙串中 `mitmproxy` 证书 0 字节、UI「未安装」）；M2 已通过：实现、风险提示与 `CA_MISSING`） |
+| AC-005 | TC-E01 / TC-E02（L3 手工：CA 安装与卸载在系统信任库生效） | Passed（**2026-09-21 `KI-007` 修复后复验：TC-E01 由应用内自动路径完成（系统钥匙串含该证书、管理域信任项含该 CA、`security verify-cert` 退出码 0、`getCaStatus() = {installed:true,trusted:true}`、UI「已安装并被系统信任」），见 [ADR-0008](../../docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)**；M4：TC-E01 的信任库写入以应用自带的手动命令完成（自动路径失败见 `KI-007`）、TC-E02 修复 `KI-010` 后卸载成功（系统钥匙串中 `mitmproxy` 证书 0 字节、UI「未安装」）；M2 已通过：实现、风险提示与 `CA_MISSING`） |
 | AC-006 | TC-B01 / TC-B02 / TC-B05（L0/L1）+ TC-H02（L3 手工：默认含 jwxt、可增删、可勾选通配） | Passed：M3 实机通过界面增删主机与通配勾选，且重启 App 后仍保留（TC-B05 / TC-H02）；M1/M2 已通过：默认值、小写化/校验、持久化与跨语言同文件读取 |
 | AC-007 | TC-G01 / TC-G02 / TC-G03（L3 手工：教务可打开并操作） | Passed（M5：macOS 通过——入口 `http://jwxt.swufe.edu.cn/` 首次进入时被升级到 WebVPN 原生 URL 形态（`https://webvpn.swufe.edu.cn/http/<token>/…`，见 [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)），随后首页、菜单与站内「学生成绩查询」均可交互且链接不跳飞到不可达地址；其它 allowlist 主机（实测 `www.swufe.edu.cn`）仍是普通主机名；TC-G03 延 Windows，见 `KI-001`）；M4 曾 `Failed`（macOS 的 TC-G01/TC-G02 失败——根 URL 白屏、真实页渲染但不可交互，根因与候选解除路径见 `KI-011`；网关的改写与反向改写链路本身经 curl 与 Chrome 内 `fetch` 双向复核可用；TC-G03 延 Windows，见 `KI-001`） |
 | AC-008 | TC-D03（L3 手工：过期停桥、清代理、弹窗重登） | Passed（M2：实机 8 秒内完成停桥 + 清代理 + 模态「WebVPN 会话已失效…」+ [去登录]，重登后状态回到「已登录」） |
@@ -344,6 +344,39 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 **副作用与已知残留**：被升级主机的地址栏进入 `https://webvpn.swufe.edu.cn/<scheme>/<token>/…`；网关原生空间下桥的调试日志只能证明「已升级」，不能再逐条证明页面内跳转（由网关服务端改写负责）；`https` scheme token 对教务不可用（入口必须 `http://`，升级目标随之用 `/http/<token>/…`）。
 **入库证据**：`evidence/acceptance-macos/acceptance-darwin-20260921-154657.md`（脱敏，`redaction-self-check: PASS`）；`--save-body` 产物与浏览器截图只留在 `/tmp/ki011-evidence/`，不入库。
 
+### `KI-007` 修复复验执行记录（2026-09-21）
+
+> 范围：`KI-007`（CA 自动安装）的修复（[ADR-0008](../../docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)）及其 macOS 真机复验（TC-E01 / TC-E02 / REQ-010 / AC-005）。
+> 驱动方式：真实应用（`npm --prefix app start -- --user-data-dir=/tmp/ki007-e2e/userdata --remote-debugging-port=9222`，经 hub 常驻）+ CDP 驱动界面；cherrchen 负责需要人的动作（系统管理员授权窗口）。
+> 前置状态：TUN / 其它系统代理未启用；`git status --short` 只有本轮改动；基线 `security dump-trust-settings -d` 无本机 CA 条目（既有条目 `MicrodoneCA` 与本项目无关），系统钥匙串无 `mitmproxy` 证书。
+
+**Phase 0：机制取证（终端，登录用户，无 sudo）**
+
+| 输入 | 实测 | 结论 |
+| ---- | ---- | ---- |
+| `security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <caCert>` | 退出码 1，`SecCertificateAddToKeychain: Write permissions error.`，无弹窗；钥匙串与信任设置均未变 | 写系统钥匙串必须 root（非 root 不会弹授权窗口） |
+| `security add-certificates -k <登录钥匙串> <caCert>`（连续两次） | 首次成功；再次 `security: … already in <keychain>`，退出码 1 | 重复导入的失败形态 → 安装步骤 1 的容错判据 |
+| `security add-trusted-cert -d -r trustRoot <caCert>`（**不带** `-k`） | 退出码 0；`SecurityAgent` 弹出 `SFAuthenticationWindow`（16:49:43 置前、16:49:48 关闭），`authorizationhost` 记录 `Verify basic credentials`；随后 `security trust-settings-export -d` 含该 CA 的 SHA-1 与新 `modDate` | 信任设置写入由系统授权窗口承担；不带 `-k` 时不动钥匙串（`trusted_cert_add` 仅在给了 `-k` 时调用 `SecCertificateAddToKeychain`） |
+| 端到端信任：以该 CA 签发叶证书 + `openssl s_server`，`/usr/bin/curl`（SecureTransport） | `http=200`、退出码 0；`security verify-cert -c <caCert> -p ssl` 退出码 0 | 管理域信任真实生效（不是工具输出误读） |
+| `security remove-trusted-cert -d <caCert>` / `security trust-settings-import -d <plist>`（普通用户） | 均阻塞：15s / 70s 无输出、无效果 | 管理域信任项无法由普通用户进程清除 |
+| `security trust-settings-import -d <plist>`（osascript 提权 = root） | `SecTrustSettingsImportExternalRepresentation: The authorization was denied since no user interaction was possible. (1)` | 与 `KI-007` 同源：提权子进程不在 GUI 会话内 |
+
+**执行与结果（应用内，CDP 驱动）**
+
+| 步骤 | 命令 / 动作 | 观察 |
+| ---- | ----------- | ---- |
+| 1 | 起应用（隔离 profile `/tmp/ki007-e2e/userdata`） | 基线：`#ca-state` = 「未安装」、`#message` 为空、`getCaStatus() = {installed:false,trusted:false}`、`security find-certificate -a -c mitmproxy -Z /Library/Keychains/System.keychain \| wc -c` = 0 |
+| 2 | 点 `#install-ca` → 风险模态（NFR-005）→ 确认 → 在系统管理员授权窗口输入密码（cherrchen） | `#message` = 「本机 CA 已安装并被系统信任。」；`#ca-state` = 「已安装并被系统信任」；`getCaStatus() = {installed:true,trusted:true}`；`security find-certificate -a -c mitmproxy -Z /Library/Keychains/System.keychain` → `SHA-1 hash: 474FA302A4B3C18DE314C873E5B75FAAB493D2AD`；`security trust-settings-export -d` 含 `474FA302…`；`security verify-cert -c <confdir>/mitmproxy-ca-cert.pem -p ssl` 退出码 0；以该 CA 签发叶证书 `curl` → `http=200`；`#message` 不含 `sudo`，全程未开终端 |
+| 3 | 证书已在钥匙串时再次点安装（幂等） | 仍返回成功（`add-certificates` 的 `already in` 容错分支生效），`#message`、`#ca-state` 同上 |
+| 4 | 点 `#uninstall-ca` → 授权窗口 | `#message` = 「本机 CA 已卸载。」；`#ca-state` = 「未安装」；`security find-certificate … \| wc -c` = 0；`getCaStatus() = {installed:false,trusted:true}`（`trusted` 仍为 `true` 属 `KI-010` 记录的信任项残留，UI/门禁以钥匙串成员资格判定） |
+| 5 | 未装 CA 时开桥（TC-E03 门禁） | 未构造出端到端复现：本轮未登录，开桥前置校验先返回 `NOT_LOGGED_IN`（顺序见 `app/src/main/orchestrator.ts`）；`getCaStatus() = {installed:false,…}` 即该门禁的输入，且门禁自 M4 起未改动 |
+
+**Phase 2（取消路径）：未验证。** 三次尝试（应用内两次、终端 `osascript` 一次）均未取到「用户取消」样本——应用内的两次系统授权被满足、安装正常完成（其中一次在凭据缓存有效期内未弹窗），终端那次 `osascript` 授权窗口到本轮记录时仍在等待人工操作（进程已停止）。按计划口径记为未验证、不计入通过。取消分支的代码路径为 `runPrivilegedDarwin()` 把 osascript 的 `User canceled` 归一为 `已取消授权`，再由 `describeFailure()` 归入「已取消系统授权，未做任何更改。」（该正则取自 M2 起的既有实现，本轮未取得实机样本）。
+
+**本轮修复**：`KI-007` → `Fixed`（安装改为「提权写系统钥匙串 + 应用进程写管理域信任设置」，见 [ADR-0008](../../docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)）；T023、T030 勾选。
+**需要 cherrchen 的动作**：系统管理员授权窗口输入密码（步骤 2、4），以及一次未完成的「取消」操作（Phase 2）。
+**已知残留**：管理域信任项在卸载后无法经 CLI 清除（`KI-010` 已记录）；安装是否弹窗取决于凭据缓存（同一会话内 `system.privilege.admin` 的 `timeout = 300` 内重复操作复用缓存凭据），见 ADR-0008 的 Consequences。
+
 ## 边界与异常场景
 
 | 场景 | 期望行为 | 实际结果 | Status |
@@ -393,10 +426,9 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 | 项 | 原因 | 已尝试 | 需要谁决策 |
 | -- | ---- | ------ | ---------- |
 | Windows 真机项（TC-C02/C03/C04、TC-E01/E02 on Windows、TC-G03/G04） | **本轮延期**：Windows 测试机不在本轮可访问环境内（`KI-001`） | 实现与单测已完成（`app/test/system-proxy-parse.test.ts`、`app/test/cert-parse.test.ts`）；Windows 步骤已写入 [development-run.md](../../docs/operations/development-run.md) 的「Windows 差异」与 [verification.md](verification.md) 的 M4 手册；跨平台采集脚本 `npm run acceptance:check` 可在 Windows 直接产出同类脱敏证据 | cherrchen（提供可访问的 Windows 测试机；解除条件按时序写入 `KI-001`） |
-| CA **自动**安装（应用内 osascript 提权写入信任设置） | macOS 15.6 下 osascript 提权子进程无法为 `SecTrustSettingsSetTrustSettings` 弹出 GUI 授权（`no user interaction was possible`）；证书可写入钥匙串，但信任设置写不进 | 已实测失败原文、已确认应用自带的手动命令可用（`sudo security add-trusted-cert …`），TC-E01 以该手动路径通过；细节见 `KI-007` | cherrchen（是否按 `KI-007` 的建议方向改造提权方式——由应用进程直接调用 `security`，让 SecurityAgent 在本 App 的 GUI 会话内弹授权；属安全模型变更，需 ADR） |
 | 会话 Cookie 名与另两个失效信号（Q-001 / DQ-001） | 另两个信号（`Set-Cookie` 清空、连续改写后 302 到 CAS）本轮未观测到（本轮用的是服务端使 ticket 失效 → 探测 `302 → /login`） | M4 已采集并只记名：`wengine_vpn_ticketwebvpn_swufe_edu_cn`、`route`、`show_vpn`、`heartbeat`、`show_faq`；已确认信号原文 `会话探测：status=302 location=https://webvpn.swufe.edu.cn/login → expired`；登记为 `KI-006` | cherrchen（是否需要为另两个信号补实现，或以现有信号收敛 Q-001） |
 
-> 已解除的旧条目：TC-E01/TC-E02（系统信任库写入，见 `KI-007`/`KI-010`）、TC-G04 的真实范围（`KI-002` 置 `Fixed`）、日志面板与真实桥联动（`KI-003` 置 `Fixed`）；**M5（2026-09-21）**：L3 教务浏览器验收（TC-G01、TC-G02）已从本表移除——`KI-011` 修复后 macOS 实机复验通过，见「M5（`KI-011` 修复）执行记录」。
+> 已解除的旧条目：TC-E01/TC-E02（系统信任库写入，见 `KI-007`/`KI-010`）、TC-G04 的真实范围（`KI-002` 置 `Fixed`）、日志面板与真实桥联动（`KI-003` 置 `Fixed`）；**M5（2026-09-21）**：L3 教务浏览器验收（TC-G01、TC-G02）已从本表移除——`KI-011` 修复后 macOS 实机复验通过，见「M5（`KI-011` 修复）执行记录」。**2026-09-21（`KI-007` 修复）**：CA **自动**安装已从本表移除——安装改为「提权写系统钥匙串 + 应用进程写管理域信任设置」（[ADR-0008](../../docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)），应用内一次点击即可完成，见「`KI-007` 修复复验执行记录（2026-09-21）」。
 
 ## 结论
 
@@ -405,5 +437,5 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 - [x] 文档影响已处理
 - [ ] Spec 状态可推进到 `Verified`
 
-> 当前：M1/M2/M3 已交付；M4 的 macOS 交互式验收已执行完毕（2026-09-21），新增 `Passed`：REQ-002、REQ-003、REQ-008、REQ-009、REQ-010、NFR-003/NFR-004 的 M4 部分、AC-002、AC-005、AC-009、AC-010，以及 TC-D01/D02/D03/D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05；**M5（2026-09-21，`KI-011` 修复后复验）**：REQ-001、REQ-007、REQ-011、NFR-006、AC-001、AC-007 转为 `Passed`（macOS 侧的教务浏览器验收 TC-G01/TC-G02 通过），因此 macOS 侧出口条件全部满足；`Deferred` 仅剩 Windows 全部真机项（`KI-001`）。未决问题：P1 `KI-007`（CA 自动安装）/`KI-013`（TUN 干扰）/`KI-014`（CAS 主题资源被服务端截断）、P2 `KI-006`/`KI-012`。Feature 状态推进到 `Implemented`，但 `Verified` 仍需 P0 全绿（Windows 侧），故不推进；M4 里程碑同理保持 `In Progress`（见 [docs/planning/milestones/M4-acceptance.md](../../docs/planning/milestones/M4-acceptance.md)）。
+> 当前：M1/M2/M3 已交付；M4 的 macOS 交互式验收已执行完毕（2026-09-21），新增 `Passed`：REQ-002、REQ-003、REQ-008、REQ-009、REQ-010、NFR-003/NFR-004 的 M4 部分、AC-002、AC-005、AC-009、AC-010，以及 TC-D01/D02/D03/D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05；**M5（2026-09-21，`KI-011` 修复后复验）**：REQ-001、REQ-007、REQ-011、NFR-006、AC-001、AC-007 转为 `Passed`（macOS 侧的教务浏览器验收 TC-G01/TC-G02 通过），因此 macOS 侧出口条件全部满足；`Deferred` 仅剩 Windows 全部真机项（`KI-001`）。未决问题：P1 `KI-013`（TUN 干扰）/`KI-014`（CAS 主题资源被服务端截断）、P2 `KI-006`/`KI-012`（`KI-007` 的 CA 自动安装已于 2026-09-21 修复，见 [ADR-0008](../../docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)）。Feature 状态推进到 `Implemented`，但 `Verified` 仍需 P0 全绿（Windows 侧），故不推进；M4 里程碑同理保持 `In Progress`（见 [docs/planning/milestones/M4-acceptance.md](../../docs/planning/milestones/M4-acceptance.md)）。
 > 因此 macOS 侧的出口条件「所有 P0 用例通过（macOS 侧）」与「教务浏览器验收在至少一侧通过」**已满足**，Feature 推进到 `Implemented`；`Verified` 仍需 P0 全绿（Windows 侧 TC-G03 延期，`KI-001`），M4 里程碑保持 `In Progress`（见 [docs/planning/milestones/M4-acceptance.md](../../docs/planning/milestones/M4-acceptance.md)）。

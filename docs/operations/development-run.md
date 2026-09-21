@@ -54,8 +54,8 @@ npm --prefix app start -- --user-data-dir=/tmp/swufe-dev      # 使用隔离 pro
 
 | 操作 | 平台行为 |
 | ---- | -------- |
-| 安装本机 CA | 先在界面弹出风险提示模态；确认后由 osascript 的 `do shell script … with administrator privileges` 提权执行 `security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <caCert>`。**会弹出系统管理员密码框**，取消即中止（不产生任何写入） |
-| 卸载本机 CA | 同样提权执行 `security delete-certificate -Z <sha1>` |
+| 安装本机 CA | 先在界面弹出风险提示模态；确认后分两步（[ADR-0008](../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)）：① osascript 的 `do shell script … with administrator privileges` 提权执行 `security add-certificates -k /Library/Keychains/System.keychain <caCert>` 把证书写入系统钥匙串（**会弹出系统管理员授权窗口**，取消即中止、不产生任何写入）；② 由**应用进程自己**执行 `security add-trusted-cert -d -r trustRoot <caCert>` 写入管理域信任设置（不带 `-k`，不改动钥匙串；授权由 macOS 面向本 App 的会话处理） |
+| 卸载本机 CA | 同样提权执行 `security delete-certificate -Z <sha1>`（只删钥匙串；管理域信任项无法经 CLI 清除，残留观察见 `KI-010`） |
 | 进程捕获（「指定应用」） | macOS 首次启用时 mitmproxy 会安装并激活网络扩展，需在授权提示内**在 5 秒内确认**；超时即失败，界面给出引导与「重试」。Windows 侧需要 UAC 提权（见 [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)） |
 
 > Windows 的 CA 安装写入**当前用户**根存储（`certutil -user -addstore Root <caCert>`），不弹管理员密码框；卸载为 `certutil -user -delstore Root mitmproxy`。
@@ -91,7 +91,7 @@ npm run acceptance:check -- --out <dir> --user-data-dir <profile>
 | ---- | ------------ |
 | 系统代理 | 通过 WinINET 注册表（`HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyEnable` / `ProxyServer`）读写，不动其它设置 |
 | 生效时机 | **不广播 `WM_SETTINGCHANGE`**：已经在运行的浏览器可能继续使用旧代理，需要重启浏览器才感知 |
-| CA | 写入当前用户根存储（`certutil -user`），不需要管理员；macOS 走系统钥匙串并需要提权 |
+| CA | 写入当前用户根存储（`certutil -user`），不需要管理员；macOS 走系统钥匙串，安装时先提权写钥匙串、再由应用进程写入信任设置（见 [ADR-0008](../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)） |
 | 进程捕获 | 需要 UAC 提权；「指定应用」的真实范围验证随 Windows 真机项一并延期 |
 
 > Windows 真机验证（TC-C02..C04、TC-E01/E02、TC-G03/G04）尚未执行，原因与解除条件见 [verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「未验证 / 无法验证项」与 [known-issues.md](../../specs/001-phase1-local-bridge/known-issues.md) 的 `KI-001`。
