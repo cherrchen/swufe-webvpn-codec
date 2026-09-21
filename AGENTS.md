@@ -16,11 +16,14 @@ Project:          SWUFE WebVPN Bridge（仓库 swufe-webvpn-codec）
 Purpose:          在 macOS / Windows 上以 Electron 桌面应用提供本机桥：用户完成官方网瑞达
                   WebVPN（CAS/MFA）登录后，本机浏览器对 allowlist 内主机自动经 WebVPN 访问
                   （第一期验收：教务 jwxt.swufe.edu.cn 可打开并操作）
-Status:           Phase 1 文档已对齐（2026-09-20）；M1 桥核心（Python sidecar + WRD 改写）已实现并通过
-                  L0/L1/L2（2026-09-21）；M2（Electron 壳 / 系统代理 / CA）未开始
+Status:           Phase 1 已交付（M1 桥核心 / M2 桌面编排 / M3 体验打磨 / M4 验收）：macOS 侧验收全部通过，含
+                  教务浏览器验收（2026-09-21 修复 KI-011 后复验 TC-G01/G02 通过，见 ADR-0007）；Spec 001 为
+                  `Implemented`。未完成：Windows 侧真机项延期（KI-001）、KI-007（CA 自动安装）/KI-013（TUN
+                  干扰）/KI-014（CAS 主题资源被服务端截断）未决，故未到 `Verified`
 Primary language: Python 3（bridge sidecar/Addon、WRD codec，见 `swufe_bridge/`）+ TypeScript（Electron 应用，M2 起）；
                   文档（`docs/` + `specs/`）与 Node 文档检查脚本是主体
-Repository type:  Documentation-first（docs/ + specs/）+ Python 桥实现（`swufe_bridge/`、`tests/`）
+Repository type:  Documentation-first（docs/ + specs/）+ 实现（Python 桥 `swufe_bridge/`、Electron 应用 `app/`、
+                  `tests/`）+ Node 文档检查脚本
 Owner:            cherrchen
 ```
 
