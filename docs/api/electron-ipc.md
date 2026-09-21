@@ -33,12 +33,15 @@
 | `getStatus` | 是（只读） |
 | `getAllowlist` | 是（只读） |
 | `setAllowlist` | 是（整体覆盖写入） |
+| `getSettings` | 是（只读） |
 | `installCa` / `uninstallCa` | 是 |
 | `getCaStatus` | 是（只读） |
 | `listCaptureCandidates` | 是（只读） |
 | `setCapturePids` | 是（整体覆盖写入） |
 | `setDebugLogging` | 是 |
 | `onDebugLog` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
+| `onStatus` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
+| `onSessionExpired` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
 
 > 原包未逐条规定幂等性；上表是本文档对实现的约定。
 
@@ -78,6 +81,15 @@ interface DebugLogEvent {
   rewritten: boolean
   direction: 'request' | 'response'
   detail?: string   // 短信息，无 body
+}
+```
+
+```ts
+interface AppSettingsView {
+  bridgePort: number
+  debugLogging: boolean
+  capturePids: number[]
+  webvpnBase: string
 }
 ```
 
@@ -188,6 +200,17 @@ setAllowlist(cfg: AllowlistConfig): Promise<void>
 - 输出：`Promise<void>`。
 - 错误：见 [错误模型](#错误模型)（`hosts` 为空且未开通配时启动桥返回 `ALLOWLIST_EMPTY`）。
 
+### `getSettings(): Promise<AppSettingsView>`
+
+```ts
+getSettings(): Promise<AppSettingsView>   // M2 补充：只读，供界面显示设置初值
+```
+
+- 用途：读取当前设置的界面可见子集（`bridgePort` / `debugLogging` / `capturePids` / `webvpnBase`），供界面显示开关与端口的初值。
+- 输入：无。
+- 输出：`AppSettingsView`；**不含** `wrdKey` / `wrdIv`（敏感值不跨 IPC）。
+- 错误：见 [错误模型](#错误模型)。
+
 ### `installCa(): Promise<{ ok: boolean; message?: string }>`
 
 ```ts
@@ -282,6 +305,31 @@ onDebugLog(cb: (e: DebugLogEvent) => void): () => void
 - 事件负载：`DebugLogEvent`（见「类型定义」）；`detail` 允许短信息、禁止 body 与 Cookie。
 - 错误：见 [错误模型](#错误模型)。
 
+### `onStatus(cb: (status: BridgeStatus) => void): () => void`
+
+```ts
+// Main → Renderer 事件（M2 补充）
+onStatus(cb: (status: BridgeStatus) => void): () => void
+```
+
+- 用途：订阅 Main → Renderer 的桥状态推送；每次状态变化（开桥/关桥/失败/过期/会话变化）后 Main 主动推送一次，界面无需轮询。
+- 输入：`cb`（状态回调）。
+- 输出：取消订阅函数 `() => void`（重复订阅各自独立）。
+- 事件负载：`BridgeStatus`（见「类型定义」）。
+- 错误：见 [错误模型](#错误模型)。
+
+### `onSessionExpired(cb: () => void): () => void`
+
+```ts
+// Main → Renderer 事件（M2 补充）
+onSessionExpired(cb: () => void): () => void
+```
+
+- 用途：订阅「会话已失效且桥已停止、系统代理已清除」的通知，界面据此弹出重登模态（文案见 [../ui-ux/main-window.md](../ui-ux/main-window.md)）；`getStatus()` 的 `error.code` 同时为 `SESSION_EXPIRED`。
+- 输入：`cb`（无参数回调）。
+- 输出：取消订阅函数 `() => void`。
+- 错误：见 [错误模型](#错误模型)。
+
 ## 错误模型
 
 错误码全集（含义与用户动作）；`message` 为面向用户的原因描述。
@@ -308,3 +356,4 @@ onDebugLog(cb: (e: DebugLogEvent) => void): () => void
 | 日期 | 变更 | 兼容性 | 关联 Spec / ADR |
 | ---- | ---- | ------ | --------------- |
 | 2026-09-20 | 首版：会话、桥控制、allowlist、证书、进程捕获、调试日志共 15 个方法/事件 | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
+| 2026-09-21 | M2 落地补充三项（不改变上述 15 个方法的语义）：`getSettings`（只读，供界面显示设置初值；WRD key/IV 不跨 IPC）、`onStatus`（Main → Renderer 状态推送）、`onSessionExpired`（会话过期事件，驱动重登模态） | 兼容（新增方法/事件） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [M2 完成记录](../planning/milestones/M2-desktop-orchestration.md) |

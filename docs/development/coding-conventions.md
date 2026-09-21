@@ -24,22 +24,27 @@ Linter:            TBD（本期未引入）
 
 | 规则 | 说明 |
 | ---- | ---- |
-| Python 包 | `swufe_bridge/`：sidecar 包——`wrd_codec.py`（codec）、`allowlist.py`（匹配语义与主机名校验）、`config.py`（配置面 + `ConfigWatcher`）、`rewrite.py`（响应反向改写纯函数）、`addon.py`（mitmproxy addon）、`sidecar.py`（进程入口）。`__init__.py` 只放 docstring、不做 eager import，保证 L0 测试不依赖 mitmproxy |
-| 测试分层 | `tests/l0`（无外部依赖：codec/allowlist/config）、`tests/l1`（addon 行为 + 假 flow）、`tests/l2`（真 sidecar + curl + 假上游）。共享 fixture：`tests/conftest.py`（配置工厂，不 import mitmproxy）与 `tests/l1/conftest.py`（flow / addon 工厂） |
-| 依赖方向 | `addon → rewrite / config / allowlist / wrd_codec`；`config → allowlist`；`sidecar → addon + config`。不引入反向依赖（与 [architecture/components.md](../architecture/components.md) 的依赖规则一致） |
+| Python 包 | `swufe_bridge/`：sidecar 包——`wrd_codec.py`（codec）、`allowlist.py`（匹配语义与主机名校验）、`config.py`（配置面 + `ConfigWatcher`）、`rewrite.py`（响应反向改写纯函数）、`addon.py`（mitmproxy addon）、`sidecar.py`（进程入口）、`ca.py`（CA 生成入口）。`__init__.py` 只放 docstring、不做 eager import，保证 L0 测试不依赖 mitmproxy |
+| Python 测试分层 | `tests/l0`（无外部依赖：codec/allowlist/config）、`tests/l1`（addon 行为 + 假 flow + CA 入口）、`tests/l2`（真 sidecar + curl + 假上游）。共享 fixture：`tests/conftest.py`（配置工厂，不 import mitmproxy）与 `tests/l1/conftest.py`（flow / addon 工厂） |
+| Electron 应用（TypeScript） | `app/src/main`（Main 进程 + 平台适配 `platform/`）、`app/src/preload`（contextBridge；**沙箱 preload 不能 require 相对路径，必须由 esbuild 打包成单文件**）、`app/src/renderer`（渲染层）、`app/src/shared`（跨进程契约类型与全局声明）；编译产物在 `app/dist/`（不提交），静态资源在 `app/static/` |
+| Electron 测试 | `app/test/*.test.ts`（App 单元，全部 electron-free，靠 `helpers/fakes.ts` 注入平台/进程依赖）、`app/test/fixtures/`（假上游与验证入口，不参与 CI 单测） |
+| 依赖方向 | Python 侧：`addon → rewrite / config / allowlist / wrd_codec`；`config → allowlist`；`sidecar → addon + config`。TypeScript 侧：`main → shared`；`preload → shared`；`renderer → shared`（渲染层不 import Main 代码）。不引入反向依赖（与 [architecture/components.md](../architecture/components.md) 的依赖规则一致） |
 
 ## 3. 命名
 
 | 对象 | 约定 |
 | ---- | ---- |
-| 文件 | snake_case：模块 `wrd_codec.py`、`allowlist.py`；测试 `test_addon_request.py` |
-| 类型 | PascalCase：`WrdCodec`、`AllowlistConfig`、`BridgeRuntimeConfig`、`BridgeAddon` |
-| 函数 | snake_case：`normalize_host`、`encode_url`、`rewrite_body_text`；模块内部辅助以 `_` 前缀（`_build_re`、`_inject_cookies`） |
-| 变量 | snake_case；跨面契约常量用 UPPER_SNAKE 集中在模块顶部（`DEFAULT_HOSTS`、`REWRITABLE_CONTENT_TYPES`、`METADATA_ORIGINAL_URL`） |
+| 文件（Python） | snake_case：模块 `wrd_codec.py`、`allowlist.py`；测试 `test_addon_request.py` |
+| 文件（TypeScript） | Main/共享模块用 camelCase 或语义短名（`orchestrator.ts`、`session-broker.ts`、`state-machine.ts`、`platform/parse.ts`）；类型/接口 PascalCase；测试 `state-machine.test.ts` 等 `<主题>.test.ts` |
+| 类型 | PascalCase：`WrdCodec`、`AllowlistConfig`、`BridgeRuntimeConfig`、`BridgeAddon`、`BridgeStatus`、`ProxyOrchestrator` |
+| 函数 | snake_case（Python，如 `normalize_host`、`encode_url`）/ camelCase（TypeScript，如 `normalizeHost`、`writeRuntimeConfig`）；模块内部辅助以 `_` 前缀（Python：`_build_re`）或 `private`（TS） |
+| 变量 | Python snake_case、TS camelCase；跨面契约常量用 UPPER_SNAKE 集中在模块顶部（Python：`DEFAULT_HOSTS`；TS：`app/src/main/constants.ts` 的 `DEFAULT_BRIDGE_PORT`、`CHANNEL_STATUS`） |
 | 常量 | UPPER_SNAKE_CASE |
 | 配置 / 接口字段 | JSON 字段用 camelCase（`includeSwufeWildcard`、`webvpnBase`、`wrdKey`），与 `docs/` 契约保持一致；Python 内部属性用 snake_case（`include_swufe_wildcard`、`webvpn_base`） |
+| stderr 控制行 / 错误码 | 机器可读前缀与错误码保持固定英文（`swufe-ready`、`swufe-error`、`swufe-debug`；`PROXY_CONFLICT`…）；用户可见文案中文 |
+| TS 模块格式 | Main / preload 输出 CommonJS（Electron `sandbox: true` 下唯一稳妥形态），Renderer 输出 ESM（`<script type="module">` 加载）；相对导入不带扩展名 |
 
-上表为 M1 落地后的实际约定。跨模块约束（不随实现变化）：
+上表为 M1/M2 落地后的实际约定。跨模块约束（不随实现变化）：
 
 - IPC / 接口类型与字段命名以 [api/electron-ipc.md](../api/electron-ipc.md) 为唯一来源；
 - 错误码必须使用既定的 6 个：`PROXY_CONFLICT`、`CA_MISSING`、`NOT_LOGGED_IN`、`SESSION_EXPIRED`、`BRIDGE_CRASH`、`ALLOWLIST_EMPTY`，不得自定义同义码。
@@ -80,11 +85,12 @@ Linter:            TBD（本期未引入）
 ## 8. 本地检查命令
 
 ```text
-Format:  TBD（本期未引入格式化工具）
-Lint:    TBD（本期未引入 linter）
-Type:    TBD（Python 侧未引入类型检查器；Node 侧用 npm run typecheck）
-Test:    uv run pytest（首次先 uv sync）
-Docs:    npm run docs:check
+Format:    TBD（本期未引入格式化工具）
+Lint:      TBD（本期未引入 linter）
+Type:      TBD（Python 侧未引入类型检查器；Node 侧用 npm run typecheck；App 侧用 npm --prefix app run typecheck）
+Test:      uv run pytest（首次先 uv sync）；App 单元：npm --prefix app run test:unit（首次先 npm --prefix app install）
+Build:     npm --prefix app run build（App 的 Main/Renderer/preload 编译产物，不提交）
+Docs:      npm run docs:check
 ```
 
-> CI 现有两个工作流：文档检查 [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml) 与 Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml)。
+> CI 现有三个工作流：文档检查 [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml)、Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml) 与 App 单元/类型 [.github/workflows/app-tests.yml](../../.github/workflows/app-tests.yml)。

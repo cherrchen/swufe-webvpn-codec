@@ -10,7 +10,7 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 `In Progress`（2026-09-21）：M1（桥核心）已实现并通过 L0/L1/L2——桥 sidecar、WRD codec、allowlist 匹配与持久化、请求改写与响应反向改写、配置热更新、L0 CI；M2–M4（Electron 壳、系统代理与 CA、进程捕获、双平台教务验收）未开始。证据见 [verification.md](verification.md) 与 [M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md)。
+当前为 `In Progress`（2026-09-21）：M1（桥核心）已实现并通过 L0/L1/L2——桥 sidecar、WRD codec、allowlist 匹配与持久化、请求改写与响应反向改写、配置热更新、L0 CI；M2（桌面编排）已实现并通过 App 单测与 macOS 实机端到端验证——Electron 壳、登录 WebView 与 Session Broker（防环）、Proxy Orchestrator（代理冲突检测、系统代理与 sidecar 生命周期）、Cert Manager（含独立 CA 生成入口与安装前风险提示）、会话过期级联（停桥 → 清代理 → 弹窗重登）、退出清代理与残留自愈。M3/M4（allowlist 与日志面板 UI、进程捕获、双平台教务验收）未开始；CA 写入/移除系统信任库与 Windows 真机项仍未验证（需管理员权限与 Windows 测试机）。证据见 [verification.md](verification.md)、[M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md) 与 [M2 里程碑](../../docs/planning/milestones/M2-desktop-orchestration.md)。
 
 ## Background
 

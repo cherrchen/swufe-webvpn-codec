@@ -38,7 +38,7 @@
 
 ### 配置文件
 
-- 路径：默认 `~/.swufe-webvpn-bridge/bridge-config.json`，`--config` 覆盖（M2 传入 Electron `userData` 下的路径）。
+- 路径：默认 `~/.swufe-webvpn-bridge/bridge-config.json`，`--config` 覆盖（M2 传入 Electron `userData` 下的 `<userData>/bridge-config.json`）。
 - 权限：`0600`（含 WebVPN 会话 Cookie，见 NFR-003）。
 - 内容（字段名与 [data-model.md](../architecture/data-model.md) 的 `AllowlistConfig` / `SessionState` / `AppSettings` 一致）：
 
@@ -63,6 +63,22 @@
 
 - 缺键取默认值；未知顶层键忽略；文件缺失或 JSON 解析失败 ⇒ `CONFIG_INVALID`。
 - **sidecar 不写入、不修改该文件**：唯一写入方是 App（M2）；M1 开发期由人工写入。
+
+### CA 生成入口（M2 新增）
+
+App 必须先能「安装 CA」再开桥，而 mitmproxy 只在 mitmdump 启动时生成 CA，因此新增一个只做生成的独立入口（复用 mitmproxy 的 `CertStore`，不自研 PKI，见 [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md)）：
+
+```bash
+python -m swufe_bridge.ca --confdir <confdir>
+```
+
+| 项 | 约定 |
+| ---- | ---- |
+| 幂等 | `<confdir>/mitmproxy-ca.pem` 已存在时不改写任何文件（重复调用返回同样的路径） |
+| 成功输出 | stdout 单行 JSON：`{"caCert": "…/mitmproxy-ca-cert.pem", "caPem": "…/mitmproxy-ca.pem", "caCer": "…/mitmproxy-ca-cert.cer", "created": true\|false}`，退出码 `0` |
+| 失败 | stderr `swufe-error CA_FAILED <message>`，退出码 `2` |
+| 权限 | 私钥文件 `0600`（仅本机用户可读，NFR-003） |
+| 落点 | M2 使用 `<userData>/mitmproxy/`；与 sidecar 的 `--confdir` 必须是同一目录 |
 
 ### 诊断输出（stderr 单行，机器可读）
 
@@ -103,3 +119,4 @@ curl -sS -i -x http://127.0.0.1:18080 --cacert <confdir>/mitmproxy-ca-cert.pem h
 | ---- | ---- | ------ | --------------- |
 | 2026-09-20 | 首版：记录方案 A / 方案 B 两种候选实现与硬约束，实现方式标 `TBD` | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | 定稿方案 A：配置文件路径与字段表、mtime + size 轮询热加载与失败回退、`swufe-ready` / `swufe-error` 行与退出码、开发运行命令、回环由 sidecar 硬编码强制 | 兼容（首版未定稿，无既有消费方） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md) |
+| 2026-09-21 | M2 落地：新增 CA 生成入口 `python -m swufe_bridge.ca --confdir <dir>`（stdout JSON / `swufe-error CA_FAILED` / 退出码 2 / 幂等）；明确 M2 的 `--config` 与 `--confdir` 落点分别为 `<userData>/bridge-config.json` 与 `<userData>/mitmproxy/` | 兼容（新增入口，控制面未变） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |

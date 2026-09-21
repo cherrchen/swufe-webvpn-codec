@@ -14,6 +14,7 @@
 | Layer | Goal | Scope | Cost | When it is mandatory | Where it runs |
 | ----- | ---- | ----- | ---- | -------------------- | ------------- |
 | L0 unit | behaviour and boundaries of WRD codec vectors and the allowlist matching function | no external deps | low | every PR (regression baseline) | CI |
+| App unit | Electron-side modules: bridge state machine, proxy/certificate/process output parsers, sidecar control-line parsing, session-probe classification, config store, Proxy Orchestrator orchestration (platform and process dependencies injected as fakes) | no Electron runtime dependency (`app/test` is entirely electron-free) | low | every PR (same batch as L0) | CI |
 | L1 component | request/response rewriting behaviour of the bridge addon against recorded traffic or a fake upstream | addon + fake upstream | medium | rewriting logic, cookie injection or routing changes | local |
 | L2 integration | end-to-end rewriting chain: `mitmdump` + curl through the local proxy against a fake WebVPN | sidecar + fake upstream + real proxy flow | medium | proxy set/clear, configuration delivery, rewriting chain changes | local |
 | L3 system | the full user path on real hardware: real WebVPN + browser acceptance of the registrar site | whole app (Electron + sidecar) | high | before a release; requires the tester's own account | manual (macOS / Windows test machines) |
@@ -47,10 +48,13 @@ Requirement acceptance criteria, reproductions of fixed bugs, and boundaries and
 Location:  tests/l0 (unit: codec, allowlist, config), tests/l1 (component: addon request/response
            rewriting, logging, hot reload), tests/l2 (integration: real mitmdump + curl + fake upstream);
            shared fixtures: tests/conftest.py (config factory, no mitmproxy import) and
-           tests/l1/conftest.py (flow / addon factories)
+           tests/l1/conftest.py (flow / addon factories);
+           app/test (app unit: `*.test.ts` + `helpers/fakes.ts`, Node's built-in test runner + tsx;
+           `fixtures/` holds the fake upstream and the verification entry, which are not part of the CI unit run)
 Naming:    files test_<topic>.py; functions test_<behaviour> (the case id goes into the function name,
            e.g. test_tc_f01_allowlisted_request_is_rewritten_end_to_end);
-           parameterisation uses @pytest.mark.parametrize("input, expected", [...])
+           parameterisation uses @pytest.mark.parametrize("input, expected", [...]);
+           on the app side files are <topic>.test.ts and case names are full sentences describing observable behaviour
 Structure: Arrange / Act / Assert (split with comments when useful)
 ```
 
@@ -70,8 +74,12 @@ Run all:        uv sync && uv run pytest (L0+L1+L2; no internet access needed)
 Run one file:   uv run pytest tests/l1/test_addon_request.py
 Run with watch: uv run pytest -f (requires the pytest-xdist plugin; not adopted this phase — when it is
                 not installed, re-run uv run pytest manually)
+App unit:       npm --prefix app run test:unit (run `npm --prefix app install` first)
+App typecheck:  npm --prefix app run typecheck
 CI test job:    L0: .github/workflows/python-tests.yml (runs uv sync --frozen + uv run pytest tests/l0 -q
                 on pull_request and pushes to main);
+                App unit and types: .github/workflows/app-tests.yml (npm ci --prefix app + typecheck + test:unit,
+                needs neither the Electron binary nor a display);
                 L1/L2 need mitmdump, curl and local ports, so they run locally only;
                 documentation checks are handled separately by .github/workflows/docs-check.yml
 ```

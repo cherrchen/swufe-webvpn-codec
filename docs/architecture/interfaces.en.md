@@ -44,10 +44,10 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 - Provider: App Shell (Electron Main).
 - Consumer: Telemetry UI, Login WebView (Renderer).
 - Stability: Internal (app-internal only; breaking changes still need assessment).
-- Input: method calls `login` / `logout` / `getSession`, `startBridge` / `stopBridge` / `getStatus`, `getAllowlist` / `setAllowlist`, `installCa` / `uninstallCa` / `getCaStatus`, `listCaptureCandidates` / `setCapturePids`, `setDebugLogging`; event subscription `onDebugLog`.
+- Input: method calls `login` / `logout` / `getSession`, `startBridge` / `stopBridge` / `getStatus`, `getAllowlist` / `setAllowlist` / `getSettings`, `installCa` / `uninstallCa` / `getCaStatus`, `listCaptureCandidates` / `setCapturePids`, `setDebugLogging`; event subscriptions `onDebugLog` / `onStatus` / `onSessionExpired` (the last two, and `getSettings`, were added in M2; `getSettings` never returns the WRD key/IV).
 - Output: `BridgeStatus`, `AllowlistConfig`, CA status, session state, `DebugLogEvent`. Field-level definitions in [api/electron-ipc.md](../api/electron-ipc.md).
 - Error model: `BridgeStatus.error.code` takes the fixed codes `PROXY_CONFLICT` / `CA_MISSING` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `BRIDGE_CRASH` / `ALLOWLIST_EMPTY`; CA operations use `{ok, message}`.
-- Idempotency: `getStatus` / `getSession` / `getAllowlist` / `getCaStatus` are idempotent reads; `setAllowlist` is idempotent; `startBridge` / `stopBridge` / `installCa` / `uninstallCa` are not (repeated calls are handled by the state machine).
+- Idempotency: `getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` are idempotent reads; `setAllowlist` is idempotent; `startBridge` / `stopBridge` / `installCa` / `uninstallCa` are not (repeated calls are handled by the state machine).
 - Versioning: preload and Main are built and versioned together; no cross-version mixing.
 - Compatibility commitment: added methods/fields are backward compatible; removals or signature changes are breaking (allowed exceptions in "Compatibility strategy").
 - Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md).

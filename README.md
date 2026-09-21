@@ -8,15 +8,15 @@
 
 | 项 | 值 |
 | --- | --- |
-| 阶段 | Phase 1 进行中：文档已对齐（2026-09-20）；M1 桥核心已实现并通过 L0/L1/L2（2026-09-21）；M2–M4 未开始 |
-| 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)；含 M1 交付的 Python 桥实现（[swufe_bridge/](swufe_bridge/wrd_codec.py)、[tests/](tests/l0/test_wrd_codec.py)） |
+| 阶段 | Phase 1 进行中：文档已对齐（2026-09-20）；M1 桥核心已实现并通过 L0/L1/L2（2026-09-21）；M2 桌面编排（Electron 壳 / 系统代理 / CA / 会话过期）已实现并通过 App 单测与端到端验证（2026-09-21；系统信任库写入与 Windows 真机验证待人工/M4）；M3–M4 未开始 |
+| 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)；含桥实现（[swufe_bridge/](swufe_bridge/wrd_codec.py)、[tests/](tests/l0/test_wrd_codec.py)）与桌面应用（[app/](app/README.md)） |
 | 第一期 Feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |
 | License | [MIT](LICENSE) |
 | 文档版本 | 1.0 |
 | 初始化日期 | 2026-09-20 |
 
-本仓库以**文档为主体**（`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程），并含 M1 交付的桥核心实现：无桌面壳时可用 `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` 直接起桥（见 [桥控制协议](docs/api/bridge-control-protocol.md)）。
+本仓库以**文档为主体**（`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程），并含 M1/M2 交付的实现：桌面应用 `npm --prefix app start`（先 `npm --prefix app install`）；无桌面壳时也可用 `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` 直接起桥（见 [桥控制协议](docs/api/bridge-control-protocol.md)）。
 
 ## 1. 它解决什么问题
 
@@ -75,8 +75,9 @@ flowchart TD
 │   ├── verification/      #   验证策略与完成标准
 │   ├── security/  operations/  planning/
 │   └── archive/           #   归档的历史设计资料（不是当前事实来源）
-├── swufe_bridge/          # M1 桥实现：WRD codec、allowlist、配置、响应反向改写、mitmproxy addon、sidecar 入口
+├── swufe_bridge/          # M1 桥实现：WRD codec、allowlist、配置、响应反向改写、mitmproxy addon、sidecar 入口、CA 生成入口
 ├── tests/                 #   L0/L1/L2 测试（codec/allowlist/config、addon 行为、真 sidecar + 假上游）
+├── app/                   # M2 桌面应用（Electron）：Main/preload/renderer、平台适配（系统代理/证书）、单元测试与验证 fixture
 ├── specs/                 # Layer 3：Feature Spec
 │   ├── 001-phase1-local-bridge/   # 第一期本机桥：spec/design/plan/tasks/verification
 │   └── _template/         #   Spec 模板骨架
@@ -116,11 +117,16 @@ docs/overview/project-overview.md
 ```bash
 npm install
 npm run docs:check   # 链接 + 双语配对 + spec 结构，一次跑完
+
+# 桌面应用（app/）：类型检查与单元测试
+npm --prefix app install
+npm --prefix app run typecheck
+npm --prefix app run test:unit
 ```
 
 单项命令：`npm run docs:links`、`npm run docs:i18n`、`npm run spec:check`、`npm run typecheck`（各自只读 Markdown / TypeScript，不构建应用）。
 
-CI 配置见 [.github/workflows/docs-check.yml](.github/workflows/docs-check.yml)：仅在 `pull_request` 与 push 到 `main` 时执行文档检查，不做部署与发布。
+CI 配置见 [.github/workflows/](.github/workflows)：`docs-check.yml`（文档检查）与 `python-tests.yml`（Python L0）在 `pull_request` 与 push 到 `main` 时执行；`app-tests.yml` 执行 App 的类型检查与单元测试。均不做部署与发布。
 
 ## 7. 语言规则
 

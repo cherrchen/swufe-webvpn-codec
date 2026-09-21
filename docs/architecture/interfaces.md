@@ -42,10 +42,10 @@ flowchart LR
 - 提供方：App Shell（Electron Main）。
 - 消费方：Telemetry UI、Login WebView（Renderer）。
 - 稳定性：Internal（仅 App 内使用；破坏性变更仍需评估）。
-- 输入：方法调用 `login` / `logout` / `getSession`、`startBridge` / `stopBridge` / `getStatus`、`getAllowlist` / `setAllowlist`、`installCa` / `uninstallCa` / `getCaStatus`、`listCaptureCandidates` / `setCapturePids`、`setDebugLogging`；事件订阅 `onDebugLog`。
+- 输入：方法调用 `login` / `logout` / `getSession`、`startBridge` / `stopBridge` / `getStatus`、`getAllowlist` / `setAllowlist` / `getSettings`、`installCa` / `uninstallCa` / `getCaStatus`、`listCaptureCandidates` / `setCapturePids`、`setDebugLogging`；事件订阅 `onDebugLog` / `onStatus` / `onSessionExpired`（后两者为 M2 新增，`getSettings` 亦为 M2 新增且不返回 WRD key/IV）。
 - 输出：`BridgeStatus`、`AllowlistConfig`、CA 状态、会话状态、`DebugLogEvent`。字段级定义见 [api/electron-ipc.md](../api/electron-ipc.md)。
 - 错误模型：`BridgeStatus.error.code` 取固定错误码 `PROXY_CONFLICT` / `CA_MISSING` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `BRIDGE_CRASH` / `ALLOWLIST_EMPTY`；CA 操作用 `{ok, message}`。
-- 幂等性：`getStatus` / `getSession` / `getAllowlist` / `getCaStatus` 为幂等读；`setAllowlist` 幂等；`startBridge` / `stopBridge` / `installCa` / `uninstallCa` 非幂等（重复调用按状态机处置）。
+- 幂等性：`getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` 为幂等读；`setAllowlist` 幂等；`startBridge` / `stopBridge` / `installCa` / `uninstallCa` 非幂等（重复调用按状态机处置）。
 - 版本策略：preload 与 Main 同构建同版本，不跨版本混用。
 - 兼容性承诺：新增方法/字段向后兼容；删除或改签名属破坏性变更（允许的例外见「兼容性策略」）。
 - 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)。

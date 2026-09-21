@@ -15,7 +15,7 @@
 | ----- | ------------ | ------------ | --------- | ------ |
 | [M0 pre-research](milestones/M0-pre-research.md) | WRD codec verification, Phase 1 requirement specs and document package | G-001 / G-002 / G-003 | TBD | Done |
 | [M1 bridge core](milestones/M1-mitm-bridge.md) | mitm WRD addon (request rewrite), cookie injection, response reverse rewrite, unit/integration tests | G-001 | TBD | Done |
-| [M2 desktop orchestration](milestones/M2-desktop-orchestration.md) | Electron shell, system proxy, CA, proxy conflict detection, stop-on-expiry | G-001 / G-002 / G-003 | TBD | Planned |
+| [M2 desktop orchestration](milestones/M2-desktop-orchestration.md) | Electron shell, system proxy, CA, proxy conflict detection, stop-on-expiry | G-001 / G-002 / G-003 | TBD | Done (the trust-store write and Windows real-machine checks still need a human/M4) |
 | [M3 experience polish](milestones/M3-experience-polish.md) | Allowlist UI, debug logging, process capture, copy | G-002 / G-003 | TBD | Planned |
 | [M4 acceptance](milestones/M4-acceptance.md) | macOS + Windows academic-affairs browser acceptance, defect burn-down | G-001 / G-002 / G-003 | TBD | Planned |
 | M5 open-source preparation (optional) | Open-source cleanup, README, follow-up TUN design memo | G-004 | TBD | Candidate |

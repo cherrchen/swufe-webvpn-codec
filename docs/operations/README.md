@@ -31,8 +31,13 @@
 | `allowlist.includeSwufeWildcard` | `*.swufe.edu.cn` 通配（含 apex `swufe.edu.cn`） | `true` / `false` | `false` | 低 | 开启后 `swufe.edu.cn` 及其全部子域纳入改写 |
 | `allowlist.updatedAt` | allowlist 最近更新时间 | ISO8601 字符串 | 创建时间 | 低 | 仅作记录 |
 
-- **存储位置**：`userData/config.json`（settings + allowlist）；会话 Cookie 位置与加密见 [security/README.md](../security/README.md) 第 4 节。
-- **配置来源与优先级**：`TBD` —— 第一期只有 `userData/config.json` 单一持久来源，构建期默认值与运行时字段（如 `systemProxyManagedByApp`）之间的覆盖顺序尚未定义，需在实现阶段确定；配置如何下发到 sidecar 见 [bridge-control-protocol.md](../api/bridge-control-protocol.md)。
+- **存储位置**：
+  - `<userData>/config.json`：顶层为 allowlist（`hosts` / `includeSwufeWildcard` / `updatedAt`），同级 `settings` 键保存 `AppSettings`（缺键取默认值）；Python 侧读同一文件的 allowlist 部分。
+  - `<userData>/bridge-config.json`：下发给 sidecar 的运行时配置（`allowlist` + `cookies` + `debug` + `webvpnBase` + `wrdKey`/`wrdIv`），权限 `0600`（含会话 Cookie）；唯一写入方是 App。
+  - `<userData>/mitmproxy/`：MITM CA 的 confdir（私钥 `0600`），同时也是 sidecar 的 `--confdir`。
+  - `<userData>/Partitions/swufe-login/`：登录会话（Electron 持久分区，不写 `session.bin`）；会话 Cookie 位置与加密见 [security/README.md](../security/README.md) 第 4 节。
+- **配置来源与优先级**：持久文件是唯一来源，构建期默认值只用于缺键/首次启动；`settings.bridgePort` 与 `settings.webvpnBase` 在开桥时读取并下发，运行期标记 `systemProxyManagedByApp` 由 Proxy Orchestrator 写入。配置如何下发到 sidecar 见 [bridge-control-protocol.md](../api/bridge-control-protocol.md)。
+- **开发期覆盖**：`--user-data-dir <dir>`（或 `SWUFE_USER_DATA_DIR`）覆盖 `userData`；`SWUFE_REPO_ROOT` 覆盖仓库根路径；`SWUFE_PYTHON` 指定运行 sidecar/CA 入口的解释器；`SWUFE_PROBE_INTERVAL_MS` 覆盖会话过期探测间隔。
 - **密钥处理**：见 [security/README.md](../security/README.md)。
 
 ## 3. 部署
@@ -42,6 +47,8 @@
              （WRD codec 与 bridge addon 随 sidecar 分发）
 部署方式:    用户本机安装并运行；应用启动时以子进程拉起 mitmproxy sidecar
              开发等效方式：本机 Node + Python venv + mitmdump
+             （M2 起：根目录 `uv sync` 后 `npm --prefix app install && npm --prefix app start`，
+              App 会用 `<repo>/.venv/bin/python -m swufe_bridge.sidecar` 拉起 sidecar，见 [app/README.md](../../app/README.md)）
 分发形态:    TBD —— 嵌入式 Python 运行时与外置 mitmproxy 可执行文件两种方案
              尚未选定（体积与签名取舍见 ADR-0002，实现阶段决定）
 发布流程:    TBD —— 尚无发布流水线；当前 CI 做文档检查（npm run docs:check）与
@@ -65,7 +72,7 @@
 
 ```text
 备份对象:    userData/config.json（settings + allowlist）
-             userData/session.bin（会话 Cookie，可选 safeStorage 加密）
+             userData/Partitions/swufe-login/（登录会话分区；Cookie 明文由 OS 用户目录权限保护）
              MITM CA confdir（mitmproxy 专用目录）
 频率:        TBD —— 第一期未定义自动备份（配置可由用户重填，CA 可重新生成）
 保留:        TBD —— 同上
@@ -73,7 +80,7 @@
 RPO / RTO:   TBD —— 同上
 ```
 
-丢失任一对象的后果：`config.json` 丢失 → 需重建 allowlist 与设置；`session.bin` 丢失 → 需重新登录；CA confdir 丢失 → 需重新生成 CA 并在系统信任库重新安装。
+丢失任一对象的后果：`config.json` 丢失 → 需重建 allowlist 与设置；登录分区丢失 → 需重新登录；CA confdir 丢失 → 需重新生成 CA 并在系统信任库重新安装。
 
 ## 6. 事故响应
 

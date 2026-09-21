@@ -8,8 +8,8 @@
 
 | Item | Value |
 | --- | --- |
-| Stage | Phase 1 in progress: documentation aligned (2026-09-20); the M1 bridge core is implemented and passing L0/L1/L2 (2026-09-21); M2–M4 not started |
-| Repository type | Documentation-first: [docs/](docs/README.en.md) + [specs/](specs/README.en.md); plus the Python bridge implementation delivered in M1 ([swufe_bridge/](swufe_bridge/wrd_codec.py), [tests/](tests/l0/test_wrd_codec.py)) |
+| Stage | Phase 1 in progress: documentation aligned (2026-09-20); the M1 bridge core is implemented and passing L0/L1/L2 (2026-09-21); M2 desktop orchestration (Electron shell / system proxy / CA / session expiry) is implemented and verified by app unit tests plus end-to-end runs (2026-09-21; the trust-store write and Windows real-machine checks still need a human/M4); M3–M4 not started |
+| Repository type | Documentation-first: [docs/](docs/README.en.md) + [specs/](specs/README.en.md); plus the bridge implementation ([swufe_bridge/](swufe_bridge/wrd_codec.py), [tests/](tests/l0/test_wrd_codec.py)) and the desktop app ([app/](app/README.md)) |
 | Phase 1 feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |
 | License | [MIT](LICENSE) |
@@ -75,7 +75,8 @@ flowchart TD
 │   ├── verification/      #   verification strategy and definition of done
 │   ├── security/  operations/  planning/
 │   └── archive/           #   archived historical design material (not a source of truth)
-├── swufe_bridge/          # M1 bridge implementation: WRD codec, allowlist, config, response reverse rewriting, mitmproxy addon, sidecar entry
+├── swufe_bridge/          # M1 bridge implementation: WRD codec, allowlist, config, response reverse rewriting, mitmproxy addon, sidecar entry, CA generation entry
+├── app/                   # M2 desktop app (Electron): Main/preload/renderer, platform adapters (system proxy/certificate), unit tests and verification fixtures
 ├── tests/                 #   L0/L1/L2 tests (codec/allowlist/config, addon behaviour, real sidecar + fake upstream)
 ├── specs/                 # Layer 3: feature specs
 │   ├── 001-phase1-local-bridge/   # Phase 1 local bridge: spec/design/plan/tasks/verification
@@ -116,11 +117,16 @@ Read per task class (docs/agent/context-routing.en.md)
 ```bash
 npm install
 npm run docs:check   # links + bilingual pairs + spec structure in one run
+
+# Desktop app (app/): type check and unit tests
+npm --prefix app install
+npm --prefix app run typecheck
+npm --prefix app run test:unit
 ```
 
 Individual commands: `npm run docs:links`, `npm run docs:i18n`, `npm run spec:check`, `npm run typecheck` (each reads Markdown / TypeScript only; none of them builds the application).
 
-CI lives in [.github/workflows/docs-check.yml](.github/workflows/docs-check.yml): it runs documentation checks on `pull_request` and pushes to `main` only, and never deploys or releases.
+CI lives in [.github/workflows/](.github/workflows): `docs-check.yml` (documentation checks) and `python-tests.yml` (Python L0) run on `pull_request` and pushes to `main`, and `app-tests.yml` type-checks the app and runs its unit tests. None of them deploy or release.
 
 ## 7. Language rules
 

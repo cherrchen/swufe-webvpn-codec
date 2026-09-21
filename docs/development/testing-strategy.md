@@ -12,6 +12,7 @@
 | 层 | 目标 | 范围 | 运行成本 | 何时必须写 | 运行位置 |
 | -- | ---- | ---- | -------- | ---------- | -------- |
 | L0 单元 | WRD codec 向量与 allowlist 匹配函数的行为与边界 | 无外部依赖 | 低 | 每次 PR（回归基线） | CI |
+| App 单元 | Electron 侧模块：桥状态机、代理/证书/进程输出解析、sidecar 控制行解析、会话探测分类、配置存储、Proxy Orchestrator 编排（用 fakes 注入平台与进程依赖） | 不依赖 Electron 运行时（`app/test` 全部 electron-free） | 低 | 每次 PR（与 L0 同批） | CI |
 | L1 组件 | Bridge addon 对录制流量或假上游的请求/响应改写行为 | addon + 假上游 | 中 | 改写逻辑、Cookie 注入、路由判定变更时 | 本地 |
 | L2 集成 | `mitmdump` + curl 经本地代理访问假 WebVPN 的端到端改写链路 | sidecar + 假上游 + 真实代理流程 | 中 | 代理设置/清除、配置下发、改写链路变更时 | 本地 |
 | L3 系统 | 真机 + 真实 WebVPN + 浏览器教务验收的完整用户路径 | 完整应用（Electron + sidecar） | 高 | 发版前；需测试者自有账号 | 手工（macOS / Windows 测试机） |
@@ -42,9 +43,10 @@ Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 
 ```text
 Location:  tests/l0（单元：codec、allowlist、config）、tests/l1（组件：addon 请求/响应改写、日志、热更新）、tests/l2（集成：真 mitmdump + curl + 假上游）；
-           共享 fixture：tests/conftest.py（配置工厂，不含 mitmproxy 依赖）与 tests/l1/conftest.py（flow / addon 工厂）
+           共享 fixture：tests/conftest.py（配置工厂，不含 mitmproxy 依赖）与 tests/l1/conftest.py（flow / addon 工厂）；
+           app/test（App 单元：`*.test.ts` + `helpers/fakes.ts`，Node 内置 test runner + tsx；`fixtures/` 放假上游与验证入口，不参与 CI 单测）
 Naming:    文件 test_<主题>.py；函数 test_<行为>（用例编号写进函数名，如 test_tc_f01_allowlisted_request_is_rewritten_end_to_end）；
-           参数化用 @pytest.mark.parametrize("输入, 期望", [...])
+           参数化用 @pytest.mark.parametrize("输入, 期望", [...])；App 侧文件 <主题>.test.ts、用例名用完整句子描述可观察行为
 Structure: Arrange / Act / Assert（必要时以注释分段）
 ```
 
@@ -63,7 +65,10 @@ Structure: Arrange / Act / Assert（必要时以注释分段）
 Run all:        uv sync && uv run pytest（L0+L1+L2；不需要外网）
 Run one file:   uv run pytest tests/l1/test_addon_request.py
 Run with watch: uv run pytest -f（需 pytest-xdist 插件；本期未引入，未安装时手动重跑 uv run pytest）
+App unit:       npm --prefix app run test:unit（首次先 `npm --prefix app install`）
+App typecheck:  npm --prefix app run typecheck
 CI test job:    L0：.github/workflows/python-tests.yml（pull_request 与 main 推送时执行 uv sync --frozen + uv run pytest tests/l0 -q）；
+                App 单元与类型：.github/workflows/app-tests.yml（npm ci --prefix app + typecheck + test:unit，不需要 Electron 二进制与显示器）；
                 L1/L2 需 mitmdump、curl 与本地端口，只在本地跑；
                 文档检查另由 .github/workflows/docs-check.yml 负责
 ```

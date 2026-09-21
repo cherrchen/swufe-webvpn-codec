@@ -26,22 +26,27 @@ Linter:            TBD (not introduced in this phase)
 
 | Rule | Description |
 | ---- | ----------- |
-| Python package | `swufe_bridge/`: the sidecar package — `wrd_codec.py` (codec), `allowlist.py` (matching semantics and host-name validation), `config.py` (config surface + `ConfigWatcher`), `rewrite.py` (pure reverse-rewrite functions for responses), `addon.py` (mitmproxy addon), `sidecar.py` (process entry point). `__init__.py` holds only a docstring and performs no eager import, so L0 tests do not depend on mitmproxy |
-| Test layers | `tests/l0` (no external dependencies: codec/allowlist/config), `tests/l1` (addon behaviour + fake flows), `tests/l2` (real sidecar + curl + fake upstream). Shared fixtures: `tests/conftest.py` (config factories, no mitmproxy import) and `tests/l1/conftest.py` (flow / addon factories) |
-| Dependency direction | `addon → rewrite / config / allowlist / wrd_codec`; `config → allowlist`; `sidecar → addon + config`. No reverse dependencies (consistent with the dependency rules in [architecture/components.md](../architecture/components.md)) |
+| Python package | `swufe_bridge/`: the sidecar package — `wrd_codec.py` (codec), `allowlist.py` (matching semantics and host-name validation), `config.py` (config surface + `ConfigWatcher`), `rewrite.py` (pure reverse-rewrite functions for responses), `addon.py` (mitmproxy addon), `sidecar.py` (process entry point), `ca.py` (CA generation entry). `__init__.py` holds only a docstring and performs no eager import, so L0 tests do not depend on mitmproxy |
+| Python test layers | `tests/l0` (no external dependencies: codec/allowlist/config), `tests/l1` (addon behaviour + fake flows + the CA entry), `tests/l2` (real sidecar + curl + fake upstream). Shared fixtures: `tests/conftest.py` (config factories, no mitmproxy import) and `tests/l1/conftest.py` (flow / addon factories) |
+| Electron app (TypeScript) | `app/src/main` (Main process + platform adapters in `platform/`), `app/src/preload` (contextBridge; **a sandboxed preload cannot require relative paths, so it must be bundled into a single file by esbuild**), `app/src/renderer` (renderer), `app/src/shared` (cross-process contract types and global declarations); build output lives in `app/dist/` (not committed) and static assets in `app/static/` |
+| Electron tests | `app/test/*.test.ts` (app unit tests, all electron-free, with platform/process dependencies injected through `helpers/fakes.ts`), `app/test/fixtures/` (fake upstream and verification entry; not part of the CI unit run) |
+| Dependency direction | Python: `addon → rewrite / config / allowlist / wrd_codec`; `config → allowlist`; `sidecar → addon + config`. TypeScript: `main → shared`; `preload → shared`; `renderer → shared` (the renderer never imports Main code). No reverse dependencies (consistent with the dependency rules in [architecture/components.md](../architecture/components.md)) |
 
 ## 3. Naming
 
 | Object | Convention |
 | ------ | ---------- |
-| Files | snake_case: modules `wrd_codec.py`, `allowlist.py`; tests `test_addon_request.py` |
-| Types | PascalCase: `WrdCodec`, `AllowlistConfig`, `BridgeRuntimeConfig`, `BridgeAddon` |
-| Functions | snake_case: `normalize_host`, `encode_url`, `rewrite_body_text`; module-internal helpers use a `_` prefix (`_build_re`, `_inject_cookies`) |
-| Variables | snake_case; contract constants shared across surfaces are gathered in UPPER_SNAKE at the top of the module (`DEFAULT_HOSTS`, `REWRITABLE_CONTENT_TYPES`, `METADATA_ORIGINAL_URL`) |
+| Files (Python) | snake_case: modules `wrd_codec.py`, `allowlist.py`; tests `test_addon_request.py` |
+| Files (TypeScript) | Main/shared modules use camelCase or short semantic names (`orchestrator.ts`, `session-broker.ts`, `state-machine.ts`, `platform/parse.ts`); types/interfaces are PascalCase; tests are `<topic>.test.ts` (e.g. `state-machine.test.ts`) |
+| Types | PascalCase: `WrdCodec`, `AllowlistConfig`, `BridgeRuntimeConfig`, `BridgeAddon`, `BridgeStatus`, `ProxyOrchestrator` |
+| Functions | snake_case (Python, e.g. `normalize_host`, `encode_url`) / camelCase (TypeScript, e.g. `normalizeHost`, `writeRuntimeConfig`); module-internal helpers use a `_` prefix (Python: `_build_re`) or `private` (TS) |
+| Variables | snake_case in Python, camelCase in TS; contract constants shared across surfaces are gathered in UPPER_SNAKE at the top of the module (Python: `DEFAULT_HOSTS`; TS: `DEFAULT_BRIDGE_PORT`, `CHANNEL_STATUS` in `app/src/main/constants.ts`) |
 | Constants | UPPER_SNAKE_CASE |
 | Config / interface fields | JSON fields use camelCase (`includeSwufeWildcard`, `webvpnBase`, `wrdKey`), consistent with the `docs/` contracts; Python-internal attributes use snake_case (`include_swufe_wildcard`, `webvpn_base`) |
+| stderr control lines / error codes | Machine-readable prefixes and error codes stay fixed English (`swufe-ready`, `swufe-error`, `swufe-debug`; `PROXY_CONFLICT`…); user-facing copy is Chinese |
+| TS module format | Main / preload emit CommonJS (the only sound shape under Electron `sandbox: true`), the renderer emits ESM (loaded via `<script type="module">`); relative imports carry no extension |
 
-The table above records the conventions actually in place after M1 landed. Cross-module constraints (independent of the implementation):
+The table above records the conventions actually in place after M1/M2 landed. Cross-module constraints (independent of the implementation):
 
 - IPC / interface type and field naming has a single source of truth: [api/electron-ipc.md](../api/electron-ipc.md);
 - Error codes must use the six established ones — `PROXY_CONFLICT`, `CA_MISSING`, `NOT_LOGGED_IN`, `SESSION_EXPIRED`, `BRIDGE_CRASH`, `ALLOWLIST_EMPTY` — and no synonymous codes may be invented.
@@ -82,11 +87,12 @@ The table above records the conventions actually in place after M1 landed. Cross
 ## 8. Local check commands
 
 ```text
-Format:  TBD (no formatter introduced in this phase)
-Lint:    TBD (no linter introduced in this phase)
-Type:    TBD (no type checker on the Python side; `npm run typecheck` on the Node side)
-Test:    uv run pytest (run `uv sync` first)
-Docs:    npm run docs:check
+Format:    TBD (no formatter introduced in this phase)
+Lint:      TBD (no linter introduced in this phase)
+Type:      TBD (no type checker on the Python side; `npm run typecheck` on the Node side; `npm --prefix app run typecheck` for the app)
+Test:      uv run pytest (run `uv sync` first); app unit tests: `npm --prefix app run test:unit` (run `npm --prefix app install` first)
+Build:     npm --prefix app run build (app Main/Renderer/preload build output; not committed)
+Docs:      npm run docs:check
 ```
 
-> CI has two workflows: the documentation check [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml) and Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml).
+> CI has three workflows: the documentation check [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml), Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml) and app unit tests/types [.github/workflows/app-tests.yml](../../.github/workflows/app-tests.yml).

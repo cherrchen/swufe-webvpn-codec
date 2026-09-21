@@ -33,8 +33,13 @@
 | `allowlist.includeSwufeWildcard` | `*.swufe.edu.cn` wildcard (including the apex `swufe.edu.cn`) | `true` / `false` | `false` | Low | When on, `swufe.edu.cn` and all its subdomains are rewritten |
 | `allowlist.updatedAt` | Last update time of the allowlist | ISO8601 string | Creation time | Low | Record keeping only |
 
-- **Storage**: `userData/config.json` (settings + allowlist); session cookie storage and encryption are in section 4 of [security/README.md](../security/README.md).
-- **Configuration sources and precedence**: `TBD` — phase 1 has a single persistent source, `userData/config.json`; precedence between build-time defaults and runtime fields (such as `systemProxyManagedByApp`) is undefined and must be settled during implementation. How configuration reaches the sidecar is described in [bridge-control-protocol.md](../api/bridge-control-protocol.md).
+- **Storage**:
+  - `<userData>/config.json`: the top level carries the allowlist (`hosts` / `includeSwufeWildcard` / `updatedAt`) and a sibling `settings` key holds `AppSettings` (missing keys take their default); the Python side reads the allowlist part of the same file.
+  - `<userData>/bridge-config.json`: the runtime config handed to the sidecar (`allowlist` + `cookies` + `debug` + `webvpnBase` + `wrdKey`/`wrdIv`), mode `0600` (it carries session cookies); the app is the only writer.
+  - `<userData>/mitmproxy/`: the MITM CA confdir (private key `0600`), which is also the sidecar's `--confdir`.
+  - `<userData>/Partitions/swufe-login/`: the login session (Electron persistent partition; no `session.bin` is written); cookie location and encryption are in section 4 of [security/README.md](../security/README.md).
+- **Configuration sources and precedence**: the persistent file is the single source; build-time defaults only fill missing keys or the first start; `settings.bridgePort` and `settings.webvpnBase` are read and pushed when the bridge starts, and the runtime marker `systemProxyManagedByApp` is written by the Proxy Orchestrator. How configuration reaches the sidecar is described in [bridge-control-protocol.md](../api/bridge-control-protocol.md).
+- **Development overrides**: `--user-data-dir <dir>` (or `SWUFE_USER_DATA_DIR`) overrides `userData`; `SWUFE_REPO_ROOT` overrides the repository root; `SWUFE_PYTHON` picks the interpreter that runs the sidecar/CA entry points; `SWUFE_PROBE_INTERVAL_MS` overrides the session-expiry probe interval.
 - **Secret handling**: see [security/README.md](../security/README.md).
 
 ## 3. Deployment
@@ -45,6 +50,9 @@ Artifact:      Electron installer (macOS / Windows) + mitmproxy sidecar
 Method:        The user installs and runs it locally; the app launches the
                mitmproxy sidecar as a child process on startup
                Development equivalent: local Node + Python venv + mitmdump
+               (from M2: run `uv sync` in the repository root, then
+               `npm --prefix app install && npm --prefix app start`; the app spawns the sidecar via
+               `<repo>/.venv/bin/python -m swufe_bridge.sidecar`, see [app/README.md](../../app/README.md))
 Distribution:  TBD - embedded Python runtime versus an external mitmproxy
                executable is not yet chosen (size/signing trade-off, see
                ADR-0002, decided during implementation)
@@ -72,7 +80,8 @@ Rollback:      Stop the bridge -> confirm the system proxy is restored ->
 
 ```text
 Scope:           userData/config.json (settings + allowlist)
-                 userData/session.bin (session cookies, optionally safeStorage-encrypted)
+                 userData/Partitions/swufe-login/ (login session partition; cookie plaintext
+                 is protected by the OS user-directory permissions)
                  MITM CA confdir (the mitmproxy-dedicated directory)
 Frequency:       TBD - phase 1 defines no automatic backup (settings can be
                  re-entered and the CA can be regenerated)
@@ -81,7 +90,7 @@ Restore drills:  TBD - as above
 RPO / RTO:       TBD - as above
 ```
 
-Consequences of losing each object: losing `config.json` means rebuilding the allowlist and settings; losing `session.bin` means logging in again; losing the CA confdir means regenerating the CA and reinstalling it in the system trust store.
+Consequences of losing each object: losing `config.json` means rebuilding the allowlist and settings; losing the login partition means logging in again; losing the CA confdir means regenerating the CA and reinstalling it in the system trust store.
 
 ## 6. Incident response
 

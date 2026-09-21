@@ -40,7 +40,7 @@ Phase 1 adopts option A (finalised 2026-09-21): Main only launches/terminates th
 
 ### Configuration file
 
-- Path: defaults to `~/.swufe-webvpn-bridge/bridge-config.json`, overridden by `--config` (M2 passes a path under Electron `userData`).
+- Path: defaults to `~/.swufe-webvpn-bridge/bridge-config.json`, overridden by `--config` (M2 passes `<userData>/bridge-config.json` under Electron `userData`).
 - Permissions: `0600` (it contains the WebVPN session cookie, see NFR-003).
 - Content (field names match `AllowlistConfig` / `SessionState` / `AppSettings` in [data-model.md](../architecture/data-model.md)):
 
@@ -65,6 +65,22 @@ Phase 1 adopts option A (finalised 2026-09-21): Main only launches/terminates th
 
 - Missing keys take their default value; unknown top-level keys are ignored; a missing file or a JSON parse failure ⇒ `CONFIG_INVALID`.
 - **The sidecar neither writes nor modifies this file**: the only writer is the app (M2); during M1 development it is written by hand.
+
+### CA generation entry (added in M2)
+
+The app must be able to install the CA *before* the first bridge start, while mitmproxy only creates its CA when mitmdump starts. A generation-only entry point therefore exists (it reuses mitmproxy's `CertStore`; no home-grown PKI, see [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md)):
+
+```bash
+python -m swufe_bridge.ca --confdir <confdir>
+```
+
+| Item | Convention |
+| ---- | ---- |
+| Idempotence | When `<confdir>/mitmproxy-ca.pem` exists no file is rewritten (repeated calls return the same paths) |
+| Success output | One JSON line on stdout: `{"caCert": "…/mitmproxy-ca-cert.pem", "caPem": "…/mitmproxy-ca.pem", "caCer": "…/mitmproxy-ca-cert.cer", "created": true\|false}`, exit code `0` |
+| Failure | stderr `swufe-error CA_FAILED <message>`, exit code `2` |
+| Permissions | The private key file is `0600` (readable only by the local user, NFR-003) |
+| Location | M2 uses `<userData>/mitmproxy/`; it must be the same directory as the sidecar's `--confdir` |
 
 ### Diagnostics output (single-line stderr, machine-readable)
 
@@ -105,3 +121,4 @@ curl -sS -i -x http://127.0.0.1:18080 --cacert <confdir>/mitmproxy-ca-cert.pem h
 | ---- | ---- | ------------- | ------------------ |
 | 2026-09-20 | First version: options A / B recorded as candidates with hard constraints; implementation marked `TBD` | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | Option A finalised: configuration file path and field table, mtime + size polling hot reload with failure fallback, `swufe-ready` / `swufe-error` lines and exit codes, development run commands, loopback enforced by the sidecar in code | Compatible (the first version was not final and had no existing consumer) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md) |
+| 2026-09-21 | M2 landed: new CA generation entry `python -m swufe_bridge.ca --confdir <dir>` (stdout JSON / `swufe-error CA_FAILED` / exit code 2 / idempotent); M2 `--config` and `--confdir` locations pinned to `<userData>/bridge-config.json` and `<userData>/mitmproxy/` | Compatible (new entry point, control plane unchanged) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |

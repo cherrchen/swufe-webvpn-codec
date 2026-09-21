@@ -62,14 +62,63 @@ The project licence is MIT (see [LICENSE](../../LICENSE)).
 
 | Dependency | Purpose | Notes |
 | ---------- | ------- | ----- |
-| Electron | desktop shell | rationale and cost in [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md) |
+| Electron | desktop shell | rationale and cost in [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md); a development dependency of `app/` from M2 (devDependencies, pinned 44.4.3), used for the development run and later packaging |
 | mitmproxy | TLS / HTTP2 / MITM, infrastructure-level dependency | see [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md); section 2 of this policy requires an ADR for it. Since M1 it is a **runtime dependency**: the sidecar drives it through `mitmproxy.tools.main.mitmdump`, and it hosts the bridge and control plane (`swufe_bridge/sidecar.py`); its dedicated confdir also carries the MITM CA |
 | cryptography | AES-128-CFB128 codec (WRD hostname token) | newly added as a direct dependency in M1; it was already pulled in transitively by mitmproxy, and declaring it directly pins the API the codec uses (`swufe_bridge/wrd_codec.py`) |
 | pytest | Python-side test framework (L0/L1/L2) | newly added in M1, dev dependency group (`[dependency-groups] dev`) |
 | hatchling | Python package build backend | newly added in M1, build-time dependency, not present at runtime |
 | pycryptodome | used only by the archived prototype [wrd_codec.py](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/wrd_codec.py) | not a dependency of the current implementation; the M1 codec uses `cryptography`'s AES-CFB128 (equivalent to the prototype's `segment_size=128`, guaranteed by the TC-A02 gate vector) |
 | sing-box | later TUN stage | not introduced in phase 1 |
-| typescript, tsx, `@types/node` | used only by this repository's documentation check scripts | Node side; no Markdown parser or framework pulled in |
+| esbuild | Bundle the sandboxed preload (`app/src/preload/index.ts` → `app/dist/preload/index.js`) | Added in M2 (`app/` devDependency, pinned 0.28.2). A `sandbox: true` preload cannot `require` relative paths, so a single file is mandatory; esbuild was already a transitive dependency of tsx and is declared directly to pin the bundling behaviour |
+| tsx | Run `app/test/**/*.test.ts` (TypeScript loader for Node's built-in test runner) | Added in M2 (`app/` devDependency, pinned 4.23.15). Chosen because the repository-root documentation scripts already use the same approach (no second TS runtime) |
+| typescript, `@types/node` | Only for this repository's documentation check scripts and for `app/` type checking | Node side; `app/` and the repository root use the same major versions (typescript 5.x, @types/node 22.x); no Markdown parser or framework is introduced |
+
+### Dependency records (added in M2)
+
+```text
+Dependency:   electron
+Version:      ^44.4.3 (app/package-lock.json pins 44.4.3)
+Purpose:      Desktop shell: login WebView, system-proxy orchestration host, CA install entry, IPC/preload boundary
+Alternatives: Tauri (needs a Rust toolchain and behaves differently in WebView terms; ADR-0003 evaluated and chose Electron)
+License:      MIT
+Risk:         Large (macOS in the ~200MB range) and must ship with the package; the platform binary is downloaded over the network (offline environments must pre-cache it)
+```
+
+```text
+Dependency:   esbuild
+Version:      ^0.28.2 (app/package-lock.json pins 0.28.2)
+Purpose:      Bundle the sandbox preload into a single file (relative require is unavailable in sandboxed preloads)
+Alternatives: hand-written single-file preload (duplicates constants, poor maintainability); sandbox:false (weakens isolation, not accepted)
+License:      MIT
+Risk:         Platform-specific binary (shipped through optional dependencies); its install script is explicitly approved via npm's allowScripts
+```
+
+```text
+Dependency:   tsx
+Version:      ^4.23.15 (app/package-lock.json pins 4.23.15)
+Purpose:      Run the TypeScript unit tests under app/test with Node's built-in test runner (same approach as the root documentation scripts)
+Alternatives: compile before testing (an extra build step, while the unit tests are deliberately electron-free); jest/vitest (would add a second test stack)
+License:      MIT
+Risk:         dev-only; brings its compilation capability through esbuild
+```
+
+```text
+Dependency:   @types/node (22.x)
+Version:      ^22.10.2 (pins 22.20.4)
+Purpose:      Node types for Main/preload and the unit tests
+Alternatives: none (standard practice)
+License:      MIT
+Risk:         types only, never shipped
+```
+
+```text
+Dependency:   typescript
+Version:      ^5.7.2 (app/ resolves 5.9.3; the repository root is 5.x too)
+Purpose:      Type checking and compilation for the three tsconfigs (Main/Renderer compiled, preload type-checked only)
+Alternatives: none (consistent with the existing documentation scripts)
+License:      Apache-2.0
+Risk:         dev-only
+```
 
 ### Dependency records (added in M1)
 

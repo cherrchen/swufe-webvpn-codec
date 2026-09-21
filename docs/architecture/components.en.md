@@ -12,19 +12,19 @@
 ## Component list
 
 > "Code location" is the real path of landed implementations; components that are not implemented yet stay `TBD（实现首个任务确定）`.
-> M1 (bridge core) has implemented WRD Codec, Bridge Addon (including the config surface and the sidecar entry) and the library layer of Allowlist Store; the Electron-side components land from M2 onwards.
+> M1 (bridge core) implemented WRD Codec, Bridge Addon (including the config surface and the sidecar entry) and the library layer of Allowlist Store; M2 landed every Electron-side component (`app/src/`), with the Windows adapters implemented and their real-machine verification deferred to M4.
 
 | Component | Type | Responsibility (one line) | Code location | Status |
 | --------- | ---- | ------------------------- | ------------- | ------ |
-| App Shell | In-process module (Electron Main) | Windows/tray (optional), config persistence, and the Main-side orchestration entry exposing preload IPC | TBD（实现首个任务确定） | Planned |
-| Login WebView | In-process module (Electron Renderer / BrowserWindow) | Hosts the official WebVPN / CAS login and guarantees anti-loop | TBD（实现首个任务确定） | Planned |
-| Session Broker | In-process module (Electron Main) | Cookie extraction, storage and expiry detection | TBD（实现首个任务确定） | Planned |
-| Proxy Orchestrator | In-process module (Electron Main) | Start/stop the mitm sidecar, set/clear the system proxy, manage process capture, detect proxy conflicts | TBD（实现首个任务确定） | Planned |
+| App Shell | In-process module (Electron Main) | Windows/tray (optional), config persistence, and the Main-side orchestration entry exposing preload IPC | `app/src/main/index.ts` (composition root, single-instance lock, quit cleanup in `shutdown.ts`), `app/src/main/ipc.ts` (IF-001), `app/src/main/windows.ts`, `app/src/main/store.ts` | Implemented (M2; no tray yet) |
+| Login WebView | In-process module (Electron Renderer / BrowserWindow) | Hosts the official WebVPN / CAS login and guarantees anti-loop | `app/src/main/session-broker.ts` (`openLogin`, `persist:swufe-login` partition + `setProxy({mode:'direct'})`) | Implemented (M2) |
+| Session Broker | In-process module (Electron Main) | Cookie extraction, storage and expiry detection | `app/src/main/session-broker.ts` (capture/clear/monitor), `app/src/main/session-probe.ts` (expiry-signal classification, pure functions) | Implemented (M2; Q-001's other two signals remain M3/M4) |
+| Proxy Orchestrator | In-process module (Electron Main) | Start/stop the mitm sidecar, set/clear the system proxy, manage process capture, detect proxy conflicts | `app/src/main/orchestrator.ts`, `app/src/main/state-machine.ts`, `app/src/main/sidecar.ts`, `app/src/main/platform/` (`exec.ts`, `parse.ts` and the darwin/win32 adapters) | Implemented (M2; Windows real-machine verification deferred to M4) |
 | WRD Codec | In-process library (shared by the App and the sidecar) | Hostname encryption/decryption and URL conversion (pure functions, no IO) | `swufe_bridge/wrd_codec.py` | Implemented (M1) |
 | Bridge Addon | Separate process (addon inside the mitmproxy sidecar) | Request rewrite, response reverse-rewrite and Cookie injection | `swufe_bridge/addon.py` (pure reverse-rewrite functions in `swufe_bridge/rewrite.py`; config surface in `swufe_bridge/config.py`; process entry `swufe_bridge/sidecar.py`) | Implemented (M1) |
-| Cert Manager | In-process module (Electron Main) | Install/uninstall and query the local MITM CA | TBD（实现首个任务确定；from M1 the sidecar's `--confdir` hosts mitmproxy CA generation） | Planned |
-| Allowlist Store | In-process module (Electron Main) | Read/write host list and wildcard option (single source for routing decisions) | `swufe_bridge/allowlist.py` (matching semantics and validation) + `swufe_bridge/config.py` (`AllowlistStore` persistence) | Partial (M1: library; M2: IPC) |
-| Telemetry UI | In-process module (Electron Renderer) | Status display and debug log panel | TBD（实现首个任务确定；M1's `swufe-debug` stderr lines are its data source） | Planned |
+| Cert Manager | In-process module (Electron Main) | Install/uninstall and query the local MITM CA | `app/src/main/platform/darwin/cert.ts`, `app/src/main/platform/win32/cert.ts`, `app/src/main/platform/ca-files.ts`; CA generation entry `swufe_bridge/ca.py` | Implemented (M2; the real trust-store write still needs a human, see the [M2 completion record](../planning/milestones/M2-desktop-orchestration.en.md)) |
+| Allowlist Store | In-process module (Electron Main) | Read/write host list and wildcard option (single source for routing decisions) | `app/src/main/store.ts` (read/write and validation of `<userData>/config.json`) + `swufe_bridge/allowlist.py` (matching semantics and validation) + `swufe_bridge/config.py` (`AllowlistStore`) | Implemented (M2; the editing UI belongs to M3) |
+| Telemetry UI | In-process module (Electron Renderer) | Status display and debug log panel | `app/src/renderer/renderer.ts`, `app/static/{index.html,styles.css}`, `app/src/preload/index.ts` | Partial (M2: status bar, bridge switch, certificate, proxy status, debug switch; allowlist editing and the log panel belong to M3) |
 
 ## Component relationships
 

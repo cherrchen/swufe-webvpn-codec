@@ -35,12 +35,15 @@ Not applicable. Both sides are two processes of the same application on the same
 | `getStatus` | yes (read-only) |
 | `getAllowlist` | yes (read-only) |
 | `setAllowlist` | yes (full overwrite) |
+| `getSettings` | yes (read-only) |
 | `installCa` / `uninstallCa` | yes |
 | `getCaStatus` | yes (read-only) |
 | `listCaptureCandidates` | yes (read-only) |
 | `setCapturePids` | yes (full overwrite) |
 | `setDebugLogging` | yes |
 | `onDebugLog` | yes (subscription; repeated subscriptions are independent and each returns its own unsubscribe function) |
+| `onStatus` | yes (subscription; independent per subscription, returns its own unsubscribe function) |
+| `onSessionExpired` | yes (subscription; independent per subscription, returns its own unsubscribe function) |
 
 > The original package does not specify idempotency per method; the table above is this document's convention for the implementation.
 
@@ -80,6 +83,15 @@ interface DebugLogEvent {
   rewritten: boolean
   direction: 'request' | 'response'
   detail?: string   // short message, no body
+}
+```
+
+```ts
+interface AppSettingsView {
+  bridgePort: number
+  debugLogging: boolean
+  capturePids: number[]
+  webvpnBase: string
 }
 ```
 
@@ -190,6 +202,17 @@ setAllowlist(cfg: AllowlistConfig): Promise<void>
 - Output: `Promise<void>`.
 - Errors: see [Error model](#error-model) (with empty `hosts` and the wildcard off, starting the bridge returns `ALLOWLIST_EMPTY`).
 
+### `getSettings(): Promise<AppSettingsView>`
+
+```ts
+getSettings(): Promise<AppSettingsView>   // added in M2: read-only, for UI defaults
+```
+
+- Purpose: read the UI-visible subset of the current settings (`bridgePort` / `debugLogging` / `capturePids` / `webvpnBase`) so the UI can show the initial switch and port values.
+- Input: none.
+- Output: `AppSettingsView`; it does **not** include `wrdKey` / `wrdIv` (sensitive values never cross IPC).
+- Errors: see the [error model](#error-model).
+
 ### `installCa(): Promise<{ ok: boolean; message?: string }>`
 
 ```ts
@@ -284,6 +307,31 @@ onDebugLog(cb: (e: DebugLogEvent) => void): () => void
 - Event payload: `DebugLogEvent` (see "Type definitions"); `detail` may hold a short message and must not hold bodies or cookies.
 - Errors: see [Error model](#error-model).
 
+### `onStatus(cb: (status: BridgeStatus) => void): () => void`
+
+```ts
+// Main → Renderer event (added in M2)
+onStatus(cb: (status: BridgeStatus) => void): () => void
+```
+
+- Purpose: subscribe to Main → Renderer bridge-status pushes; Main pushes once after every status change (start/stop/failure/expiry/session change) so the UI never has to poll.
+- Input: `cb` (status callback).
+- Output: unsubscribe function `() => void` (independent per subscription).
+- Event payload: `BridgeStatus` (see "Type definitions").
+- Errors: see the [error model](#error-model).
+
+### `onSessionExpired(cb: () => void): () => void`
+
+```ts
+// Main → Renderer event (added in M2)
+onSessionExpired(cb: () => void): () => void
+```
+
+- Purpose: subscribe to "the session expired and the bridge has stopped with the system proxy cleared", so the UI can show the re-login modal (copy in [../ui-ux/main-window.md](../ui-ux/main-window.md)); `getStatus().error.code` is `SESSION_EXPIRED` at the same time.
+- Input: `cb` (no-argument callback).
+- Output: unsubscribe function `() => void`.
+- Errors: see the [error model](#error-model).
+
 ## Error model
 
 The full error code set (meaning and user action); `message` carries the user-facing reason.
@@ -310,3 +358,4 @@ The full post-expiry handling (stop bridge → clear system proxy → stop proce
 | Date | Change | Compatibility | Related spec / ADR |
 | ---- | ------ | ------------- | ------------------ |
 | 2026-09-20 | First version: session, bridge control, allowlist, certificate, process capture and debug logging — 15 methods/events total | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
+| 2026-09-21 | M2 added three items (the semantics of the 15 methods above are unchanged): `getSettings` (read-only, for UI defaults; the WRD key/IV never cross IPC), `onStatus` (Main → Renderer status pushes) and `onSessionExpired` (session-expiry event driving the re-login modal) | Compatible (added methods/events) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [M2 completion record](../planning/milestones/M2-desktop-orchestration.en.md) |
