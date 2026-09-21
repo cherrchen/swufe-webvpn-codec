@@ -49,6 +49,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0004](ADR-0004-refuse-start-when-system-proxy-in-use.md) | 系统代理被占用时拒绝启动 | Accepted | 2026-09-20 | — |
 | [ADR-0005](ADR-0005-builtin-wrd-key-with-override.md) | WRD 默认密钥内置并保留配置覆盖 | Accepted | 2026-09-20 | — |
 | [ADR-0006](ADR-0006-local-capture-mode-and-mutual-exclusion.md) | mitmproxy local 模式做进程捕获，且与系统代理互斥 | Accepted | 2026-09-21 | — |
+| [ADR-0007](ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md) | 网关自有命名空间直通，且 bootstrap 文档升级到网关原生 URL 空间 | Accepted | 2026-09-21 | — |
 
 ## 规则
 

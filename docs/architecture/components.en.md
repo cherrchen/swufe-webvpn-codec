@@ -12,7 +12,7 @@
 ## Component list
 
 > "Code location" is the real path of landed implementations; components that are not implemented yet stay `TBD（实现首个任务确定）`.
-> M1 (bridge core) implemented WRD Codec, Bridge Addon (including the config surface and the sidecar entry) and the library layer of Allowlist Store; M2 landed every Electron-side component (`app/src/`), with the Windows adapters implemented and their real-machine verification deferred to M4; M3 completed the capture modes (process capture), the allowlist editing UI and the debug log panel.
+> M1 (bridge core) implemented WRD Codec, Bridge Addon (including the config surface and the sidecar entry) and the library layer of Allowlist Store; M2 landed every Electron-side component (`app/src/`), with the Windows adapters implemented and their real-machine verification deferred to M4; M3 completed the capture modes (process capture), the allowlist editing UI and the debug log panel; M5 ([ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)) added gateway-owned namespace passthrough and bootstrap document promotion to the Bridge Addon.
 
 | Component | Type | Responsibility (one line) | Code location | Status |
 | --------- | ---- | ------------------------- | ------------- | ------ |
@@ -21,7 +21,7 @@
 | Session Broker | In-process module (Electron Main) | Cookie extraction, storage and expiry detection | `app/src/main/session-broker.ts` (capture/clear/monitor), `app/src/main/session-probe.ts` (expiry-signal classification, pure functions) | Implemented (M2; Q-001's other two signals remain M3/M4) |
 | Proxy Orchestrator | In-process module (Electron Main) | Start/stop the mitm sidecar, set/clear the system proxy, switch between the two capture modes ("system proxy / selected apps"), detect proxy conflicts | `app/src/main/orchestrator.ts`, `app/src/main/state-machine.ts`, `app/src/main/sidecar.ts`, `app/src/main/platform/` (`exec.ts`, `parse.ts` and the darwin/win32 adapters) | Implemented (M2; Windows real-machine verification deferred to M4) |
 | WRD Codec | In-process library (shared by the App and the sidecar) | Hostname encryption/decryption and URL conversion (pure functions, no IO) | `swufe_bridge/wrd_codec.py` | Implemented (M1) |
-| Bridge Addon | Separate process (addon inside the mitmproxy sidecar) | Request rewrite, response reverse-rewrite and Cookie injection | `swufe_bridge/addon.py` (pure reverse-rewrite functions in `swufe_bridge/rewrite.py`; config surface in `swufe_bridge/config.py`; process entry `swufe_bridge/sidecar.py`) | Implemented (M1) |
+| Bridge Addon | Separate process (addon inside the mitmproxy sidecar) | Request rewrite, response reverse-rewrite and Cookie injection; gateway-owned root namespace passthrough; HTML that matches the gateway bootstrap predicate is promoted to the gateway-native URL space | `swufe_bridge/addon.py` (pure reverse-rewrite functions and the bootstrap predicate in `swufe_bridge/rewrite.py`; config surface in `swufe_bridge/config.py`; process entry `swufe_bridge/sidecar.py`) | Implemented (M1; M5 added passthrough and promotion) |
 | Cert Manager | In-process module (Electron Main) | Install/uninstall and query the local MITM CA | `app/src/main/platform/darwin/cert.ts`, `app/src/main/platform/win32/cert.ts`, `app/src/main/platform/ca-files.ts`; CA generation entry `swufe_bridge/ca.py` | Implemented (M2; the real trust-store write still needs a human, see the [M2 completion record](../planning/milestones/M2-desktop-orchestration.en.md)) |
 | Allowlist Store | In-process module (Electron Main) | Read/write host list and wildcard option (single source for routing decisions) | `app/src/main/store.ts` (read/write and validation of `<userData>/config.json`) + `swufe_bridge/allowlist.py` (matching semantics and validation) + `swufe_bridge/config.py` (`AllowlistStore`) | Implemented (M2; the editing UI landed in M3) |
 | Telemetry UI | In-process module (Electron Renderer) | Capture-mode selection, allowlist editing, status display and the debug log panel | `app/src/renderer/renderer.ts`, `app/static/{index.html,styles.css}`, `app/src/preload/index.ts` | Implemented (M3: status bar, bridge switch, certificate, proxy status, debug switch + the capture-mode section, allowlist editing and the log panel) |
@@ -117,17 +117,18 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 
 ### Bridge Addon
 
-- Responsibility: WRD-rewrite allowlisted requests and inject Cookies; reverse-rewrite responses; emit debug log events; overlay/remove the local capture mode from the runtime config and report the capture state.
+- Responsibility: WRD-rewrite allowlisted requests and inject Cookies; reverse-rewrite responses; gateway-owned root namespaces (`/wengine-vpn/`, `/authserver/`) take no token and are fetched straight from the gateway root, and their responses are not reverse-rewritten; HTML documents that match the gateway bootstrap predicate are promoted to the gateway-native URL space with `302`; emit debug log events; overlay/remove the local capture mode from the runtime config and report the capture state.
 - Not responsible for: UI; reading/writing user config directly (it only receives pushed config); depending on the Renderer/UI; session capture.
 - Input: HTTP/HTTPS requests and responses through the local bridge; the pushed `{allowlist, cookies, debug, capture}` config.
 - Output: upstream requests rewritten into WebVPN form; reverse-rewritten responses; debug log events (host + rewrite result); `swufe-capture` diagnostic lines.
 - Dependencies: WrdCodec.
 - Depended on by: Proxy Orchestrator (through the control port).
 - Key invariants: traffic outside the allowlist stays direct and unrewritten (C-004); `webvpn.swufe.edu.cn` and `authserver.swufe.edu.cn` are hard-coded exclusions (INV-004); logs never contain Cookies or bodies (INV-001).
+- Gateway-owned namespaces and promotion ([ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)): only paths that **begin with** `GATEWAY_ROOT_PREFIXES` (`/wengine-vpn/`, `/authserver/`) are passed through (site-owned paths such as `/xtgl/wengine-vpn/x` still get token rewriting); promotion applies only to already WRD-rewritten `GET`/`HEAD` responses and only to documents for which `is_gateway_bootstrap_html` is true, and it changes only the response's `Location` semantics (it never rewrites the page content); after promotion those pages no longer go through the bridge, and `webvpn.swufe.edu.cn` remains `not-allowlisted`.
 - Capture mechanics (ADR-0006): the sidecar starts with `--mode regular@<port>` and **never** passes `--listen-port` (a global `listen_port` would make the `local:<spec>` added at runtime collide with `regular` on the same listen address); at runtime it overlays `local:<spec>` onto the same mitmproxy instance, the regular listener stays in place and the bridge port remains available, and `swufe-ready`'s `listen_port` is derived from the regular mode.
 - Capture reporting: the `swufe-capture {"enabled":bool,"processes":string[],"error":string|null}` diagnostic line (its keys are fixed to `enabled` / `processes` / `error`), emitted on the first apply and on every config change; after a failure there is no automatic retry until the runtime config is rewritten (the UI's "retry" button pushes the config again). Process capture is optional, so that line never takes part in the readiness decision and a failure does not change the bridge state.
-- Related tests: TC-F01, TC-F02, TC-F03, TC-F04, TC-D04.
-- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md), [ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md), [ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md), [ADR-0005](adr/ADR-0005-builtin-wrd-key-with-override.md).
+- Related tests: TC-F01, TC-F02, TC-F03, TC-F04, TC-D04, TC-G01, TC-G02.
+- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md), [ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md), [ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md), [ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md), [ADR-0005](adr/ADR-0005-builtin-wrd-key-with-override.md).
 
 ### Cert Manager
 
@@ -185,7 +186,7 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 | Session Broker | cherrchen | Whether the Cookie strategy and the "only reader" constraint are preserved |
 | Proxy Orchestrator | cherrchen | Whether the proxy-conflict and clearing policy and the capture-mode mutual exclusion (ADR-0004, ADR-0006, INV-002) change |
 | WRD Codec | cherrchen | Whether codec vectors (NFR-002) and default key/iv semantics (ADR-0005) are affected |
-| Bridge Addon | cherrchen | Whether the rewrite strategy, allowlist semantics and log minimisation (C-004, INV-001, INV-004) are affected |
+| Bridge Addon | cherrchen | Whether the rewrite strategy, allowlist semantics, log minimisation (C-004, INV-001, INV-004) and the gateway-owned namespace passthrough / bootstrap promotion rules (ADR-0007) are affected |
 | Cert Manager | cherrchen | Whether the CA / trust model (ADR-0002, REQ-010) changes |
 | Allowlist Store | cherrchen | Whether the defaults and wildcard semantics (INV-003) change |
 | Telemetry UI | cherrchen | Whether new IPC is introduced or sensitive data is displayed |

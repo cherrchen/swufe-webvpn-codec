@@ -10,7 +10,7 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 `In Progress`（2026-09-21）：M1（桥核心）已实现并通过 L0/L1/L2——桥 sidecar、WRD codec、allowlist 匹配与持久化、请求改写与响应反向改写、配置热更新、L0 CI；M2（桌面编排）已实现并通过 App 单测与 macOS 实机端到端验证——Electron 壳、登录 WebView 与 Session Broker（防环）、Proxy Orchestrator（代理冲突检测、系统代理与 sidecar 生命周期）、Cert Manager（含独立 CA 生成入口与安装前风险提示）、会话过期级联（停桥 → 清代理 → 弹窗重登）、退出清代理与残留自愈。M3（体验打磨）已实现——可编辑 allowlist UI、一级「捕获方式」与进程捕获（mitmproxy local 模式）、调试日志面板、捕获态状态与授权引导文案，人工验证结果见 [verification.md](verification.md)；M4（验收）的 **macOS 侧已执行**（2026-09-21，真实应用 + CDP + 真实 CAS/MFA 会话）：登录/未登录拒绝、开桥与系统代理、代理冲突、会话失效级联、进程捕获真实范围、日志面板、退出清代理、CA 安装（经应用自带手动命令）与卸载均通过；**教务浏览器验收（TC-G01/TC-G02）未通过**——本部署网关对每个 HTML 响应注入客户端 shim，与透明桥的普通 URL 空间模型不兼容（[known-issues.md](known-issues.md) `KI-011`，P0 未决），Windows 侧全部延期（`KI-001`），CA 的自动安装路径在 macOS 15.6 上失败（`KI-007`）。验收期修复三个缺陷（`KI-008`/`KI-009`/`KI-010`）。因此本 Spec 仍为 `In Progress`：M4 的「所有 P0 通过」「教务验收至少一侧通过」两条出口条件未满足，不得推进到 `Verified`。证据见 [verification.md](verification.md)、[M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md)、[M2 里程碑](../../docs/planning/milestones/M2-desktop-orchestration.md)、[M3 里程碑](../../docs/planning/milestones/M3-experience-polish.md) 与 [M4 里程碑](../../docs/planning/milestones/M4-acceptance.md)。
+当前为 `Implemented`（2026-09-21）：M1（桥核心）已实现并通过 L0/L1/L2——桥 sidecar、WRD codec、allowlist 匹配与持久化、请求改写与响应反向改写、配置热更新、L0 CI；M2（桌面编排）已实现并通过 App 单测与 macOS 实机端到端验证——Electron 壳、登录 WebView 与 Session Broker（防环）、Proxy Orchestrator（代理冲突检测、系统代理与 sidecar 生命周期）、Cert Manager（含独立 CA 生成入口与安装前风险提示）、会话过期级联（停桥 → 清代理 → 弹窗重登）、退出清代理与残留自愈。M3（体验打磨）已实现——可编辑 allowlist UI、一级「捕获方式」与进程捕获（mitmproxy local 模式）、调试日志面板、捕获态状态与授权引导文案，人工验证结果见 [verification.md](verification.md)；M4（验收）的 **macOS 侧已执行**（2026-09-21，真实应用 + CDP + 真实 CAS/MFA 会话）：登录/未登录拒绝、开桥与系统代理、代理冲突、会话失效级联、进程捕获真实范围、日志面板、退出清代理、CA 安装（经应用自带手动命令）与卸载均通过；M4 期间教务浏览器验收（TC-G01/TC-G02）因网关客户端 shim 与透明桥不兼容而失败（`KI-011`，P0）。**M5（2026-09-21，`KI-011` 修复后的复验）**：网关自有命名空间直通 + bootstrap 文档升级到网关原生 URL 空间（[ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）在 macOS 实机复验通过——教务首页可打开、站内导航可操作（TC-G01/TC-G02/AC-007），其它 allowlist 主机仍留在普通 URL 空间；`uv run pytest -q` = 198 passed、App 单测 71、`docs:check` 0 error/0 warning。仍有两类未完成：Windows 侧全部真机项延期（`KI-001`）、CA 的自动安装路径在 macOS 15.6 上失败（`KI-007`）与个别直连主机/环境干扰（`KI-012`/`KI-013`），因此本 Spec 为 `Implemented`，**不**推进到 `Verified`（`Verified` 需要 P0 全绿，仍差 Windows 侧）。证据见 [verification.md](verification.md) 的 M4/M5 记录、[M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md)、[M2 里程碑](../../docs/planning/milestones/M2-desktop-orchestration.md)、[M3 里程碑](../../docs/planning/milestones/M3-experience-polish.md) 与 [M4 里程碑](../../docs/planning/milestones/M4-acceptance.md)。
 
 ## Background
 
@@ -74,7 +74,7 @@ WebVPN 是**应用层反向代理**，不是 SSLVPN/TUN，因此本机普通浏�
 | REQ-004 | 与其它代理共存：启动前检测系统代理，已被占用则拒绝启动并提示先关闭 Clash / mihomo / sing-box 等 | Must | FR-4（99-appendix/requirements-onepager-v1.0.md §4） |
 | REQ-005 | Allowlist 路由：仅 allowlist 主机（含可选 `*.swufe.edu.cn`）经 WebVPN 改写；其余直连；默认必保 `jwxt.swufe.edu.cn`，可自定义增删 | Must | FR-5（99-appendix/requirements-onepager-v1.0.md §4） |
 | REQ-006 | WRD 请求改写：WrdCodec 生成 WebVPN URL；上游改为 `webvpn.swufe.edu.cn`；附加 WebVPN Cookie；按需最小必要调整 `Host`/`Origin`/`Referer` | Must | FR-6（请求）（99-appendix/requirements-onepager-v1.0.md §4） |
-| REQ-007 | 响应反向改写（浏览器验收硬依赖）：`Location`、`Set-Cookie` 的 Domain/Path、HTML/JS/JSON 中的校内绝对 URL | Must | FR-6（响应）（99-appendix/requirements-onepager-v1.0.md §4） |
+| REQ-007 | 响应反向改写（浏览器验收硬依赖）：`Location`、`Set-Cookie` 的 Domain/Path、HTML/JS/JSON 中的校内绝对 URL；两条例外见 [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)：网关自有根命名空间（`/wengine-vpn/`、`/authserver/`）直接取自网关根且其响应不反向改写，命中网关 bootstrap 判据的 HTML 文档升级到网关原生 URL 空间 | Must | FR-6（响应）（99-appendix/requirements-onepager-v1.0.md §4） |
 | REQ-008 | 防环：访问 `webvpn.swufe.edu.cn` / `authserver.swufe.edu.cn` 不得进入本桥；已是 WebVPN 形态的请求直通 | Must | FR-2 防环 / FR-6 相关（99-appendix/requirements-onepager-v1.0.md §4） |
 | REQ-009 | 可观测性：默认可见连接状态/allowlist/错误原因；界面提供调试日志面板（三列：时间、域名、结果；最多保留最近 200 条，默认不显示），仅记「域名 + 是否改写成功」，不含正文、请求体与 Cookie | Should（原包 FR-7 标为可选能力；对应用例 TC-F04 优先级 P1） | FR-7（99-appendix/requirements-onepager-v1.0.md §4） |
 | REQ-010 | 证书生命周期：本机生成 MITM CA（复用 mitmproxy CA 机制，不自研 PKI）；一键安装到系统信任、一键卸载；私钥不上传 | Must | FR-8（99-appendix/requirements-onepager-v1.0.md §4） |
@@ -150,13 +150,13 @@ WebVPN 是**应用层反向代理**，不是 SSLVPN/TUN，因此本机普通浏�
 
 > 每条必须可验证，并与 [verification.md](verification.md) 的矩阵一一对应；取自原包验收清单（`99-appendix/requirements-onepager-v1.0.md` §8）。
 
-- [ ] AC-001：当在 macOS 与 Windows 上运行安装/开发版时，系统应能启动 Electron 应用并显示主窗口（REQ-001；TC-G01 / TC-G03）——**M4（2026-09-21）**：macOS 的启动与界面全部通过，但两条 TC 的教务首页部分失败（见 AC-007 / `KI-011`）；Windows 延期（`KI-001`）。保持未勾选
+- [x] AC-001：当在 macOS 与 Windows 上运行安装/开发版时，系统应能启动 Electron 应用并显示主窗口（REQ-001；TC-G01 / TC-G03）——**M5（2026-09-21）macOS 通过**：应用启动、界面与两条 TC 的教务首页部分（TC-G01）全部通过；Windows 仍延期（`KI-001`）
 - [x] AC-002：当用户完成官方 WebVPN/CAS 登录时，UI 应显示「已登录」状态，且日志中不出现 Cookie 明文或密码（REQ-002；TC-D01 / TC-F04）
 - [x] AC-003：当系统代理已被其它软件占用时，用户开启桥，系统应拒绝启动并提示先关闭该代理（REQ-004；TC-C01）
 - [x] AC-004：当捕获方式为「系统代理」且桥开启时，系统 HTTP/HTTPS 代理应指向本桥；当捕获方式为「指定应用」时，本 App 不设置系统代理且只有所选应用的流量经桥；当桥关闭或 App 退出时，应清除本 App 设置的系统代理（REQ-003；TC-C02 / TC-C03 / TC-C04 / TC-G04）
 - [x] AC-005：当用户点击「安装证书」/「卸载证书」时，系统应把本机 MITM CA 加入/移出系统信任库，并在 UI 反映当前状态（REQ-010；TC-E01 / TC-E02）
 - [x] AC-006：当首次启动或重置配置时，allowlist 应默认含 `jwxt.swufe.edu.cn`，用户可增删主机并可启用 `*.swufe.edu.cn` 通配（REQ-005；TC-B01 / TC-B02 / TC-B05 / TC-H02）
-- [ ] AC-007：当桥运行且 CA 已信任时，本机浏览器访问 `jwxt.swufe.edu.cn` 应能打开页面并完成常规导航操作（REQ-006 / REQ-007；TC-G01 / TC-G02 / TC-G03）——**M4（2026-09-21）未通过**：根 URL 白屏、真实页渲染但不可交互，根因是本部署网关的客户端 shim 与透明桥不兼容（`KI-011`，P0，候选解除路径与决策点见该条目）；改写链路本身经复核可用。保持未勾选
+- [x] AC-007：当桥运行且 CA 已信任时，本机浏览器访问 `jwxt.swufe.edu.cn` 应能打开页面并完成常规导航操作（REQ-006 / REQ-007；TC-G01 / TC-G02 / TC-G03）——**M5（2026-09-21）macOS 通过**：入口 `http://jwxt.swufe.edu.cn/` 在首次进入时被升级到 WebVPN 原生 URL 形态（`https://webvpn.swufe.edu.cn/http/<token>/…`，见 [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)），随后在网关原生模式下操作（首页、菜单、站内「学生成绩查询」均可交互，链接不跳飞到不可达地址）；其它 allowlist 主机（实测 `www.swufe.edu.cn`）保持普通主机名。TC-G03 仍延期（`KI-001`）
 - [x] AC-008：当 WebVPN 会话过期时，系统应停桥、清除系统代理、停止进程捕获并弹窗提示重新登录（REQ-002 / REQ-003；TC-D03）
 - [x] AC-009：当调试日志开启时，界面日志面板（时间、域名、结果三列，最多保留最近 200 条）应仅包含域名与是否改写成功，不含响应正文、请求体与 Cookie；开关关闭时面板隐藏且记录清空（REQ-009；TC-F04）
 - [x] AC-010：当登录 WebView 访问 `webvpn.swufe.edu.cn` / `authserver.swufe.edu.cn` 时，流量应不经过本桥（无代理环）（REQ-008；TC-D04）

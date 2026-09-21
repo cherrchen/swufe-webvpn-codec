@@ -20,12 +20,12 @@
 
 **回归策略**：L0 每次 PR 必跑；L1/L2 在对应模块变更时本地跑；L3 发版前跑。用例集（TC-A01..TC-H02）与优先级见 Phase 1 Spec 的 `verification.md`，发版门槛见 [docs/verification/verification-strategy.md](../verification/verification-strategy.md) 第 6 节。
 
-**L3 的执行方式（M4 起）**：按 [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 双平台验收执行手册」逐步执行（每步含执行者/命令/期望/证据落点），两侧平台共用 `npm run acceptance:check` 采集脱敏证据（OS/代理/信任库/CA 权限/桥存活/curl 对照 + `redaction-self-check`），手册的结果表逐行填写。前置条件：**先关闭其它代理工具的 TUN / 虚拟网卡模式**（`KI-013`）；需要人的动作（管理员密码、CAS/MFA 登录、系统扩展授权）由测试者本人完成。
+**L3 的执行方式（M4 起）**：按 [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 双平台验收执行手册」逐步执行（每步含执行者/命令/期望/证据落点），两侧平台共用 `npm run acceptance:check` 采集脱敏证据（OS/代理/信任库/CA 权限/桥存活/curl 对照 + `redaction-self-check`），手册的结果表逐行填写。前置条件：**先关闭其它代理工具的 TUN / 虚拟网卡模式**（`KI-013`）；需要人的动作（管理员密码、CAS/MFA 登录、系统扩展授权）由测试者本人完成。登录步骤可能遇到 `KI-014`（CAS 主题静态资源被服务端截断导致登录窗样式丢失）：重载登录窗即可继续，属外部服务行为。
 
 ## 2. 覆盖要求
 
 ```text
-Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 190 个用例与 71 个 App 单测用例全绿）
+Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 198 个用例（L0 97 + L1 93 + L2 8）与 71 个 App 单测用例全绿）
 Coverage tool:   TBD（M1 未引入；层与用例即当前的可回归证据）
 Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 ```
@@ -38,6 +38,7 @@ Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 - 会话过期时的停桥、清代理、停捕获（TC-D03）；
 - 防环：登录流量不经 WRD 二次包装（TC-D04）；
 - 响应反向改写的关键跳转（`Location` 与教务内导航，TC-F03 / TC-G02）；
+- 网关自有命名空间直通（路径以 `/wengine-vpn/`、`/authserver/` 开头时不加 token、取自网关根且响应不反向改写）与 bootstrap 升级判据的边界（`text/html` + ≤ 8192 B + 同时含两个标记；含同样注入的大页面**不得**升级），覆盖在 L1 `tests/l1/test_addon_request.py` / `test_addon_response.py`，端到端一条在 L2 `tests/l2/test_proxy_end_to_end.py`（ADR-0007）；
 - 进程捕获（REQ-003）：`swufe_bridge.capture` 的模式集推导 / 失败回滚 / 不重试语义用 L0 单测（`tests/l0/test_capture.py`），addon 的捕获循环用 L1 注入式单测（`tests/l1/test_addon_capture.py`，注入 fake，**不得真实启用 local 模式**）；真实范围与「切回系统代理即停」属 L3 手工验证（需测试者本人在系统授权提示内确认）。
 
 此外必须覆盖需求验收标准、已修复 Bug 的复现路径、边界与错误路径。

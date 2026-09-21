@@ -8,7 +8,7 @@
 > 本文件建立 **Requirement → Verification** 映射，是「Feature 是否完成」的判定依据。
 > 规则见 [verification-strategy.md](../../docs/verification/verification-strategy.md)。
 > Feature **不因为「代码写完了」被视为完成**；状态必须推进到 `Verified`。
-> 当前进度：M1（桥核心）、M2（桌面编排）、M3（体验打磨）已实现；M4 的 **macOS 交互式验收已执行完毕**（真实应用 + CDP + 真实 CAS/MFA 会话，2026-09-21）：登录、开桥、系统代理、会话失效级联、进程捕获、日志面板、CA 安装/卸载等用例通过，验收期修复了三个缺陷（`KI-008` 会话探测丢 Cookie、`KI-009` 登录窗 ERR_ABORTED、`KI-010` CA 卸载缺 `-Z`）；**教务浏览器验收（TC-G01/TC-G02）失败**，根因是本部署网关的客户端 shim 与透明桥不兼容（`KI-011`，P0，未决），因此 macOS 侧「所有 P0 通过」与「教务验收至少一侧通过」两条出口条件**未满足**；Windows 侧全部延期（`KI-001`）。CA 的**自动**安装路径在 macOS 15.6 上失败（`KI-007`，TC-E01 改用应用自带的手动命令后通过）。故 Feature 整体仍为 `In Progress`，不得推进到 `Verified`。
+> 当前进度：M1（桥核心）、M2（桌面编排）、M3（体验打磨）已实现；M4 的 **macOS 交互式验收已执行完毕**（真实应用 + CDP + 真实 CAS/MFA 会话，2026-09-21）：登录、开桥、系统代理、会话失效级联、进程捕获、日志面板、CA 安装/卸载等用例通过，验收期修复了三个缺陷（`KI-008` 会话探测丢 Cookie、`KI-009` 登录窗 ERR_ABORTED、`KI-010` CA 卸载缺 `-Z`）；M4 期间教务浏览器验收（TC-G01/TC-G02）失败（根因 `KI-011`）。**M5（2026-09-21，`KI-011` 修复后复验）**：网关自有命名空间直通 + bootstrap 文档升级（[ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）在 macOS 实机复验通过——TC-G01/TC-G02 转为 `Passed`，macOS 侧出口条件（含「教务浏览器验收至少一侧通过」）**已满足**。仍有两类未完成：Windows 侧全部真机项延期（`KI-001`），以及 `KI-007`（CA 自动安装，macOS 15.6 下 osascript 提权无法写信任设置）、`KI-013`（TUN 干扰需环境预检/文案）、`KI-014`（CAS 主题资源被服务端截断，需重载登录窗）等未决项。故本 Feature 推进到 `Implemented`，**不**推进到 `Verified`（`Verified` 需要 P0 全绿，仍差 Windows 侧）。
 
 ## 映射表
 
@@ -16,23 +16,23 @@
 
 | Requirement | Verification | Status |
 | ----------- | ------------ | ------ |
-| REQ-001 | TC-H01（L3 手工：状态条与状态机一致，含捕获态）；应用启动 smoke（TC-G01/TC-G03 前置，L3 手工） | Failed（M4：TC-G01/TC-G02 失败，根因见 `KI-011`；TC-G03 延 Windows，见 `KI-001`）——应用启动与界面部分通过：M4 实机状态条覆盖含「桥接中（进程捕获）」在内的六种呈现且与状态机一致（TC-H01）、日志面板与真实桥端到端联动（TC-F04）；M3 已通过：主窗口一级「捕获方式」区、可增删的 allowlist 与日志面板实机可用；状态条在捕获生效时显示「桥接中（进程捕获）」（渲染层以真实推流验证，桥未运行时保持「桥接中」）；M2 已通过：应用启动 smoke，且五个状态（未登录/已登录/桥接中/错误/过期处理中）实机可见并与状态机一致 |
+| REQ-001 | TC-H01（L3 手工：状态条与状态机一致，含捕获态）；应用启动 smoke（TC-G01/TC-G03 前置，L3 手工） | Passed（M5：macOS 侧全部通过——TC-G01 复验通过（教务首页可打开并可操作，见「M5（KI-011 修复）执行记录」）；TC-G03 仍延 Windows，见 `KI-001`）；M4 曾 `Failed`（TC-G01/TC-G02 失败，根因见 `KI-011`；TC-G03 延 Windows，见 `KI-001`）——应用启动与界面部分通过：M4 实机状态条覆盖含「桥接中（进程捕获）」在内的六种呈现且与状态机一致（TC-H01）、日志面板与真实桥端到端联动（TC-F04）；M3 已通过：主窗口一级「捕获方式」区、可增删的 allowlist 与日志面板实机可用；状态条在捕获生效时显示「桥接中（进程捕获）」（渲染层以真实推流验证，桥未运行时保持「桥接中」）；M2 已通过：应用启动 smoke，且五个状态（未登录/已登录/桥接中/错误/过期处理中）实机可见并与状态机一致 |
 | REQ-002 | TC-D01、TC-D02、TC-D03（L1 组件 + L3 手工：登录成功、未登录拒绝开桥、过期停桥清代理弹窗） | Passed（M4：TC-D01 在真实 CAS/MFA 会话下通过、TC-D02 通过、TC-D03 以服务端使 ticket 失效触发并在 ≤8s 内完成级联且重登后回到「已登录」；过程中修复 `KI-008`（探测丢 Cookie）与 `KI-009`（登录窗 ERR_ABORTED））；M2 已通过：TC-D02（未登录时开关禁用且 `startBridge` 返回 `NOT_LOGGED_IN`）、TC-D03（过期级联实机 8 秒内完成）、TC-D01（桩上游「打开门户 → 采集 Cookie → 已登录」）；M1 已通过：Cookie 注入与去重、配置热更新 |
 | REQ-003 | TC-C02、TC-C03、TC-C04（L1 组件 / L2 集成：设代理、关桥清代理、退出清代理）；TC-G04（L3 手工：进程捕获的范围与停止） | Passed（M4：TC-C02/C03/C04 与 TC-G04 的真实范围全部实机通过——捕获与系统代理互斥（`Enabled: No`）、正向「被选中的 Chrome 经桥」、反向「未选中的 curl 不经桥」、切回系统代理即恢复）；M2 已通过：TC-C02/C03/C04 实机——开桥把 6 个启用服务指向 `127.0.0.1:8080`，关桥/退出清空，异常退出残留由 `recoverOnLaunch()` 自愈；M1 已通过：sidecar 起桥、回环监听、结束进程即停止；M3 已通过：`--mode regular@<port>` 起桥且 `swufe-ready.listen_port` 等于 `--port`（L2）、捕获模式集推导/回滚/不重试（L0 `tests/l0/test_capture.py`）、addon 叠加与移除 `local:` 并回报 `swufe-capture`（L1 `tests/l1/test_addon_capture.py`）、互斥编排（`app/test/orchestrator.test.ts` 6 例）、实机切到「指定应用」不设置系统代理（`networksetup` 证据见「M3 手工验证记录」）、系统代理被占用时拒绝启用「指定应用」并弹出冲突模态（实机 CDP 驱动） |
 | REQ-004 | TC-C01（L1 组件 / L2 集成：已有系统代理时拒绝启动，错误码 `PROXY_CONFLICT`） | Passed（M2：实机 `Enabled: Yes / 127.0.0.1:7890` 时拒绝启动、模态提示、OS 设置未被改动、未启动 sidecar；`app/test/orchestrator.test.ts` 断言冲突时不调用 `enable`） |
 | REQ-005 | TC-B01..B05（L0 单元 + L1 组件：默认值、精确命中、非名单直连语义、通配、持久化）；TC-H02（L3 手工：通配勾选） | Passed：M3 实机通过 TC-B05 / TC-H02——界面添加 `portal.swufe.edu.cn` 后出现在列表、删除后回落，非法主机名显示「主机名不合法：…」且不写入，勾选 `*.swufe.edu.cn` 与增删结果在重启 App 后仍保留（`/tmp/m3-e2e/config.json` 证据）；M1/M2 已通过：TC-B01..B05 以及 App 侧 `<userData>/config.json` 的读写与校验（`app/test/store.test.ts`）与跨语言同文件用例（`tests/l0/test_config.py`） |
 | REQ-006 | TC-A01..A05（L0 单元：codec 向量）；TC-F01（L2 集成：curl 经代理访问 allowlist 主机） | Passed（M1） |
-| REQ-007 | TC-F03（L1 组件：`Location` 反向改写）；TC-G02（L3 手工：教务页面内导航不跳飞） | Failed（M4：TC-G02 因网关客户端 shim 与透明桥不兼容而失败，见 `KI-011`；`Location` 反向改写本身在真实链路上通过——经桥 `http://jwxt.swufe.edu.cn/` 的 `302` 被改写为普通主机）；M1 已通过：`Location`、`Set-Cookie` Domain/Path、HTML/JS/JSON 反向改写与内容类型边界（`tests/l1/test_rewrite.py`、`tests/l1/test_addon_response.py`） |
+| REQ-007 | TC-F03（L1 组件：`Location` 反向改写）；TC-G02（L3 手工：教务页面内导航不跳飞） | Passed（M5：macOS 的 TC-G02 复验通过——教务首页与站内导航均在网关原生空间可用且不跳飞；`Location` 反向改写本身在 M1/L1 与真实链路均通过；两条例外（网关自有命名空间直通、bootstrap 文档升级）见 [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）；M4 曾 `Failed`（TC-G02 因网关客户端 shim 与透明桥不兼容而失败，见 `KI-011`；`Location` 反向改写本身在真实链路上通过——经桥 `http://jwxt.swufe.edu.cn/` 的 `302` 被改写为普通主机）；M1 已通过：`Location`、`Set-Cookie` Domain/Path、HTML/JS/JSON 反向改写与内容类型边界（`tests/l1/test_rewrite.py`、`tests/l1/test_addon_response.py`） |
 | REQ-008 | TC-D04（L2 集成 / L3 手工：登录 WebView 无代理环）；TC-F02（L2 集成：非 allowlist 直连不改写） | Passed（M4：真实 CAS 会话下登录窗口 `resolveProxy(https://webvpn.swufe.edu.cn) = DIRECT`，登录期间无 webvpn/authserver 的 `swufe-debug` 行；桥运行期这两个主机均为 `not-allowlisted`，防环对照段记录到未包装的 `302 → https://webvpn.swufe.edu.cn/login`）；M2 已通过：登录分区 `setProxy({mode:'direct'})`，实机日志 `resolveProxy(...) = DIRECT` 且登录期间无 `swufe-debug` 行；M1 已通过：TC-F02 与「已是 WebVPN 形态的请求直通」 |
 | REQ-009 | TC-F04（L2 集成 + L3 手工：调试日志仅域名与改写结果）；TC-H01（L3 手工：状态可见） | Passed（M4：真实桥流量下逐条出现——累计 200 条上限、最新在前、行内只有「时间/域名/结果」，关闭开关后面板隐藏且行数归 0（TC-F04 + TC-H01））；M3 已通过：日志面板三列（时间/域名/结果）、200 条上限、最新在前、清空、随开关显示/隐藏与关闭时清空——在真实渲染层上以真实 `onDebugLog` 推流验证，且事件携带的额外字段（cookie/body）不进入界面；M2 已通过：debug 事件经 IPC 到达渲染层且只保留契约的五个键（`app/test/sidecar-lines.test.ts`、`app/test/debug-relay.test.ts`）；M1 已通过：TC-F04 的 L2 部分（键集固定、无 Cookie/正文） |
 | REQ-010 | TC-E01、TC-E02、TC-E03（L3 手工，需管理员权限：安装 CA、卸载 CA、未装 CA 提示 `CA_MISSING`） | Passed（M4：TC-E01 经应用自带的手动命令把 CA 写入系统信任库并被系统信任（自动路径失败，见 `KI-007`）、TC-E02 修复 `KI-010` 后卸载成功（钥匙串 0 字节、UI「未安装」）、TC-E03 未装 CA 时开桥返回 `CA_MISSING` 且未做任何 OS 变更）；M2 已通过：TC-E03、安装前风险提示模态、CA 生成入口（`tests/l1/test_ca.py`） |
-| REQ-011 | TC-G01（L3 手工：macOS 教务验收）；TC-G03（L3 手工：Windows 教务验收） | Failed（M4：macOS 的 TC-G01/TC-G02 失败，根因见 `KI-011`；TC-G03 延 Windows，见 `KI-001`） |
+| REQ-011 | TC-G01（L3 手工：macOS 教务验收）；TC-G03（L3 手工：Windows 教务验收） | Passed（M5：macOS 侧（TC-G01）通过；TC-G03 延 Windows，见 `KI-001`）；M4 曾 `Failed`（macOS 的 TC-G01/TC-G02 失败，根因见 `KI-011`；TC-G03 延 Windows，见 `KI-001`） |
 | NFR-001 | 代码审查（TLS/HTTP2/证书签发实现来自 mitmproxy，无自研 PKI）；TC-E01（L3 手工：CA 生成于 mitmproxy 专用 confdir） | Passed（M2：CA 生成入口 `swufe_bridge/ca.py` 复用 mitmproxy `CertStore`，App 与 sidecar 使用同一 `<userData>/mitmproxy/` confdir，实机开桥即在该目录生成 CA）；M1 已通过：TLS/HTTP2/证书签发全部来自 mitmproxy（无自研 PKI） |
 | NFR-002 | TC-A01..A05（L0 单元：与 `wrd_codec.py` 向量一致，含 authserver / jwxt 样本） | Passed（M1） |
 | NFR-003 | TC-D01（L1/L3：登录后无密码文件）＋ TC-F04（L2/L3：日志不含正文/Cookie）＋ 人工检查（L3：CA 私钥与会话文件权限仅本机用户可读、不上传） | Passed（M2：实机 `bridge-config.json` 与 CA 私钥均为 0600；会话只以 `name/value/domain/path` 下发 sidecar，WRD key/IV 不跨 IPC（`getSettings` 只返回界面可见子集）；会话存于 Electron 持久分区，不写密码文件）；M1 已通过：TC-F04 的自动化部分与 0600 写入。M4 已通过：真实会话下 `bridge-config.json` 与 CA 私钥均为 0600、profile 内无任何密码文件，脱敏采集报告经 `redaction-self-check` 确认无 Cookie/密钥值（`npm run acceptance:check`） |
 | NFR-004 | TC-C03、TC-C04（L1/L2：关桥与退出清代理）；TC-D03（L3 手工：过期清代理） | Passed（M2：实机三种路径均清空系统代理——关桥、退出（`before-quit` 清理完成后才退出）、会话过期；异常退出残留由下次启动的 `recoverOnLaunch()` 清除；`app/test/orchestrator.test.ts` 断言只清本桥项。M4 实机复验：关桥、应用内退出、会话失效三条路径均把 6 个服务恢复为 `Enabled: No` 且无 sidecar 残留） |
 | NFR-005 | TC-E01（L3 手工：安装 CA 前展示风险提示文案）；进程捕获授权引导文案 | Passed（M2：点击「安装本机 CA」先弹出风险模态，文案与 ui-ux 一致；取消后未发生任何安装动作。真实安装动作未执行，见 TC-E01。M3：捕获失败时实机显示「启用失败 — <原因>」+ macOS 扩展授权引导文案 + 「重试」按钮，文案与 [ui-ux/main-window.md](../../docs/ui-ux/main-window.md) 一致） |
-| NFR-006 | TC-G01（macOS）、TC-G03（Windows）（L3 手工） | Failed（M4：macOS 的编排链路与启动均通过，但教务浏览器验收失败，见 `KI-011`；Windows 实现 + 单测完成、真机验证延 M4/T038 与 `KI-001`） |
+| NFR-006 | TC-G01（macOS）、TC-G03（Windows）（L3 手工） | Passed（M5：macOS 侧通过——教务可打开并可操作；Windows 侧的编排与启动实现已完成、真机验证延 M4/T038 与 `KI-001`）；M4 曾 `Failed`（macOS 的编排链路与启动均通过，但教务浏览器验收失败，见 `KI-011`；Windows 实现 + 单测完成、真机验证延 M4/T038 与 `KI-001`） |
 | NFR-007 | TC-H01、TC-H02（L3 手工：界面文案为中文优先） | Passed：M3 实机确认新增的捕获方式区、应用列表、日志面板与两条新文案全部为中文；M2 已通过：主窗口状态条、按钮、模态与错误文案全部为中文，实机可见 |
 
 Status 取值：`Pending` / `Passed` / `Failed` / `N/A`（`N/A` 必须写明理由）。
@@ -41,13 +41,13 @@ Status 取值：`Pending` / `Passed` / `Failed` / `N/A`（`N/A` 必须写明理�
 
 | Acceptance Criteria | 对应验证项 | Status |
 | ------------------- | ---------- | ------ |
-| AC-001 | TC-G01 / TC-G03（L3 手工：双平台启动 Electron 应用） | Failed（M4：应用启动与界面部分通过——真实应用可启动、可交互、单实例锁生效；但两条 TC 的教务首页部分失败，见 AC-007 与 `KI-011`；TC-G03 延 Windows，见 `KI-001`）；M2 已通过 macOS 启动 smoke：`npm --prefix app start` 显示主窗口并可交互，单实例锁生效 |
+| AC-001 | TC-G01 / TC-G03（L3 手工：双平台启动 Electron 应用） | Passed（M5：macOS 的启动、界面与 TC-G01 全部通过；TC-G03 延 Windows，见 `KI-001`）；M4 曾 `Failed`（应用启动与界面部分通过——真实应用可启动、可交互、单实例锁生效；但两条 TC 的教务首页部分失败，见 AC-007 与 `KI-011`；TC-G03 延 Windows，见 `KI-001`）；M2 已通过 macOS 启动 smoke：`npm --prefix app start` 显示主窗口并可交互，单实例锁生效 |
 | AC-002 | TC-D01（L1/L3：登录后 `loggedIn=true`）+ TC-F04（日志检查无 Cookie/密码） | Passed（M4：真实 CAS/MFA 会话下 `loggedIn = true`（`expiresAt` 有值）、状态条「已登录」、profile 内无密码文件；日志面板与 `swufe-debug` 行只含域名/结果（TC-F04））；M2 已通过：桩上游下「登录 → `loggedIn=true` → 状态条已登录」，过程无密码文件；M1 已通过：日志检查部分 |
 | AC-003 | TC-C01（L1/L2：系统代理已占用时拒绝启动并提示） | Passed（M2：实机模态提示 + OS 设置未变 + 未启动 sidecar） |
 | AC-004 | TC-C02 / TC-C03 / TC-C04（L1/L2：开桥设代理、关桥清代理、退出清代理）+ TC-G04（M3：指定应用时不设置系统代理） | Passed（M2：实机 `networksetup` 三态证据；M3：捕获方式为「指定应用」时编排层不调用 `enable` 并在切换时撤销本 App 设置过的代理（`app/test/orchestrator.test.ts`），实机切换捕获方式后 `networksetup` 仍为 `Enabled: No`。M4：TC-G04 的真实范围已通过——捕获态下系统代理为 `Enabled: No`、被选中的 Chrome 经桥、未选中的 curl 不经桥、切回「系统代理」即恢复（`KI-002` 置 `Fixed`）；M2/M4 的 TC-C02/C03/C04 实机三态证据见结果表） |
 | AC-005 | TC-E01 / TC-E02（L3 手工：CA 安装与卸载在系统信任库生效） | Passed（M4：TC-E01 的信任库写入以应用自带的手动命令完成（自动路径失败见 `KI-007`），`security verify-cert` 退出码 0、`getCaStatus() = {installed:true,trusted:true}`；TC-E02 修复 `KI-010` 后卸载成功（系统钥匙串中 `mitmproxy` 证书 0 字节、UI「未安装」）；M2 已通过：实现、风险提示与 `CA_MISSING`） |
 | AC-006 | TC-B01 / TC-B02 / TC-B05（L0/L1）+ TC-H02（L3 手工：默认含 jwxt、可增删、可勾选通配） | Passed：M3 实机通过界面增删主机与通配勾选，且重启 App 后仍保留（TC-B05 / TC-H02）；M1/M2 已通过：默认值、小写化/校验、持久化与跨语言同文件读取 |
-| AC-007 | TC-G01 / TC-G02 / TC-G03（L3 手工：教务可打开并操作） | Failed（M4：macOS 的 TC-G01/TC-G02 失败——根 URL 白屏、真实页渲染但不可交互，根因与候选解除路径见 `KI-011`；网关的改写与反向改写链路本身经 curl 与 Chrome 内 `fetch` 双向复核可用；TC-G03 延 Windows，见 `KI-001`） |
+| AC-007 | TC-G01 / TC-G02 / TC-G03（L3 手工：教务可打开并操作） | Passed（M5：macOS 通过——入口 `http://jwxt.swufe.edu.cn/` 首次进入时被升级到 WebVPN 原生 URL 形态（`https://webvpn.swufe.edu.cn/http/<token>/…`，见 [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)），随后首页、菜单与站内「学生成绩查询」均可交互且链接不跳飞到不可达地址；其它 allowlist 主机（实测 `www.swufe.edu.cn`）仍是普通主机名；TC-G03 延 Windows，见 `KI-001`）；M4 曾 `Failed`（macOS 的 TC-G01/TC-G02 失败——根 URL 白屏、真实页渲染但不可交互，根因与候选解除路径见 `KI-011`；网关的改写与反向改写链路本身经 curl 与 Chrome 内 `fetch` 双向复核可用；TC-G03 延 Windows，见 `KI-001`） |
 | AC-008 | TC-D03（L3 手工：过期停桥、清代理、弹窗重登） | Passed（M2：实机 8 秒内完成停桥 + 清代理 + 模态「WebVPN 会话已失效…」+ [去登录]，重登后状态回到「已登录」） |
 | AC-009 | TC-F04（L2 + L3：调试日志仅域名与改写结果） | Passed（M4：真实桥流量下逐条出现、累计 200 条上限、行内只有域名与结果、关闭开关后隐藏并清零）；M3 已通过：面板三列 / 200 条上限 / 清空 / 随开关显示隐藏（真实渲染层 + 真实 `onDebugLog` 推流），且额外字段（cookie/body）不进入界面；M2 已通过：debug 事件经 IPC 到渲染层且只保留五个键；M1 已通过：L2 部分 |
 | AC-010 | TC-D04（L2/L3：登录 WebView 不经本桥） | Passed（M4：真实 CAS 会话下登录窗口 `resolveProxy(https://webvpn.swufe.edu.cn) = DIRECT`、登录期间无 webvpn/authserver 的 `swufe-debug` 行；桥运行期这两主机均为 `not-allowlisted`（防环对照段记录到未包装的 `302 → /login`））；M2 已通过：登录窗 `resolveProxy = DIRECT`、登录期间无 webvpn/authserver 的 `swufe-debug` 行 |
@@ -91,6 +91,19 @@ Status 取值：`Pending` / `Passed` / `Failed` / `N/A`（`N/A` 必须写明理�
 | 会话探测隔离实验（Electron 内 `net.request`，`/tmp/probe-experiment.js`） | 默认参数：`redirect event status=302 location=https://webvpn.swufe.edu.cn/login`；`useSessionCookies: true`：`response status=200 location=(none)`；`useSessionCookies: false`：同上 302 | 2026-09-21 | `KI-008` 的根因与修复判据（同一 Cookie 三种参数的一次对照） |
 | 真实应用 M4 验收（`npm --prefix app start -- --user-data-dir=/tmp/m4-acceptance --remote-debugging-port=9222`，`SWUFE_PROBE_INTERVAL_MS=8000`） | 见「M4 结果表」：TC-D02/E03/E01/D01/D04/C01/C02/F01/F04/D03/G04/C03/C04/E02/H01/H02/B05 通过；TC-G01/G02 失败；全过程无密码文件落盘，`bridge-config.json` 与 CA 私钥 0600 | 2026-09-21 | 需要 cherrchen 的动作：管理员密码（CA 安装/卸载）、CAS/MFA 登录、浏览器内登录 |
 | 教务浏览器验收（真实 Chrome，系统代理路径；curl 与 Chrome 内 `fetch` 双向复核） | `http://jwxt.swufe.edu.cn/` 经桥 `200/925B`（网关 shim 页）、`/wengine-vpn/js/main.js` 经桥 `404`（网关根 `200/376922B`）、`/xtgl/index_initMenu.html` 经桥 `200/76854B` 且体被改写；浏览器实测白屏 / 页面不可交互 → TC-G01/G02 `Failed`（`KI-011`） | 2026-09-21 | `https` 形态经网关为 `302 → /wengine-vpn/failed`，故教务只能走 `http`；自动化导航在本环境反复卡死，关键观察由 cherrchen 手工完成 |
+
+| `uv run pytest -q` | `198 passed`（L0 97 + L1 93 + L2 8） | 2026-09-21 | M5：新增 8 例——`tests/l1/test_addon_request.py` 4 例（网关自有路径直通）、`tests/l1/test_addon_response.py` 3 例（升级 / 不误升级 / 自有响应不改写）、`tests/l2/test_proxy_end_to_end.py::test_gateway_owned_path_and_promotion_end_to_end` 1 例 |
+| 反向验证：临时把 `GATEWAY_ROOT_PREFIXES` 置空 + `_promote_to_gateway` 直接 `return False` 后重跑新增用例 | `5 failed`（`test_gateway_owned_path_is_not_token_wrapped`、`test_gateway_owned_authserver_path_is_not_token_wrapped`、`test_gateway_owned_response_is_not_reverse_rewritten`、`test_bootstrap_document_is_promoted`、`test_gateway_owned_path_and_promotion_end_to_end`），其余 3 例为反向守卫两向通过；随后恢复文件 | 2026-09-21 | M5：证明新增用例非空断言（撤掉实现即失败） |
+| `npm --prefix app run typecheck` / `npm --prefix app run test:unit` | 无 error / `71 passed` | 2026-09-21 | M5：App 侧未改动，回归确认无影响 |
+| `npm run docs:check` | `0 error(s), 0 warning(s)` | 2026-09-21 | M5：ADR-0007 中英配对与全部文档同步后 |
+| `curl -sS -x http://127.0.0.1:8080 --cacert <caCert> -o /dev/null -w '%{http_code} %{size_download}\n' 'http://jwxt.swufe.edu.cn/wengine-vpn/js/main.js?ver=20211207'`（真实应用 + 系统代理路径，桥运行中） | `200 376922`（`application/javascript`） | 2026-09-21 | M5：网关自有路径直通的实机对照（修复前经桥为 `404`） |
+| 真实 Chrome（系统代理路径，`--disable-features=HttpsUpgrades,…` 以复现文档记载的 `http` 入口）打开 `http://jwxt.swufe.edu.cn/` | 302 链 → CAS（`authserver`，`not-allowlisted`）→ 登录后桥日志出现 `{"host":"jwxt.swufe.edu.cn","direction":"response","detail":"promoted"}`，浏览器进入 `https://webvpn.swufe.edu.cn/http/<token>/xtgl/index_initMenu.html…` | 2026-09-21 | M5：升级规则的实机证据（TC-G01） |
+| 同一浏览器内：教务首页 → 点「信息查询 → 学生成绩查询」 | 打开 `…/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default`，标题「学生成绩查询」，无错误页，查询表单 + 表格渲染（5 个 `table`），页面正文含 `?vpn-7&ver=…` 的网关原生改写 | 2026-09-21 | M5：站内导航不跳飞（TC-G02） |
+| 非 jwxt 主机回归（勾选 `*.swufe.edu.cn` 通配后）：Chrome 打开 `https://www.swufe.edu.cn/` → 站内点「学校概况」 | 地址栏保持 `www.swufe.edu.cn`（`location.host` 未变）、标题「西南财经大学」→「学校概况-西南财经大学」、无 `#main-frame-error`；桥日志 `rewritten=true` 且响应 `no-wrd-match`（该站页面不含 WRD 字面量，故无 body 改写可记） | 2026-09-21 | M5：普通 URL 空间未被误升级 |
+| 同一轮另一台非 jwxt 主机：`curl -x http://127.0.0.1:8080 --cacert <caCert> https://lib.swufe.edu.cn/` | `302`，`location: https://webvpn.swufe.edu.cn/https/<lib-token>/`（该主机的入口文档同样是网关 bootstrap 页 ⇒ 同样升级，按 ADR-0007 属预期） | 2026-09-21 | M5：升级按判据发生，与主机无关 |
+| `npm run acceptance:check -- --out /tmp/ki011-evidence --port 8080 --host jwxt.swufe.edu.cn --scheme http --user-data-dir /tmp/ki011-gateway --save-body` | `bridge-port: open`、`bridge-smoke: 302 Found`、`trust-store: installed: yes`、`redaction-self-check: PASS`；报告入库 `evidence/acceptance-macos/acceptance-darwin-20260921-154657.md`（`--save-body` 产物不入库） | 2026-09-21 | M5：脱敏证据（T044 器材） |
+| 关桥后的系统代理与残留检查（`networksetup -getwebproxy/-getsecurewebproxy Ethernet`+`Wi-Fi`、`scutil --proxy`、`pgrep -fl swufe_bridge`） | 全部 `Enabled: No`、`HTTPEnable 0`/`HTTPSEnable 0`、无 sidecar 进程 | 2026-09-21 | M5：本改动未影响 NFR-004 |
+| `KI-014` 定位：登录窗 CDP（`Network.enable` + `Log.enable` + `Page.reload`）与 `curl --http2 'https://authserver.swufe.edu.cn/authserver/swufeThemezxqr/static/css/bootstrap.min.css?v=…'` 连续 8 + 3 次 | CDP：`net::ERR_INCOMPLETE_CHUNKED_ENCODING`（`bootstrap.min.css`、`jquery-latest.min.js`），样式表 `cssRules.length = 0`；重载后 `cssRules = 1187`、`decodedBodySize = 121048`；curl 11 次中 3 次被截断（`33612`/`25136`/`26880` B，`curl: (18)`） | 2026-09-21 | M5 期间发现（cherrchen 报告登录页渲染错误）；根因在校方服务端，与桥/本项目无关，登记 `KI-014` |
 
 > 只记录**实际执行过**的命令；未执行时写明原因，不得写「应该没问题」。
 
@@ -266,7 +279,7 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 | TC-B05 | 顺带 | Passed | 界面添加 `portal.swufe.edu.cn`（非法值 `http://x/` 被拒且不写入）→ 重启后仍在 → 删除后列表回落，`config.json` 回到默认 |
 | TC-G03（Windows） | — | Deferred | `KI-001` |
 
-**M4 教务浏览器验收记录（TC-G01 / TC-G02，Failed）**
+**M4 教务浏览器验收记录（TC-G01 / TC-G02，M4 时为 `Failed`；已在 M5 修复复验通过——见下节「M5（`KI-011` 修复）执行记录」与 [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）**
 
 执行方式：真实 Chrome（系统代理路径，不设 `--proxy-server`），一部分由执行者用 CDP 驱动、关键的页面观察与点击由 cherrchen 手工完成（自动化导航在本环境反复卡死，见下）；桥侧以 `swufe-debug` 行与脱敏快照取证。
 
@@ -292,6 +305,44 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 补充观察：`http://jwxt.swufe.edu.cn/` 的 http 形态是教务唯一可经网关代理的形态（`https` 形态网关返回 `/wengine-vpn/failed`），故上述验证全部走 `http`；`--scheme http` 开关即为该事实而加到采集脚本上。
 
 
+
+### M5（KI-011 修复）执行记录（2026-09-21）
+
+> 范围：`KI-011` 的修复（网关自有命名空间直通 + bootstrap 文档升级到网关原生 URL 空间，[ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）及其 macOS 实机复验（TC-G01 / TC-G02 / AC-007）。
+> 驱动方式：真实应用（`npm --prefix app start -- --user-data-dir=/tmp/ki011-gateway --remote-debugging-port=9222`）+ CDP 驱动界面与浏览器（系统代理路径，未设 `--proxy-server`）；cherrchen 负责需要人的动作（CAS/MFA、管理员密码）。
+> 前置状态：TUN / 其它系统代理已关闭（`scutil --proxy` 为 `HTTPEnable 0`/`HTTPSEnable 0`，无 Clash/mihomo 进程），`git status --short` 仅含本轮改动。
+
+**Phase 0：判定常数与证据（实现前取证）**
+
+| 输入 | 实测值 | 来源 |
+| ---- | ------ | ---- |
+| 网关自有根命名空间 | `/wengine-vpn/`、`/authserver/` 未登录也可从网关根取到（`/wengine-vpn/js/js/wechat-font.js` → `200 737B`）；网关根 `/` 与任意 token 路径未登录一律 `302 → /login` | 本轮只读探测 + M4 记录 |
+| 客户端 shim 运行时 | `https://webvpn.swufe.edu.cn/wengine-vpn/js/main.js?ver=20211207` → `200 376922B application/javascript` | 本轮只读探测 |
+| bootstrap 引导页字节数 B | **925 B**（含 `__vpn_` 与 `/wengine-vpn/js/main.js`） | M4 实测（`KI-011`、上文 M4 记录） |
+| 真实站点页字节数 | **76 854 B**（同一注入下） | M4 实测 |
+| 判据可分性 | B（925）≤ 8192，真实页（76 854）> 8192 ⇒ 默认谓词「≤ 上限 + 同时含两个标记」可分，**不**需要备用谓词（正文引用谓词） | 由上两行推出 |
+| 定常数 | `GATEWAY_BOOTSTRAP_MAX_BYTES = 8192`（B ≤ 8192 成立 ⇒ 取 8192） | [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md) |
+
+**执行与结果**
+
+| 步骤 | 命令 / 动作 | 观察 |
+| ---- | ----------- | ---- |
+| 1 | 起真实应用（隔离 profile `/tmp/ki011-gateway`），应用内完成 CAS/MFA 登录 | `getSession() = {loggedIn:true, expiresAt:"2026-09-28T07:44:48.776Z"}`；状态条「已登录」 |
+| 2 | 安装本机 CA（风险提示模态 → 确认 → 管理员密码；macOS 15.6 的自动路径失败属 `KI-007`） | `security find-certificate -a -c mitmproxy -Z /Library/Keychains/System.keychain` 有 1 条；`security verify-cert -c <confdir>/mitmproxy-ca-cert.pem -p ssl` 退出码 0；`getCaStatus() = {installed:true,trusted:true}` |
+| 3 | 开桥（系统代理路径） | `getStatus() = {state:"running", systemProxyEnabled:true, bridgePort:8080}`；6 个网络服务指向 `127.0.0.1:8080`（`acceptance:check` 的 `system-proxy` 段） |
+| 4 | 直通对照：`/wengine-vpn/js/main.js` 经桥 | `200 376922` bytes `application/javascript`（`detail=gateway-root`）——修复前为经桥 `404` |
+| 5 | 系统 Chrome（系统代理路径）打开入口 `http://jwxt.swufe.edu.cn/` | 302 链（`xtgl/login_slogin.html` → `authserver` CAS）后，桥日志出现 `jwxt.swufe.edu.cn` `direction=response` `detail=**promoted**`；浏览器落到 `https://webvpn.swufe.edu.cn/http/<token>/xtgl/index_initMenu.html?jsdm=xs&…`，标题「教学管理信息服务平台」，菜单与用户信息完整（**TC-G01 通过**） |
+| 6 | 站内导航：点「信息查询 → 学生成绩查询」 | 打开 `…/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default`，标题「学生成绩查询」，无 `#main-frame-error`，查询表单 + 5 个表格渲染；页面资产 URL 形如 `/http/<token>/…?vpn-7&ver=…`（网关服务端改写，桥不参与）——**TC-G02 通过** |
+| 7 | 普通空间回归：勾选 `*.swufe.edu.cn` → Chrome 打开 `https://www.swufe.edu.cn/` → 点「学校概况」 | 地址栏 `www.swufe.edu.cn` 不变、标题「学校概况-西南财经大学」、无错误页；桥日志 `rewritten=true` + 响应 `no-wrd-match`（该站页面不含 WRD 字面量） |
+| 8 | 另一非 jwxt 主机：`https://lib.swufe.edu.cn/` 经桥 | `302 → https://webvpn.swufe.edu.cn/https/<lib-token>/`——该主机入口文档同样是网关 bootstrap 页，按 ADR-0007「同样升级」（预期行为） |
+| 9 | 收尾：关通配、关桥、退出应用 | 关桥后所有服务 `Enabled: No`、`scutil` 0/0、无 `swufe_bridge` 残留（NFR-004 未回归） |
+
+**需要 cherrchen 的动作**：应用内 CAS/MFA 一次（登录窗）、CA 安装的管理员密码与（`KI-007` 情况下的）`sudo security add-trusted-cert …` 手动命令、以及浏览器内的 CAS（进入网关原生空间后浏览器需要自己的网关会话——这是 ADR-0007 记录的行为，桥不注入应用内会话）。
+
+**本轮修复**：`KI-011` → `Fixed`（判据常数、修复点与复验方式见 [known-issues.md](known-issues.md)）。
+**本轮新增**：`KI-014`（CAS 主题静态资源被服务端截断 → 登录窗样式丢失；规避 = 重载登录窗；与桥无关）。
+**副作用与已知残留**：被升级主机的地址栏进入 `https://webvpn.swufe.edu.cn/<scheme>/<token>/…`；网关原生空间下桥的调试日志只能证明「已升级」，不能再逐条证明页面内跳转（由网关服务端改写负责）；`https` scheme token 对教务不可用（入口必须 `http://`，升级目标随之用 `/http/<token>/…`）。
+**入库证据**：`evidence/acceptance-macos/acceptance-darwin-20260921-154657.md`（脱敏，`redaction-self-check: PASS`）；`--save-body` 产物与浏览器截图只留在 `/tmp/ki011-evidence/`，不入库。
 
 ## 边界与异常场景
 
@@ -330,30 +381,29 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 | ---- | ------------ | ---- |
 | [docs/requirements/](../../docs/requirements/README.md) | 是 | 已同步：REQ-001..REQ-011 / NFR-001..NFR-007 的规范定义在 requirements，本 Spec 只引用 ID（M1/M2 均未新增需求） |
 | [docs/operations/](../../docs/operations/README.md) | 是 | M2 已同步：配置落点（`<userData>/config.json`、`bridge-config.json`、`mitmproxy/`、登录分区）、开发期覆盖项与「持久文件为唯一来源」的配置优先级；M4 已同步：新增 [development-run.md](../../docs/operations/development-run.md)（+en，承载 T040：前置条件、启动、管理员权限操作、自检、常见故障、Windows 差异、停止与重置），README §3 指向该文件并补 TUN 模式前置条件（`KI-013`） |
-| [docs/architecture/](../../docs/architecture/README.md) | 是 | M1 已同步：[interfaces.md](../../docs/architecture/interfaces.md)（IF-002 方案 A 定稿）；M2 已同步：[components.md](../../docs/architecture/components.md)（Electron 组件的代码位置与状态已落地，Windows 适配「实现待 M4 真机」）；M3 已同步：新增 [ADR-0006](../../docs/architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)（中英）并在 [ADR 索引](../../docs/architecture/adr/README.md) 登记，[components.md](../../docs/architecture/components.md) / [interfaces.md](../../docs/architecture/interfaces.md) / [data-flow.md](../../docs/architecture/data-flow.md) / [data-model.md](../../docs/architecture/data-model.md) 更新捕获方式、`capture` 配置键、`swufe-capture` 行与 `AppSettings.captureMode` / `captureProcesses` |
+| [docs/architecture/](../../docs/architecture/README.md) | 是 | M5 已同步：新增 [ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)（中英）并在 [ADR 索引](../../docs/architecture/adr/README.md) 登记，[components.md](../../docs/architecture/components.md) / [interfaces.md](../../docs/architecture/interfaces.md) / [data-flow.md](../../docs/architecture/data-flow.md) 补「网关自有命名空间直通 + bootstrap 文档升级」；M1 已同步：[interfaces.md](../../docs/architecture/interfaces.md)（IF-002 方案 A 定稿）；M2 已同步：[components.md](../../docs/architecture/components.md)（Electron 组件的代码位置与状态已落地，Windows 适配「实现待 M4 真机」）；M3 已同步：新增 [ADR-0006](../../docs/architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)（中英）并在 [ADR 索引](../../docs/architecture/adr/README.md) 登记，[components.md](../../docs/architecture/components.md) / [interfaces.md](../../docs/architecture/interfaces.md) / [data-flow.md](../../docs/architecture/data-flow.md) / [data-model.md](../../docs/architecture/data-model.md) 更新捕获方式、`capture` 配置键、`swufe-capture` 行与 `AppSettings.captureMode` / `captureProcesses` |
 | [docs/api/](../../docs/api/README.md) | 是 | M1 已同步：[bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md)（方案 A 定稿）、[wrd-codec-library.md](../../docs/api/wrd-codec-library.md)（Python 实现映射）；M2 已同步：[bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md)（CA 生成入口与 M2 落点）、[electron-ipc.md](../../docs/api/electron-ipc.md)（`getSettings` / `onStatus` / `onSessionExpired`）；M3 已同步：[electron-ipc.md](../../docs/api/electron-ipc.md)（`setCapturePids` → `setCaptureProcesses` + 新增 `setCaptureMode`、`captureError`、`CaptureCandidate.pattern`、`AppSettingsView` 与错误码前缀约定，中英）、[bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md)（`capture` 配置键、`swufe-capture` 诊断行、`--mode regular@<port>`，中英） |
 | ADR | 是一部分 | M3 新增 [ADR-0006](../../docs/architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)：进程捕获用 mitmproxy `local` 模式且与系统代理互斥（中英 + 索引）；M1 未新增 ADR（未改架构/公共接口/数据模型/安全模型）；IF-002 的实现方式选择属实现阶段决策，记录于 [bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md) |
-| [docs/development/](../../docs/development/README.md) | 是 | M1 已同步：testing-strategy（分层/命名/运行命令与 CI）、coding-conventions（语言/目录/命名/错误处理）、dependency-policy（uv 与依赖登记）、development-workflow（分支与提交、CI）；M2 已同步：testing-strategy（App 单测层与 `app-tests.yml`）、coding-conventions（TS 目录/命名/模块格式）、dependency-policy（electron/esbuild/tsx/typescript/@types/node 记录）；M3 已同步：testing-strategy 补「进程捕获：L0/L1 注入式单测 + L3 手工范围验证」与用例基线（190 Python + 70 App 单测） |
-| [docs/planning/](../../docs/planning/roadmap.md) | 是 | M1 已同步：[M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md) 置 `Done`；M2 已同步：[M2 里程碑](../../docs/planning/milestones/M2-desktop-orchestration.md) 置 `Done` 并记录证据与遗留项；M3 已同步：[M3 里程碑](../../docs/planning/milestones/M3-experience-polish.md) 置 `Done`（退出条件勾选 + 完成记录 + 实现期偏差）、[roadmap](../../docs/planning/roadmap.md) 与 [milestones/README](../../docs/planning/milestones/README.md) 状态行同步；M4 已同步：[M4 里程碑](../../docs/planning/milestones/M4-acceptance.md) 由 `Planned` 改为 `In Progress` 并写入完成记录与遗留问题、[roadmap](../../docs/planning/roadmap.md) 与 [milestones/README](../../docs/planning/milestones/README.md) 状态行同步为 `In Progress` |
-| `.en.md` 配对 | 是 | 已同步：`docs/**` 改动均成对更新（`npm run docs:check` 的 i18n 检查通过）；Spec 目录不属双语强制范围 |
+| [docs/development/](../../docs/development/README.md) | 是 | M5 已同步：testing-strategy 的用例基线更新为 198 Python + 71 App 单测；M1 已同步：testing-strategy（分层/命名/运行命令与 CI）、coding-conventions（语言/目录/命名/错误处理）、dependency-policy（uv 与依赖登记）、development-workflow（分支与提交、CI）；M2 已同步：testing-strategy（App 单测层与 `app-tests.yml`）、coding-conventions（TS 目录/命名/模块格式）、dependency-policy（electron/esbuild/tsx/typescript/@types/node 记录）；M3 已同步：testing-strategy 补「进程捕获：L0/L1 注入式单测 + L3 手工范围验证」与用例基线（190 Python + 70 App 单测） |
+| [docs/planning/](../../docs/planning/roadmap.md) | 是 | M5 已同步：M4 里程碑的 TC-G01/TC-G02 退出条件按复验结果勾选并写明「Windows 延期」，roadmap 与 milestones/README 状态行同步（教育浏览器验收已在 macOS 侧达成）；M1 已同步：[M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md) 置 `Done`；M2 已同步：[M2 里程碑](../../docs/planning/milestones/M2-desktop-orchestration.md) 置 `Done` 并记录证据与遗留项；M3 已同步：[M3 里程碑](../../docs/planning/milestones/M3-experience-polish.md) 置 `Done`（退出条件勾选 + 完成记录 + 实现期偏差）、[roadmap](../../docs/planning/roadmap.md) 与 [milestones/README](../../docs/planning/milestones/README.md) 状态行同步；M4 已同步：[M4 里程碑](../../docs/planning/milestones/M4-acceptance.md) 由 `Planned` 改为 `In Progress` 并写入完成记录与遗留问题、[roadmap](../../docs/planning/roadmap.md) 与 [milestones/README](../../docs/planning/milestones/README.md) 状态行同步为 `In Progress` |
+| `.en.md` 配对 | 是 | 已同步：`docs/**` 改动均成对更新（含 M5 新增的 ADR-0007 中英与受影响的 planning/development/architecture 文档；`npm run docs:check` 的 i18n 检查 0 error / 0 warning）；Spec 目录不属双语强制范围 |
 
 ## 未验证 / 无法验证项
 
 | 项 | 原因 | 已尝试 | 需要谁决策 |
 | -- | ---- | ------ | ---------- |
-| L3 教务浏览器验收（TC-G01、TC-G02） | **本轮已执行并失败**：本部署网关对每个 HTML 响应注入客户端 shim（`__vpn_*` + `/wengine-vpn/js/main.js`），该 shim 期望浏览器工作在 WebVPN URL 空间；透明桥把该相对路径加 token 前缀 → 经桥 404（网关根为 200/376 922B）→ 教务首页白屏、真实页渲染但不可交互 | M4 已用真实 Chrome + 真实会话（cherrchen 手工观察与点击）+ curl 与 Chrome 内 `fetch` 双向复核：改写链路本身可用（`302`/`Location`/`body` 均按契约改写），失败点定位到 shim；细节与候选解除路径见 [known-issues.md](known-issues.md) 的 `KI-011` | cherrchen（在三条候选修复路径中决策：网关自有路径不走 token / HTML 中剥离 shim / 接受教务以门户形态使用；均改公共契约，需 ADR） |
 | Windows 真机项（TC-C02/C03/C04、TC-E01/E02 on Windows、TC-G03/G04） | **本轮延期**：Windows 测试机不在本轮可访问环境内（`KI-001`） | 实现与单测已完成（`app/test/system-proxy-parse.test.ts`、`app/test/cert-parse.test.ts`）；Windows 步骤已写入 [development-run.md](../../docs/operations/development-run.md) 的「Windows 差异」与 [verification.md](verification.md) 的 M4 手册；跨平台采集脚本 `npm run acceptance:check` 可在 Windows 直接产出同类脱敏证据 | cherrchen（提供可访问的 Windows 测试机；解除条件按时序写入 `KI-001`） |
 | CA **自动**安装（应用内 osascript 提权写入信任设置） | macOS 15.6 下 osascript 提权子进程无法为 `SecTrustSettingsSetTrustSettings` 弹出 GUI 授权（`no user interaction was possible`）；证书可写入钥匙串，但信任设置写不进 | 已实测失败原文、已确认应用自带的手动命令可用（`sudo security add-trusted-cert …`），TC-E01 以该手动路径通过；细节见 `KI-007` | cherrchen（是否按 `KI-007` 的建议方向改造提权方式——由应用进程直接调用 `security`，让 SecurityAgent 在本 App 的 GUI 会话内弹授权；属安全模型变更，需 ADR） |
 | 会话 Cookie 名与另两个失效信号（Q-001 / DQ-001） | 另两个信号（`Set-Cookie` 清空、连续改写后 302 到 CAS）本轮未观测到（本轮用的是服务端使 ticket 失效 → 探测 `302 → /login`） | M4 已采集并只记名：`wengine_vpn_ticketwebvpn_swufe_edu_cn`、`route`、`show_vpn`、`heartbeat`、`show_faq`；已确认信号原文 `会话探测：status=302 location=https://webvpn.swufe.edu.cn/login → expired`；登记为 `KI-006` | cherrchen（是否需要为另两个信号补实现，或以现有信号收敛 Q-001） |
 
-> 已在本轮解除的旧条目：TC-E01/TC-E02（系统信任库写入，见 `KI-007`/`KI-010`）、TC-G04 的真实范围（`KI-002` 置 `Fixed`）、日志面板与真实桥联动（`KI-003` 置 `Fixed`）。
+> 已解除的旧条目：TC-E01/TC-E02（系统信任库写入，见 `KI-007`/`KI-010`）、TC-G04 的真实范围（`KI-002` 置 `Fixed`）、日志面板与真实桥联动（`KI-003` 置 `Fixed`）；**M5（2026-09-21）**：L3 教务浏览器验收（TC-G01、TC-G02）已从本表移除——`KI-011` 修复后 macOS 实机复验通过，见「M5（`KI-011` 修复）执行记录」。
 
 ## 结论
 
-- [ ] 映射表无 `Pending`（仍有两类未完成：教务浏览器验收 `Failed`（`KI-011`，P0 未决）与 Windows 真机项延期（`KI-001`））
+- [x] 映射表无 `Pending`（已无 `Pending`/`Failed` 行：M5 后教务浏览器验收转为 `Passed`；未完成项为 Windows 真机项延期（`KI-001`，已在相关行的状态文案中显式标注））
 - [x] 执行的命令与结果已记录
 - [x] 文档影响已处理
 - [ ] Spec 状态可推进到 `Verified`
 
-> 当前：M1（桥核心）、M2（桌面编排）、M3（体验打磨）已交付；M4 的 macOS 交互式验收已执行完毕（2026-09-21），新增 `Passed`：REQ-002、REQ-003、REQ-008、REQ-009、REQ-010、NFR-003/NFR-004 的 M4 部分、AC-002、AC-005、AC-009、AC-010，以及 TC-D01/D02/D03/D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05；`Failed`：REQ-001/REQ-007/REQ-011、NFR-006、AC-001、AC-007（全部指向教务浏览器验收 `TC-G01/TC-G02`，根因 `KI-011`）；`Deferred`：Windows 全部真机项（`KI-001`）。验收期修复三个缺陷（`KI-008`/`KI-009`/`KI-010`），新增四类未决问题（`KI-007`/`KI-011`/`KI-012`/`KI-013`）。
-> 因此 macOS 侧的出口条件「所有 P0 用例通过」与「教务浏览器验收在至少一侧通过」**均未满足**，Feature 保持 `In Progress`，不推进到 `Verified`；M4 里程碑同理保持 `In Progress`（见 [docs/planning/milestones/M4-acceptance.md](../../docs/planning/milestones/M4-acceptance.md)）。
+> 当前：M1/M2/M3 已交付；M4 的 macOS 交互式验收已执行完毕（2026-09-21），新增 `Passed`：REQ-002、REQ-003、REQ-008、REQ-009、REQ-010、NFR-003/NFR-004 的 M4 部分、AC-002、AC-005、AC-009、AC-010，以及 TC-D01/D02/D03/D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05；**M5（2026-09-21，`KI-011` 修复后复验）**：REQ-001、REQ-007、REQ-011、NFR-006、AC-001、AC-007 转为 `Passed`（macOS 侧的教务浏览器验收 TC-G01/TC-G02 通过），因此 macOS 侧出口条件全部满足；`Deferred` 仅剩 Windows 全部真机项（`KI-001`）。未决问题：P1 `KI-007`（CA 自动安装）/`KI-013`（TUN 干扰）/`KI-014`（CAS 主题资源被服务端截断）、P2 `KI-006`/`KI-012`。Feature 状态推进到 `Implemented`，但 `Verified` 仍需 P0 全绿（Windows 侧），故不推进；M4 里程碑同理保持 `In Progress`（见 [docs/planning/milestones/M4-acceptance.md](../../docs/planning/milestones/M4-acceptance.md)）。
+> 因此 macOS 侧的出口条件「所有 P0 用例通过（macOS 侧）」与「教务浏览器验收在至少一侧通过」**已满足**，Feature 推进到 `Implemented`；`Verified` 仍需 P0 全绿（Windows 侧 TC-G03 延期，`KI-001`），M4 里程碑保持 `In Progress`（见 [docs/planning/milestones/M4-acceptance.md](../../docs/planning/milestones/M4-acceptance.md)）。

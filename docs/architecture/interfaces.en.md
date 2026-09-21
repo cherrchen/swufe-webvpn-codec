@@ -114,8 +114,8 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 - Error model: session-expiry signals (probe returns a login-page marker / `Set-Cookie` clears the session / repeated 302 to CAS after rewriting) → `SESSION_EXPIRED`; unreachable network → `BRIDGE_CRASH` or rewrite failure.
 - Idempotency: GET/HEAD are idempotent per HTTP semantics; POST and others are decided by the campus service.
 - Versioning: no version negotiation; changes are adapted (see R2 for Cookie field/policy changes).
-- Compatibility commitment: `webvpn.swufe.edu.cn` and `authserver.swufe.edu.cn` are never wrapped twice (INV-004); Login WebView traffic bypasses the bridge.
-- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md).
+- Compatibility commitment: `webvpn.swufe.edu.cn` and `authserver.swufe.edu.cn` are never wrapped twice (INV-004); Login WebView traffic bypasses the bridge; gateway-owned root namespaces (`/wengine-vpn/`, `/authserver/`) take no token and are fetched straight from the gateway root, and HTML documents that match the gateway bootstrap predicate are promoted by the Bridge Addon to the gateway-native URL space with `302` ([ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)).
+- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md), [ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md).
 
 ## Compatibility strategy
 
@@ -126,7 +126,7 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 | IF-003 | added optional parameters | changing signatures or the default key/iv semantics | TBD |
 | IF-004 | adapting to new OS API versions | changing the proxy-clearing policy (INV-002) | TBD |
 | IF-005 | adapting to new OS trust-store APIs | changing the CA / trust model (ADR-0002, REQ-010) | TBD |
-| IF-006 | adapting to upstream semantics | upstream changes altering the rewrite/anti-loop strategy | TBD |
+| IF-006 | adapting to upstream semantics | upstream changes altering the rewrite/anti-loop strategy; changing the passthrough scope of gateway-owned namespaces or the bootstrap promotion predicate (ADR-0007) | TBD |
 
 ## Contract tests
 
@@ -137,4 +137,4 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-A01–A05) | codec vectors and URL conversion consistency |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-C01–C04) | conflict refusal, proxy set and clear |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-E01–E03) | install, uninstall and missing-CA prompt |
-| IF-006 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-F01–F03, TC-G01–G03, TC-D01) | upstream rewrite, response reverse-rewrite and browser acceptance |
+| IF-006 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-F01–F03, TC-G01–G03, TC-D01) + L1 `tests/l1/test_addon_request.py` / `test_addon_response.py` (gateway-owned path passthrough, bootstrap promotion and non-promotion) + L2 `tests/l2/test_proxy_end_to_end.py` | upstream rewrite, response reverse-rewrite, gateway-owned namespace passthrough and promotion, browser acceptance |

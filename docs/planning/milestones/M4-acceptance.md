@@ -16,21 +16,21 @@
 
 | Spec | 状态 | 依赖 |
 | ---- | ---- | ---- |
-| [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Draft | M3 |
+| [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Implemented（M5 后；`Verified` 待 Windows 侧 `KI-001`） | M3 |
 
 ## 退出条件
 
 - [x] macOS：应用可启动并完成登录/开桥/关桥/退出全链路（TC-D01/D02/D03/D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05 通过）
-- [ ] macOS：浏览器可打开教务首页（TC-G01，P0）——**未通过**：根 URL 返回网关的客户端 shim 页并白屏；根因见 [known-issues.md](../../../specs/001-phase1-local-bridge/known-issues.md) `KI-011`
-- [ ] macOS：教务站内导航可用，不因绝对 URL 跳飞到不可达地址（TC-G02，P0）——**未通过**：教务真实页可渲染但脚本依赖 shim，页面不可交互（同一 `KI-011`）
+- [x] macOS：浏览器可打开教务首页（TC-G01，P0）——**M5（2026-09-21）通过**：`KI-011` 修复（网关自有命名空间直通 + bootstrap 文档升级，[ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）后，入口 `http://jwxt.swufe.edu.cn/` 被升级到 WebVPN 原生 URL 形态并正常打开（桥日志 `detail=promoted`）
+- [x] macOS：教务站内导航可用，不因绝对 URL 跳飞到不可达地址（TC-G02，P0）——**M5（2026-09-21）通过**：网关原生空间下首页菜单与站内「学生成绩查询」均可交互、无错误页（同一 [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）
 - [ ] Windows：重复 TC-G01 通过（TC-G03，P0）——**延期**：机器不在本轮可访问环境（`KI-001`）
-- [ ] 所有 P0 用例通过（TC-A01/A02/A03、TC-B01..TC-B03、TC-C01..TC-C04、TC-D01..TC-D04、TC-E01/E02、TC-F01/F02、TC-G01..TC-G03）——**未满足**：除 TC-G01/TC-G02（失败）与 TC-G03（延期）外全部通过
-- [ ] P1 用例无未决阻断缺陷——**未满足**：`KI-007`（CA 自动安装）、`KI-011`（教务浏览器验收，同时是 P0）、`KI-013`（TUN 干扰）未决
-- [ ] 教务浏览器验收在至少一侧桌面 OS 通过（目标两侧都过）——**未满足**
-- [x] 已知问题列表已记录（`id/title/severity/status/linked_case/owner/note`，含验收期新增 `KI-007`..`KI-013`）
+- [ ] 所有 P0 用例通过（TC-A01/A02/A03、TC-B01..TC-B03、TC-C01..TC-C04、TC-D01..TC-D04、TC-E01/E02、TC-F01/F02、TC-G01..TC-G03）——**macOS 侧已全部通过**（M5 后 TC-G01/TC-G02 转通过）；**未满足的只有 TC-G03**（Windows 真机项延期，`KI-001`）
+- [ ] P1 用例无未决阻断缺陷——**未满足**：`KI-011` 已 `Fixed`（M5），仍未决的是 `KI-007`（CA 自动安装）、`KI-013`（TUN 干扰）、`KI-014`（CAS 主题资源被服务端截断，需重载登录窗）
+- [x] 教务浏览器验收在至少一侧桌面 OS 通过（目标两侧都过）——**M5（2026-09-21）已满足**：macOS 侧 TC-G01/TC-G02 通过；Windows 侧仍待 `KI-001` 解除后按 [development-run.md](../../operations/development-run.md) 复跑
+- [x] 已知问题列表已记录（`id/title/severity/status/linked_case/owner/note`，含验收期新增 `KI-007`..`KI-014`；M5 后 `KI-011` 置 `Fixed`）
 - [x] 相关文档已同步（含双语配对：`development-run.md`、milestone/roadmap/testing-strategy 与 Spec 五文件）
 
-> 出口口径：macOS 侧除教务浏览器验收外全部通过；Windows 侧显式延期。**「至少一侧桌面 OS 通过」这一下限未达成**，故本里程碑保持 `In Progress`，Spec 001 亦保持 `In Progress`。
+> 出口口径：macOS 侧（含教务浏览器验收）已全部通过；Windows 侧显式延期。**「至少一侧桌面 OS 通过」这一下限已在 M5（2026-09-21）达成**，但「所有 P0 通过」仍差 TC-G03（Windows，`KI-001`）、「P1 无未决阻断缺陷」仍有 `KI-007`/`KI-013`/`KI-014`，故本里程碑保持 `In Progress`，Spec 001 推进到 `Implemented`（未到 `Verified`）。
 
 验收环境：macOS 与 Windows 各一台测试机、Chrome/Edge、mitmproxy 与 curl；测试账号为测试者自有西财账号（不写入仓库），仅在授权设备上使用。
 本轮实测补充：**验收前必须关闭其它代理工具的 TUN / 虚拟网卡模式**（Clash/mihomo fake-ip 会让经桥的上游连接挂起，见 `KI-013`）；教务只能以 `http://jwxt.swufe.edu.cn/...` 形态经网关代理（`https` 形态网关返回 `/wengine-vpn/failed`）。
@@ -42,6 +42,18 @@
 | R5 学校政策限制自动化（低/高） | 验收时若被判定为不合规访问，项目需停更或改为手动转换 | 私用优先、文档声明用途边界；必要时降级为手动转换并保留结论 |
 | R1 教务前端大量动态绝对 URL（中/高） | 站内导航可能在运行时动态拼接 URL，验收不通过 | 验收以「可操作关键路径」为主，不绑定 DOM；以响应改写分层与调试日志定位漏改 |
 | R2 Cookie 字段变更（中/高） | 验收期间会话注入或过期判定失效，阻塞手工验收 | 探测集中 + 快速补丁；必要时重登后重跑相关用例 |
+
+### M5 复验记录（2026-09-21，`KI-011` 修复后）
+
+**范围**：`KI-011`（网关客户端 shim 与透明桥不兼容）的修复与 macOS 实机复验；修复方案见 [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)（网关自有命名空间直通 + bootstrap 文档升级到网关原生 URL 空间）。
+
+**结果**：TC-G01 通过（入口 `http://jwxt.swufe.edu.cn/` → 桥日志 `detail=promoted` → 网关原生空间首页完整渲染）、TC-G02 通过（站内「学生成绩查询」可交互、链接不跳飞）；非 jwxt 主机（`www.swufe.edu.cn`）仍留在普通 URL 空间；`/wengine-vpn/js/main.js` 经桥 200 / 376 922 B（修复前经桥 404）；`lib.swufe.edu.cn` 因同样是 bootstrap 页而同样升级（预期）。回归：`uv run pytest -q` = 198 passed、App 单测 71 passed、`docs:check` 0 error / 0 warning、关桥后系统代理与进程均无残留。
+
+**证据**：[specs/001-phase1-local-bridge/verification.md](../../../specs/001-phase1-local-bridge/verification.md) 的「M5（`KI-011` 修复）执行记录」；脱敏快照 `specs/001-phase1-local-bridge/evidence/acceptance-macos/acceptance-darwin-20260921-154657.md`。
+
+**本轮新增问题**：`KI-014`（CAS 主题静态资源被服务端截断 → 登录窗样式丢失，重载可恢复；与桥无关）。
+
+**仍未完成**：Windows 全部真机项（`KI-001`）；`KI-007`（CA 自动安装）、`KI-013`（TUN 干扰）、`KI-014`。
 
 ## 完成记录
 

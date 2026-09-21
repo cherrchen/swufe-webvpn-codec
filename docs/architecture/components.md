@@ -11,7 +11,7 @@
 
 > 「代码位置」为已落地实现的真实路径；尚未实现的组件仍为 `TBD（实现首个任务确定）`。
 > M1（桥核心）已实现 WRD Codec、Bridge Addon（含配置面与 sidecar 入口）与 Allowlist Store 的库层；M2 已落地 Electron 侧全部组件
-> （`app/src/`），Windows 平台适配已实现、真机验证待 M4；M3 补齐捕获方式（进程捕获）、allowlist 增删界面与调试日志面板。
+> （`app/src/`），Windows 平台适配已实现、真机验证待 M4；M3 补齐捕获方式（进程捕获）、allowlist 增删界面与调试日志面板；M5（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）给 Bridge Addon 增加网关自有命名空间直通与 bootstrap 文档升级。
 
 | 组件 | 类型 | 职责（一句话） | 代码位置 | 状态 |
 | ---- | ---- | -------------- | -------- | ---- |
@@ -20,7 +20,7 @@
 | Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与失效检测 | `app/src/main/session-broker.ts`（采集/清除/监视）、`app/src/main/session-probe.ts`（失效信号分类，纯函数） | Implemented (M2；Q-001 的另两个信号留 M3/M4) |
 | Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、在「系统代理 / 指定应用」两种捕获方式间切换、代理冲突检测 | `app/src/main/orchestrator.ts`、`app/src/main/state-machine.ts`、`app/src/main/sidecar.ts`、`app/src/main/platform/`（`exec.ts`、`parse.ts` 与 darwin/win32 适配） | Implemented (M2；Windows 真机验证待 M4) |
 | WRD Codec | 进程内库（App 与 sidecar 共享） | hostname 加解密与 URL 互转（纯函数，无 IO） | `swufe_bridge/wrd_codec.py` | Implemented (M1) |
-| Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入 | `swufe_bridge/addon.py`（响应反向改写纯函数 `swufe_bridge/rewrite.py`；配置面 `swufe_bridge/config.py`；进程入口 `swufe_bridge/sidecar.py`） | Implemented (M1) |
+| Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入；网关自有根命名空间直通；命中网关 bootstrap 判据的 HTML 升级到网关原生 URL 空间 | `swufe_bridge/addon.py`（响应反向改写纯函数与 bootstrap 判据 `swufe_bridge/rewrite.py`；配置面 `swufe_bridge/config.py`；进程入口 `swufe_bridge/sidecar.py`） | Implemented (M1；M5 增加直通与升级) |
 | Cert Manager | 进程内模块（Electron Main） | 本机 MITM CA 的安装/卸载与状态查询 | `app/src/main/platform/darwin/cert.ts`、`app/src/main/platform/win32/cert.ts`、`app/src/main/platform/ca-files.ts`；CA 生成入口 `swufe_bridge/ca.py` | Implemented (M2；系统信任库写入的真机验证待人工，见 [M2 完成记录](../planning/milestones/M2-desktop-orchestration.md)) |
 | Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | `app/src/main/store.ts`（`<userData>/config.json` 读写与校验）+ `swufe_bridge/allowlist.py`（匹配语义与校验）+ `swufe_bridge/config.py`（`AllowlistStore`） | Implemented (M2；编辑界面已在 M3 落地) |
 | Telemetry UI | 进程内模块（Electron Renderer） | 捕获方式选择、allowlist 增删、状态展示与调试日志面板 | `app/src/renderer/renderer.ts`、`app/static/{index.html,styles.css}`、`app/src/preload/index.ts` | Implemented (M3：状态条/桥开关/证书/代理状态/调试开关 + 捕获方式区、allowlist 编辑与日志面板) |
@@ -116,17 +116,18 @@ flowchart TD
 
 ### Bridge Addon
 
-- 职责：对命中 allowlist 的请求做 WRD 改写与 Cookie 注入；对响应做反向改写；产出调试日志事件；按运行时配置叠加 / 移除 local 捕获模式并回报捕获状态。
+- 职责：对命中 allowlist 的请求做 WRD 改写与 Cookie 注入；对响应做反向改写；网关自有根命名空间（`/wengine-vpn/`、`/authserver/`）不经 token、直接取自网关根且其响应不反向改写；命中网关 bootstrap 判据的 HTML 文档以 `302` 升级到网关原生 URL 空间；产出调试日志事件；按运行时配置叠加 / 移除 local 捕获模式并回报捕获状态。
 - 不负责：不做 UI；不直接读写用户配置（只接受下发的配置）；不依赖 Renderer/UI；不做会话采集。
 - 输入：经本机桥的 HTTP/HTTPS 请求与响应；下发的 `{allowlist, cookies, debug, capture}` 配置。
 - 输出：改写到 WebVPN 形态的上行请求；反向改写后的响应；调试日志事件（域名 + 是否改写成功）；`swufe-capture` 诊断行。
 - 依赖：WrdCodec。
 - 被谁依赖：Proxy Orchestrator（经控制口）。
 - 关键不变式：非 allowlist 流量直连不改写（C-004）；`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 硬编码排除（INV-004）；日志不含 Cookie 与正文（INV-001）。
+- 网关自有命名空间与升级（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）：只有路径**以** `GATEWAY_ROOT_PREFIXES`（`/wengine-vpn/`、`/authserver/`）开头才直通（站点自有路径如 `/xtgl/wengine-vpn/x` 仍走 token 改写）；升级只对已 WRD 改写的 `GET`/`HEAD` 响应、且只对 `is_gateway_bootstrap_html` 为真的文档生效，并只改响应的 `Location` 语义（不回写页面内容）；升级后这些页面不再经桥改写，`webvpn.swufe.edu.cn` 仍为 `not-allowlisted`。
 - 捕获机制（ADR-0006）：sidecar 以 `--mode regular@<port>` 启动并**不传** `--listen-port`（全局 `listen_port` 会让运行时新增的 `local:<spec>` 与 `regular` 被判为同一监听地址而报错）；运行时把 `local:<spec>` 叠加到同一个 mitmproxy 实例，regular 监听保留、桥端口始终可用，`swufe-ready` 的 `listen_port` 由 regular 模式推导。
 - 捕获回报：`swufe-capture {"enabled":bool,"processes":string[],"error":string|null}` 诊断行（键固定为 `enabled` / `processes` / `error` 三个），首次应用与配置变更时上报；失败后不自动重试，直到运行时配置被重写（界面「重试」按钮即再次下发配置）。进程捕获是可选能力，该行不参与就绪判定，失败也不改变桥状态。
-- 相关测试：TC-F01、TC-F02、TC-F03、TC-F04、TC-D04。
-- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)、[ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)、[ADR-0005](adr/ADR-0005-builtin-wrd-key-with-override.md)。
+- 相关测试：TC-F01、TC-F02、TC-F03、TC-F04、TC-D04、TC-G01、TC-G02。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)、[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)、[ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)、[ADR-0005](adr/ADR-0005-builtin-wrd-key-with-override.md)。
 
 ### Cert Manager
 
@@ -184,7 +185,7 @@ flowchart TD
 | Session Broker | cherrchen | Cookie 策略与「唯一读取点」约束是否保持 |
 | Proxy Orchestrator | cherrchen | 代理冲突与清除策略、捕获方式互斥（ADR-0004、ADR-0006、INV-002）是否改变 |
 | WRD Codec | cherrchen | codec 向量（NFR-002）与默认 key/iv 语义（ADR-0005）是否受影响 |
-| Bridge Addon | cherrchen | 改写策略、allowlist 语义与日志最小化（C-004、INV-001、INV-004）是否受影响 |
+| Bridge Addon | cherrchen | 改写策略、allowlist 语义、日志最小化（C-004、INV-001、INV-004）与网关自有命名空间直通 / bootstrap 升级规则（ADR-0007）是否受影响 |
 | Cert Manager | cherrchen | CA / 信任模型（ADR-0002、REQ-010）是否改变 |
 | Allowlist Store | cherrchen | 默认值与通配语义（INV-003）是否改变 |
 | Telemetry UI | cherrchen | 是否引入新的 IPC 或展示敏感数据 |

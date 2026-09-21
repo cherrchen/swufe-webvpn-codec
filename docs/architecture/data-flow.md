@@ -23,14 +23,14 @@ flowchart LR
     REV --> B
 ```
 
-说明：来自本机浏览器的请求先经系统代理或进程捕获进入本机桥，由 Bridge Addon 做 allowlist 判定；命中则用 WrdCodec 生成 WebVPN URL、附加 WebVPN Cookie 后发往 `webvpn.swufe.edu.cn`，再由校内服务返回，响应经反向改写（`Location`、`Set-Cookie`、HTML/JS/JSON 内绝对 URL）回到浏览器；未命中则直连且不改写。客户端侧始终使用真实主机名，仅上行改走 WebVPN。两种接管方式互斥（ADR-0006）：系统代理覆盖全部流量；「指定应用」由 mitmproxy local 模式只接管所选应用，此时本 App 不设置系统代理（见 DF-005 / DF-007）。
+说明：来自本机浏览器的请求先经系统代理或进程捕获进入本机桥，由 Bridge Addon 做 allowlist 判定；命中则用 WrdCodec 生成 WebVPN URL、附加 WebVPN Cookie 后发往 `webvpn.swufe.edu.cn`，再由校内服务返回，响应经反向改写（`Location`、`Set-Cookie`、HTML/JS/JSON 内绝对 URL）回到浏览器；未命中则直连且不改写。客户端侧始终使用真实主机名，仅上行改走 WebVPN；两条例外（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）：路径以 `/wengine-vpn/`、`/authserver/` 开头时不经 token、直接取自网关根（其响应不反向改写）；命中网关 bootstrap 判据（`text/html` + ≤ 8192 B + 同时含 `__vpn_` 与 `/wengine-vpn/js/main.js`）的 HTML 文档由 Bridge Addon 以 `302` 升级到网关原生 URL 空间（`https://webvpn.swufe.edu.cn/<scheme>/<token>/…`），该主机此后不再经本桥改写。两种接管方式互斥（ADR-0006）：系统代理覆盖全部流量；「指定应用」由 mitmproxy local 模式只接管所选应用，此时本 App 不设置系统代理（见 DF-005 / DF-007）。
 
 ## 流程清单
 
 | ID | 流程 | 触发 | 输入 | 关键变换 | 输出 | 持久化 | 详见 |
 | -- | ---- | ---- | ---- | -------- | ---- | ------ | ---- |
 | DF-001 | 请求改写 | 命中 allowlist 的请求进入本机桥 | 真实主机名的原始 HTTP/HTTPS 请求 | allowlist 精确判定 → WrdCodec 生成 WebVPN URL → 上游主机改为 `webvpn.swufe.edu.cn` → 附加 WebVPN Cookie → 按需最小调整 `Host`/`Origin`/`Referer` | 改写后的上行请求 | 无 | [components.md](components.md)、[api/wrd-codec-library.md](../api/wrd-codec-library.md) |
-| DF-002 | 响应反向改写 | WebVPN 上游返回响应 | WebVPN 形态响应 | 按优先级改写：`Location` → `Set-Cookie` 的 Domain/Path → `text/html` / `application/javascript` / `application/json` 中绝对 URL；其它内容类型默认不改写 | 真实主机名语义的响应 | 无 | [components.md](components.md)、[interfaces.md](interfaces.md) |
+| DF-002 | 响应反向改写与 bootstrap 升级 | WebVPN 上游返回响应 | WebVPN 形态响应 | 网关自有命名空间的响应原样透传；其余按优先级改写：`Location` → `Set-Cookie` 的 Domain/Path → `text/html` / `application/javascript` / `application/json` 中绝对 URL，其它内容类型默认不改写；命中 bootstrap 判据的 HTML（`GET`/`HEAD`）改以 `302` + `Cache-Control: no-store` 升级到同一 URL 的 WRD 形态 | 真实主机名语义的响应，或指向网关原生 URL 空间的 `302` | 无 | [components.md](components.md)、[interfaces.md](interfaces.md)、[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md) |
 | DF-003 | 会话获取与失效检测 | 用户完成 CAS/MFA 登录；或失效信号命中 | 登录 WebView session 的 Cookie；探测 URL 的响应 | 同策略导出或白名单拷贝 Cookie → 注入桥；失效信号（探测返回登录页标记 / `Set-Cookie` 清空会话 / 连续改写后 302 到 CAS）触发停桥流程 | `SessionState` 或过期处理 | `userData/session.bin`（加密）或 Electron Session 持久分区 | [data-model.md](data-model.md)、[api/electron-ipc.md](../api/electron-ipc.md) |
 | DF-004 | CA 安装与卸载 | 用户点击安装/卸载 | mitmproxy 专用 confdir 中的 MITM CA | 生成/读取 CA → 调用 OS 信任库安装或卸载 | CA 状态（installed / trusted） | mitmproxy 专用 confdir | [components.md](components.md)、[api/electron-ipc.md](../api/electron-ipc.md)、[security/](../security/README.md) |
 | DF-005 | 系统代理设置与清除 | 开桥 / 关桥 / 会话过期 / 退出 / 切换捕获方式 | OS 当前代理设置；`captureMode` | 读 OS 代理 → 已启用且非本桥则拒绝启动（`PROXY_CONFLICT`）→ `system-proxy` 时设 `127.0.0.1:<bridge_port>` 并记「由本 App 设置」标记；`selected-apps` 时不设置，并在切换时撤销此前由本 App 设置过的（清标记）→ 关闭时仅在标记存在时清除 | 系统代理指向本桥或恢复原状 | `AppSettings.systemProxyManagedByApp`（运行时标记） | [components.md](components.md)、[api/electron-ipc.md](../api/electron-ipc.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md) |
@@ -55,7 +55,7 @@ flowchart LR
 | DF-004 / DF-005 | 关闭后必须无残留：不留半开系统代理；CA 可随时一键卸载 | 关闭/过期/退出后若检测到残留，进入错误状态并给出可观测信号（`BRIDGE_CRASH`） |
 | DF-006 | 幂等：allowlist 精确匹配为幂等判定，同一主机多次判定结果稳定；`setAllowlist` 重复调用结果一致 | 匹配不确定即视为不命中的保守行为（直连不改写） |
 | DF-003 | 会话失效处理的三步（停桥、清系统代理、停进程捕获）必须同时完成，不出现半开状态 | 未完成全部三步即视为错误状态，暴露 `SESSION_EXPIRED` |
-| DF-002 | 改写前后 URL 语义稳定：客户端侧始终呈现真实主机名，仅上行改走 WebVPN | 语义不稳定会导致跳转到不可达地址，暴露为改写结果异常（见 R1） |
+| DF-002 | 改写前后 URL 语义稳定：客户端侧始终呈现真实主机名，仅上行改走 WebVPN；例外只允许两处——网关自有根命名空间直通与命中判据的 bootstrap 文档升级（ADR-0007），且升级只改变入口文档的地址（不改变页面内容） | 语义不稳定会导致跳转到不可达地址，暴露为改写结果异常（见 R1）；判据误命中会把普通页面也升级，靠「≤8192 B + 双标记」与 L1 用例兜住 |
 | DF-001 | 改写只作用于 allowlist 主机；`webvpn.swufe.edu.cn` / `authserver.swufe.edu.cn` 永不二次包装 | 违反即形成环路，登录与桥流量出现自环（`SESSION_EXPIRED` 或登录失败） |
 | DF-007 | 互斥：`captureMode = 'selected-apps'` 时不设置系统代理，并撤销此前由本 App 设置过的；`captureMode = 'system-proxy'` 时 `capture.processes` 恒为空；进程捕获失败不得改变桥状态（仍 `running`） | 违反互斥会让被捕获应用的 `CONNECT` 经系统代理进入 transparent 层并硬失败（静默半坏）；捕获失败只更新 `captureError` 与 `localCaptureEnabled` |
 

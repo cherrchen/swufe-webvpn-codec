@@ -112,8 +112,8 @@ flowchart LR
 - 错误模型：会话失效信号（探测返回登录页标记 / `Set-Cookie` 清空会话 / 连续改写后 302 到 CAS）→ `SESSION_EXPIRED`；网络不可达 → `BRIDGE_CRASH` 或改写失败。
 - 幂等性：GET/HEAD 幂等按 HTTP 语义；POST 等由校内服务决定。
 - 版本策略：无版本协商；变化即适配（Cookie 字段/策略变更见 R2）。
-- 兼容性承诺：`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 永不二次包装（INV-004）；登录 WebView 流量 bypass 本桥。
-- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)。
+- 兼容性承诺：`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 永不二次包装（INV-004）；登录 WebView 流量 bypass 本桥；网关自有根命名空间（`/wengine-vpn/`、`/authserver/`）不经 token 直接取自网关根，命中网关 bootstrap 判据的 HTML 文档由 Bridge Addon 以 `302` 升级到网关原生 URL 空间（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）。
+- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)、[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)。
 
 ## 兼容性策略
 
@@ -124,7 +124,7 @@ flowchart LR
 | IF-003 | 新增可选参数 | 改签名或改变默认 key/iv 语义 | TBD |
 | IF-004 | 适配新的 OS API 版本 | 改变代理清除策略（INV-002） | TBD |
 | IF-005 | 适配新的 OS 信任库 API | 改变 CA / 信任模型（ADR-0002、REQ-010） | TBD |
-| IF-006 | 跟随上游语义做适配 | 上游变化导致改写/防环策略改变 | TBD |
+| IF-006 | 跟随上游语义做适配 | 上游变化导致改写/防环策略改变；改变网关自有命名空间的直通范围或 bootstrap 升级判据（ADR-0007） | TBD |
 
 ## 契约测试
 
@@ -135,4 +135,4 @@ flowchart LR
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-A01–A05） | codec 向量与 URL 互转一致 |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-C01–C04） | 冲突拒绝、设置与清除代理 |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-E01–E03） | 安装、卸载与未安装提示 |
-| IF-006 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-F01–F03、TC-G01–G03、TC-D01） | 上行改写、响应反向改写与浏览器验收 |
+| IF-006 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-F01–F03、TC-G01–G03、TC-D01）+ L1 `tests/l1/test_addon_request.py` / `test_addon_response.py`（网关自有路径直通、bootstrap 升级与不误升级）+ L2 `tests/l2/test_proxy_end_to_end.py` | 上行改写、响应反向改写、网关自有命名空间直通与升级、浏览器验收 |

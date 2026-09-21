@@ -22,12 +22,12 @@
 
 **Regression policy**: L0 runs on every PR; L1/L2 run locally when the relevant module changes; L3 runs before a release. The case set (TC-A01..TC-H02) and priorities live in the phase 1 spec's `verification.md`; the release gate is section 6 of [docs/verification/verification-strategy.md](../verification/verification-strategy.md).
 
-**How L3 is executed (from M4 on)**: follow the "M4 双平台验收执行手册" in [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) step by step (each step names the executor, command, expectation and where its evidence lands); both platforms share `npm run acceptance:check` to collect redacted evidence (OS / proxy / trust store / CA permissions / bridge liveness / curl controls plus `redaction-self-check`) and to fill the manual's result table. Prerequisite: **turn off the TUN / virtual-interface mode of any other proxy tool first** (`KI-013`); the actions that need a human (administrator password, CAS/MFA login, system-extension authorization) are performed by the tester.
+**How L3 is executed (from M4 on)**: follow the "M4 双平台验收执行手册" in [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) step by step (each step names the executor, command, expectation and where its evidence lands); both platforms share `npm run acceptance:check` to collect redacted evidence (OS / proxy / trust store / CA permissions / bridge liveness / curl controls plus `redaction-self-check`) and to fill the manual's result table. Prerequisite: **turn off the TUN / virtual-interface mode of any other proxy tool first** (`KI-013`); the actions that need a human (administrator password, CAS/MFA login, system-extension authorization) are performed by the tester. The login step may hit `KI-014` (CAS theme static assets truncated by the server, leaving the login window unstyled): reloading the login window is enough to continue, and this is external-service behaviour.
 
 ## 2. Coverage expectations
 
 ```text
-Coverage target: TBD (no numeric target; the current baseline is 190 green L0/L1/L2 cases plus 71 app unit cases)
+Coverage target: TBD (no numeric target; the current baseline is 198 green L0/L1/L2 cases (L0 97 + L1 93 + L2 8) plus 71 app unit cases)
 Coverage tool:   TBD (not adopted in M1; the layers and cases are the current regression evidence)
 Exceptions:      the L3 and manual layers are excluded from coverage and
                  replaced by manual steps
@@ -41,6 +41,7 @@ Coverage is a reference metric, not the goal. **Must be covered**:
 - stopping the bridge, clearing the proxy and stopping capture on session expiry (TC-D03);
 - loop prevention: login traffic is never re-wrapped by WRD (TC-D04);
 - the critical redirects of response reverse rewriting (`Location` and in-registrar navigation, TC-F03 / TC-G02);
+- gateway-owned namespace passthrough (paths beginning with `/wengine-vpn/` or `/authserver/` take no token, are fetched from the gateway root and their responses are not reverse-rewritten) and the boundaries of the bootstrap promotion predicate (`text/html` + ≤ 8192 B + containing both markers; a large page carrying the same injection **must not** be promoted), covered in the L1 `tests/l1/test_addon_request.py` / `test_addon_response.py`, with one end-to-end case in the L2 `tests/l2/test_proxy_end_to_end.py` (ADR-0007);
 - process capture (REQ-003): mode-set derivation, rollback on failure and the no-retry semantics of `swufe_bridge.capture` in L0 unit tests (`tests/l0/test_capture.py`), and the addon's capture loop in an L1 test with injected fakes (`tests/l1/test_addon_capture.py` — automated tests **must never** really enable local mode); the real scope and "switching back to the system proxy stops it" belong to L3 manual verification (the tester has to confirm the OS authorisation prompt in person).
 
 Requirement acceptance criteria, reproductions of fixed bugs, and boundaries and error paths must also be covered.
