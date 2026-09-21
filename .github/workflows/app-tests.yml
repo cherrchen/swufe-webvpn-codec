@@ -1,0 +1,43 @@
+name: app-tests
+
+# Electron app (M2): type check all three tsconfigs and run the Electron-free unit
+# suite. The suite deliberately never imports `electron`, so no binary download and
+# no display are needed here; L3/real-machine checks stay manual
+# (see docs/development/testing-strategy.md).
+# This workflow does not build installers, deploy, release or publish anything.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Typecheck and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefix app
+
+      - name: Typecheck
+        run: npm --prefix app run typecheck
+
+      - name: Unit tests
+        run: npm --prefix app run test:unit
