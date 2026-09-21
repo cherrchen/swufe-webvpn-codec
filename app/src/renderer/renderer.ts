@@ -314,7 +314,7 @@ installCaButton.addEventListener('click', () => {
   void (async () => {
     // NFR-005: the risk notice must be shown before anything is installed.
     if ((await showModal(caWarningModal)) !== 'confirm') return
-    setMessage('正在安装本机 CA（系统可能要求输入管理员密码）…')
+    setMessage('正在安装本机 CA：请在随后弹出的系统授权窗口输入管理员密码…')
     try {
       const result = await api.installCa()
       setMessage(result.ok ? '本机 CA 已安装并被系统信任。' : `安装失败：${result.message ?? '未知原因'}`)

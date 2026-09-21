@@ -2,7 +2,7 @@
 
 import { execFile } from 'node:child_process'
 
-import { COMMAND_TIMEOUT_MS } from './constants'
+import { COMMAND_TIMEOUT_MS, PRIVILEGE_PROMPT_TIMEOUT_MS } from './constants'
 
 export interface RunResult {
   code: number
@@ -44,10 +44,16 @@ export function run(
 /**
  * Run a privileged shell command through osascript's "with administrator privileges".
  * A user cancel surfaces as a non-zero exit code, never a throw.
+ *
+ * Only for writes that touch the keychain alone: the macOS CA keychain add and uninstall.
+ * Trust settings must go through `platform/darwin/cert.ts` instead: an osascript-administered
+ * child has no GUI session, so macOS refuses to prompt for that authorization (KI-007, ADR-0008).
  */
 export async function runPrivilegedDarwin(shellCommand: string): Promise<RunResult> {
   const escaped = shellCommand.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
-  const result = await run('osascript', ['-e', `do shell script "${escaped}" with administrator privileges`])
+  const result = await run('osascript', ['-e', `do shell script "${escaped}" with administrator privileges`], {
+    timeoutMs: PRIVILEGE_PROMPT_TIMEOUT_MS,
+  })
   if (result.code !== 0 && /User canceled/i.test(result.stderr)) {
     return { code: 1, stdout: result.stdout, stderr: '已取消授权' }
   }

@@ -22,6 +22,8 @@ export const AUTH_HOST = 'authserver.swufe.edu.cn'
 export const BRIDGE_READY_TIMEOUT_MS = 30_000
 export const SIDECAR_STOP_TIMEOUT_MS = 5_000
 export const COMMAND_TIMEOUT_MS = 10_000
+/** macOS authorization dialogs (admin password / Touch ID) outlive the default command timeout. */
+export const PRIVILEGE_PROMPT_TIMEOUT_MS = 120_000
 export const SESSION_PROBE_INTERVAL_MS = 30_000
 export const SESSION_PROBE_TIMEOUT_MS = 5_000
 export const STATUS_CACHE_TTL_MS = 2_000
