@@ -1,0 +1,143 @@
+/** Pure parsers for OS command output — the unit-testable half of the platform adapters. */
+
+export interface NetworkService {
+  name: string
+  disabled: boolean
+}
+
+export interface ProxyState {
+  enabled: boolean
+  server: string | null
+  port: number | null
+}
+
+export interface CaptureCandidate {
+  pid: number
+  name: string
+}
+
+/** `networksetup -listallnetworkservices`: header line, `*` prefix means disabled. */
+export function parseNetworkServices(stdout: string): NetworkService[] {
+  const services: NetworkService[] = []
+  for (const rawLine of stdout.split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('An asterisk')) continue
+    const disabled = line.startsWith('*')
+    const name = disabled ? line.replace(/^\*+\s*/, '').trim() : line
+    if (name) services.push({ name, disabled })
+  }
+  return services
+}
+
+/** `networksetup -getwebproxy <service>` (Server/Port stay populated even when disabled). */
+export function parseNetworksetupProxy(stdout: string): ProxyState {
+  let enabled = false
+  let server: string | null = null
+  let port: number | null = null
+  for (const rawLine of stdout.split('\n')) {
+    const line = rawLine.trim()
+    const [rawKey, ...rest] = line.split(':')
+    const key = (rawKey ?? '').trim().toLowerCase()
+    const value = rest.join(':').trim()
+    if (key === 'enabled') enabled = value.toLowerCase() === 'yes'
+    else if (key === 'server') server = value || null
+    else if (key === 'port') {
+      const parsed = Number.parseInt(value, 10)
+      port = Number.isFinite(parsed) ? parsed : null
+    }
+  }
+  return { enabled, server, port }
+}
+
+const WIN_PROXY_ENTRY_RE = /^(https?|socks)=(.+)$/i
+
+/**
+ * `reg query ... Internet Settings` values (`ProxyEnable` / `ProxyServer`).
+ * `ProxyServer` is either `host:port` or `proto=host:port;proto=host:port`.
+ */
+export function parseWinInetValue(stdout: string): { enable: boolean | null; server: string | null } {
+  let enable: boolean | null = null
+  let server: string | null = null
+  for (const rawLine of stdout.split('\n')) {
+    const match = rawLine.match(/^\s*(\S+)\s+REG_(DWORD|SZ)\s+(.*)$/)
+    if (!match) continue
+    const [, name, type, rawValue] = match
+    const value = (rawValue ?? '').trim()
+    if (name === 'ProxyEnable' && type === 'DWORD') enable = value === '0x1'
+    else if (name === 'ProxyServer' && type === 'SZ') server = value || null
+  }
+  return { enable, server }
+}
+
+/** Map the WinINET pair onto the same shape the macOS adapter produces. */
+export function winInetState(enable: boolean | null, server: string | null): ProxyState {
+  const enabled = enable === true
+  if (!server) return { enabled, server: null, port: null }
+  const entries = server.includes('=')
+    ? server.split(';').map((entry) => {
+        const match = entry.trim().match(WIN_PROXY_ENTRY_RE)
+        return match ? (match[2] ?? '') : entry.trim()
+      })
+    : [server]
+  const targets = new Set(entries.map((entry) => entry.trim()).filter(Boolean))
+  if (targets.size !== 1) return { enabled, server, port: null }
+  const target = [...targets][0] ?? ''
+  const separator = target.lastIndexOf(':')
+  const host = separator === -1 ? '' : target.slice(0, separator)
+  const port = separator === -1 ? Number.NaN : Number.parseInt(target.slice(separator + 1), 10)
+  if (!host || !Number.isFinite(port)) return { enabled, server, port: null }
+  return { enabled, server: host, port }
+}
+
+/** An enabled proxy pointing anywhere but this bridge blocks our start (ADR-0004). */
+export function isConflict(state: ProxyState, bridgePort: number): boolean {
+  if (!state.enabled) return false
+  return !(state.server === '127.0.0.1' && state.port === bridgePort)
+}
+
+/** Only ever clear what this bridge owns (INV-002). */
+export function shouldClear(state: ProxyState, bridgePort: number): boolean {
+  return state.enabled && state.server === '127.0.0.1' && state.port === bridgePort
+}
+
+/** `ps -Ao pid=,comm=` → pid + executable path (macOS capture candidates). */
+export function parsePsOutput(stdout: string): CaptureCandidate[] {
+  const candidates: CaptureCandidate[] = []
+  for (const rawLine of stdout.split('\n')) {
+    const match = rawLine.trim().match(/^(\d+)\s+(.+)$/)
+    if (!match) continue
+    const pid = Number.parseInt(match[1] ?? '', 10)
+    const name = (match[2] ?? '').trim()
+    if (Number.isFinite(pid) && name) candidates.push({ pid, name })
+  }
+  return candidates
+}
+
+/** `tasklist /fo csv /nh` → pid + image name (Windows capture candidates). */
+export function parseTasklistOutput(stdout: string): CaptureCandidate[] {
+  const candidates: CaptureCandidate[] = []
+  for (const rawLine of stdout.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line) continue
+    const fields = line.match(/"([^"]*)"/g)?.map((field) => field.slice(1, -1))
+    if (!fields) continue
+    const pid = Number.parseInt(fields[1] ?? '', 10)
+    const name = fields[0] ?? ''
+    if (Number.isFinite(pid) && name) candidates.push({ pid, name })
+  }
+  return candidates
+}
+
+/**
+ * `security find-certificate` prints nothing and exits 0 when there is no match,
+ * so presence must be judged by output, not by exit code.
+ */
+export function parseFindCertificate(stdout: string): { found: boolean; sha1: string | null } {
+  const match = stdout.match(/SHA-1 hash:\s*([0-9A-Fa-f]+)/)
+  return { found: stdout.trim().length > 0, sha1: match?.[1]?.toUpperCase() ?? null }
+}
+
+/** `certutil -store Root <name>` prints one "Cert Hash(sha1)" block per match. */
+export function certutilHasCert(stdout: string): boolean {
+  return /Cert Hash\(sha1\)/i.test(stdout)
+}

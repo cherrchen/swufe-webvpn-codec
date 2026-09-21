@@ -1,0 +1,99 @@
+/** Electron Main entry: wires the store, session broker, orchestrator, IPC and window. */
+
+import { app, BrowserWindow } from 'electron'
+import { join } from 'node:path'
+
+import { CONFDIR_NAME } from './constants'
+import { registerIpc } from './ipc'
+import { ProxyOrchestrator } from './orchestrator'
+import { resolveRepoRoot } from './paths'
+import { createCertManager, createSystemProxy } from './platform'
+import { SessionBroker } from './session-broker'
+import { installShutdown } from './shutdown'
+import { SidecarProcess } from './sidecar'
+import { AppStore } from './store'
+import { createMainWindow } from './windows'
+
+/** `--user-data-dir[=]<dir>` / `SWUFE_USER_DATA_DIR`: isolate config and cookies for tests. */
+function applyUserDataOverride(): void {
+  const inline = process.argv.find((arg) => arg.startsWith('--user-data-dir='))
+  const index = process.argv.indexOf('--user-data-dir')
+  const fromArgv = inline
+    ? inline.slice('--user-data-dir='.length)
+    : index >= 0
+      ? process.argv[index + 1]
+      : undefined
+  const dir = process.env.SWUFE_USER_DATA_DIR ?? fromArgv
+  if (dir) app.setPath('userData', dir)
+}
+
+applyUserDataOverride()
+
+let mainWindow: BrowserWindow | null = null
+let orchestrator: ProxyOrchestrator | null = null
+
+async function start(): Promise<void> {
+  await app.whenReady()
+  app.setAppUserModelId('com.swufe.webvpn-bridge')
+
+  const appRoot = app.getAppPath()
+  const userDataDir = app.getPath('userData')
+  const repoRoot = resolveRepoRoot(appRoot)
+
+  const store = new AppStore(userDataDir)
+  store.load()
+  const session = new SessionBroker(store.getSettings().webvpnBase)
+  await session.prepare()
+  const certManager = createCertManager(join(userDataDir, CONFDIR_NAME), repoRoot)
+
+  orchestrator = new ProxyOrchestrator({
+    store,
+    session,
+    systemProxy: createSystemProxy(),
+    certManager,
+    sidecarFactory: (options) => new SidecarProcess({ repoRoot, userDataDir, port: options.port }),
+    userDataDir,
+  })
+  await orchestrator.recoverOnLaunch()
+
+  registerIpc({
+    store,
+    session,
+    orchestrator,
+    certManager,
+    broadcast: (channel, payload) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
+    },
+  })
+
+  mainWindow = createMainWindow(appRoot)
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    app.quit()
+  })
+}
+
+/** NFR-004: quitting always clears our own proxy before the process goes away. */
+function install(): void {
+  if (!app.requestSingleInstanceLock()) {
+    app.quit()
+    return
+  }
+
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  })
+
+  installShutdown(async () => {
+    await orchestrator?.stop()
+  })
+
+  void start().catch((error: unknown) => {
+    console.error(`swufe-app 启动失败：${String(error)}`)
+    app.exit(1)
+  })
+}
+
+install()

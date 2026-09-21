@@ -1,0 +1,146 @@
+:root {
+  color-scheme: light;
+  --fg: #1c1c1e;
+  --muted: #6b6b70;
+  --line: #d8d8dc;
+  --ok: #1a7f37;
+  --busy: #0a63c4;
+  --warn: #a15c00;
+  --error: #b3261e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0 20px 24px;
+  font: 14px/1.5 -apple-system, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--fg);
+  background: #fbfbfd;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  padding: 12px 0 8px;
+  background: inherit;
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+section {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+#status-bar {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+}
+
+#status-text {
+  font-weight: 600;
+}
+
+#status-bar[data-tone='ok'] #status-text {
+  color: var(--ok);
+}
+
+#status-bar[data-tone='busy'] #status-text {
+  color: var(--busy);
+}
+
+#status-bar[data-tone='warn'] #status-text {
+  color: var(--warn);
+}
+
+#status-bar[data-tone='error'] #status-text {
+  color: var(--error);
+}
+
+#status-bar[data-tone='muted'] #status-text {
+  color: var(--muted);
+}
+
+#status-reason {
+  color: var(--muted);
+}
+
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.switch,
+.checkbox {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: 12px;
+}
+
+.hint {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+#message {
+  min-height: 1.5em;
+  color: var(--warn);
+}
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  max-width: 420px;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+dialog form {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
