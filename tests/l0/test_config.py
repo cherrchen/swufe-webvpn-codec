@@ -53,6 +53,26 @@ def test_tc_b05_mutations_survive_a_new_store_instance(store: AllowlistStore) ->
     assert reloaded.updated_at is not None
 
 
+def test_store_reads_file_with_settings_sibling_key(store: AllowlistStore) -> None:
+    """The App store keeps its settings beside the allowlist in the same file."""
+    store.path.write_text(
+        json.dumps(
+            {
+                "hosts": ["Jwxt.SWUFE.edu.cn", "portal.swufe.edu.cn"],
+                "includeSwufeWildcard": True,
+                "updatedAt": "2026-09-21T00:00:00+00:00",
+                "settings": {"bridgePort": 8080, "debugLogging": False, "capturePids": []},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = store.load()
+
+    assert cfg.hosts == ("jwxt.swufe.edu.cn", "portal.swufe.edu.cn")
+    assert cfg.include_swufe_wildcard is True
+
+
 def test_store_rejects_invalid_host_atomically(store: AllowlistStore) -> None:
     store.load()
     before = store.path.read_text(encoding="utf-8")
