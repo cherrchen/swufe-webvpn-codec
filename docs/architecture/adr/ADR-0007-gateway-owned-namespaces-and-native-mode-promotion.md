@@ -30,8 +30,8 @@
 
 ## Decision
 
-1. **网关自有路径前缀不经 token，直接取自网关根。** 命中 allowlist 的主机，请求路径以 `/wengine-vpn/` 或 `/authserver/` 开头时（`swufe_bridge/addon.py` 的 `GATEWAY_ROOT_PREFIXES`），桥把上行目标改为 `{webvpnBase}{path}`（含 query），只注入会话 Cookie，**不**做 WRD 编码；此类响应不做任何反向改写（它们是网关自己的资源，不含被代理站点的 URL）。判定按「路径以该前缀开头」，因此 `/xtgl/wengine-vpn/x` 这类站点自有路径仍走 token 改写。
-2. **命中 bootstrap 判据的 HTML 文档升级到网关原生 URL 空间。** 对已做过 WRD 改写的 `GET` / `HEAD` 响应，若 `Content-Type` 为 `text/html`、正文长度 ≤ `GATEWAY_BOOTSTRAP_MAX_BYTES`（8192 B）且同时含 `GATEWAY_BOOTSTRAP_MARKERS`（`__vpn_` 与 `/wengine-vpn/js/main.js`），桥以 `302` + `Cache-Control: no-store` 把该文档换成同一 URL 的 WRD 形态（`swufe_bridge/addon.py` 的 `_promote_to_gateway`）。入口地址栏保持普通 URL，**其它 allowlist 主机仍留在普通 URL 空间**。
+1. **网关自有路径前缀不经 token，直接取自网关根。** 命中 allowlist 的主机，请求路径以 `/wengine-vpn/` 或 `/authserver/` 开头时（`bridges/python/swufe_bridge/addon.py` 的 `GATEWAY_ROOT_PREFIXES`），桥把上行目标改为 `{webvpnBase}{path}`（含 query），只注入会话 Cookie，**不**做 WRD 编码；此类响应不做任何反向改写（它们是网关自己的资源，不含被代理站点的 URL）。判定按「路径以该前缀开头」，因此 `/xtgl/wengine-vpn/x` 这类站点自有路径仍走 token 改写。
+2. **命中 bootstrap 判据的 HTML 文档升级到网关原生 URL 空间。** 对已做过 WRD 改写的 `GET` / `HEAD` 响应，若 `Content-Type` 为 `text/html`、正文长度 ≤ `GATEWAY_BOOTSTRAP_MAX_BYTES`（8192 B）且同时含 `GATEWAY_BOOTSTRAP_MARKERS`（`__vpn_` 与 `/wengine-vpn/js/main.js`），桥以 `302` + `Cache-Control: no-store` 把该文档换成同一 URL 的 WRD 形态（`bridges/python/swufe_bridge/addon.py` 的 `_promote_to_gateway`）。入口地址栏保持普通 URL，**其它 allowlist 主机仍留在普通 URL 空间**。
 3. **判据只决定「是否升级」**，不改变 allowlist 语义，也不改变 `Location` → `Set-Cookie` → 正文反向改写的主契约；升级后该主机后续流量由浏览器直接在网关原生空间发起，`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 仍为 `not-allowlisted` 直通（INV-004 防环不变）。
 4. **执行责任人**：cherrchen。
 
@@ -52,7 +52,7 @@
 - 教务可打开并可操作：入口仍是 `http://jwxt.swufe.edu.cn/`，浏览器被 `302` 到网关原生形态后由网关自己的 shim 接管（实测首页、`xtgl/index_initMenu.html` 与站内「学生成绩查询」均可交互、链接不跳飞到不可达地址）；
 - 其它 allowlist 主机的透明语义不变：非 bootstrap 页仍留在普通 URL 空间（实测 `www.swufe.edu.cn` 的站内导航保持普通主机名且页面完整渲染）；
 - 直通规则同时修掉网关自有资源在普通 URL 空间下的 404（实测 `/wengine-vpn/js/main.js` 经桥 200 / 376 922 B，正文逐字节未改）；
-- 判据是纯函数（`swufe_bridge/rewrite.py` 的 `is_gateway_bootstrap_html`），不需要真实网关即可 L1 覆盖。
+- 判据是纯函数（`bridges/python/swufe_bridge/rewrite.py` 的 `is_gateway_bootstrap_html`），不需要真实网关即可 L1 覆盖。
 
 ### Negative
 
@@ -65,7 +65,7 @@
 
 | 风险 | 可能性 | 影响 | 缓解措施 |
 | ---- | ------ | ---- | -------- |
-| 网关改版：引导页变大或不再含这两个标记 | 低 | 高 | 常数与谓词集中在 `swufe_bridge/rewrite.py`；实测字节数与复验命令记录在 [verification.md](../../../specs/001-phase1-local-bridge/verification.md) 的 M5 记录，改版时按同法重测并更新 |
+| 网关改版：引导页变大或不再含这两个标记 | 低 | 高 | 常数与谓词集中在 `bridges/python/swufe_bridge/rewrite.py`；实测字节数与复验命令记录在 [verification.md](../../../specs/001-phase1-local-bridge/verification.md) 的 M5 记录，改版时按同法重测并更新 |
 | 真实站点页恰好 ≤ 8192 B 且含这两个标记 ⇒ 误升级 | 低 | 中 | 实测真实页与引导页量级差 >80×（76 854 B vs 925 B）；L1 用例锁定「含同样注入的大页面不升级」 |
 | 用户以为「登录一次就够」，在网关原生空间遇到第二次 CAS | 中 | 中 | 在 spec / verification / development-run 写明该行为；应用内的 CAS/MFA 登录窗仍然只需一次 |
 | `https` scheme token 对部分主机不可用（教务只能 `http`） | 已实测 | 中 | 保留既有事实记录：入口用 `http://`，升级目标由入口 scheme 决定（`/http/<token>/…`） |
@@ -75,4 +75,4 @@
 - 相关需求：REQ-006、REQ-007、REQ-008、REQ-011、NFR-006、AC-007
 - 相关 Spec：[specs/001-phase1-local-bridge/](../../../specs/001-phase1-local-bridge/spec.md)（design.md §Proposed Solution、verification.md 的 M5 记录、known-issues.md 的 `KI-011`）
 - 相关 ADR：[ADR-0001](ADR-0001-wrd-rewrite-in-mitm-layer.md)（改写放 mitm 层）、[ADR-0004](ADR-0004-refuse-start-when-system-proxy-in-use.md)（冲突时拒绝而不是半工作）、[ADR-0006](ADR-0006-local-capture-mode-and-mutual-exclusion.md)（捕获方式互斥）
-- 实现依据：`swufe_bridge/addon.py`（`GATEWAY_ROOT_PREFIXES`、`_promote_to_gateway`、`METADATA_WRD_URL`、`METADATA_GATEWAY_ROOT`）、`swufe_bridge/rewrite.py`（`GATEWAY_BOOTSTRAP_MARKERS`、`GATEWAY_BOOTSTRAP_MAX_BYTES`、`is_gateway_bootstrap_html`）
+- 实现依据：`bridges/python/swufe_bridge/addon.py`（`GATEWAY_ROOT_PREFIXES`、`_promote_to_gateway`、`METADATA_WRD_URL`、`METADATA_GATEWAY_ROOT`）、`bridges/python/swufe_bridge/rewrite.py`（`GATEWAY_BOOTSTRAP_MARKERS`、`GATEWAY_BOOTSTRAP_MAX_BYTES`、`is_gateway_bootstrap_html`）

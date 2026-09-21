@@ -8,7 +8,11 @@
   "engines": {
     "node": ">=22"
   },
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
+    "dev": "pnpm --filter swufe-webvpn-bridge run start",
+    "build": "pnpm --filter swufe-webvpn-bridge run build",
+    "start": "pnpm --filter swufe-webvpn-bridge run start",
     "docs:check": "tsx scripts/docs-check.ts",
     "acceptance:check": "tsx scripts/acceptance-collect.ts",
     "docs:links": "tsx scripts/docs-links-check.ts",

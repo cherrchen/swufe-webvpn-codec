@@ -31,7 +31,7 @@ Phase 1 adopts option A (finalised 2026-09-21): Main only launches/terminates th
 
 | Capability | Implementation |
 | ---- | ---- |
-| Start | `uv run python -m swufe_bridge.sidecar --config <file> --port <port> --confdir <dir>` (M2 spawns the same entry point as an Electron child process); mitmdump itself is started with `--mode regular@<port>` and **never** `--listen-port` (M3, see below) |
+| Start | `uv run --directory bridges/python python -m swufe_bridge.sidecar --config <file> --port <port> --confdir <dir>` (M2 spawns the same entry point as an Electron child process); mitmdump itself is started with `--mode regular@<port>` and **never** `--listen-port` (M3, see below) |
 | Readiness probe | a `swufe-ready` line on stderr **and** TCP reachable at `127.0.0.1:<port>` |
 | Configuration delivery | write the configuration file (full overwrite); the sidecar hot-reloads it by polling mtime + size, with no signal and no restart |
 | Configuration failure fallback | on a parse failure the last usable configuration is kept and the bridge keeps serving, emitting `swufe-error CONFIG_INVALID <message>` (the same message is not printed twice) |
@@ -104,7 +104,7 @@ swufe-error LISTEN_NOT_LOOPBACK <message>
 ### Development run
 
 ```bash
-uv run python -m swufe_bridge.sidecar --config <bridge-config.json> --port 18080 --confdir <confdir>
+uv run --directory bridges/python python -m swufe_bridge.sidecar --config <bridge-config.json> --port 18080 --confdir <confdir>
 # once ready (a swufe-ready line appears on stderr):
 curl -sS -i -x http://127.0.0.1:18080 --cacert <confdir>/mitmproxy-ca-cert.pem https://jwxt.swufe.edu.cn/sso/jziotlogin
 ```

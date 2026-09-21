@@ -21,13 +21,13 @@
 
 ## 退出条件
 
-- [x] `curl` 经本地桥 + 真实或模拟 WebVPN 访问 allowlist 主机成功（TC-F01，P0）——假上游：`tests/l2/test_proxy_end_to_end.py`；真实 `webvpn.swufe.edu.cn`：见「完成记录」的手工 smoke（返回门户登录 302，无真实会话）
+- [x] `curl` 经本地桥 + 真实或模拟 WebVPN 访问 allowlist 主机成功（TC-F01，P0）——假上游：`bridges/python/tests/l2/test_proxy_end_to_end.py`；真实 `webvpn.swufe.edu.cn`：见「完成记录」的手工 smoke（返回门户登录 302，无真实会话）
 - [x] 非 allowlist 主机不改写、按直连语义处理（TC-F02，P0）——L2 断言正文与上游 Cookie 均为空
 - [x] L0 通过：codec 向量（TC-A01..TC-A05）与 allowlist 匹配函数（TC-B01..TC-B04）——74 passed
 - [x] L1 通过：addon 对录制流量 / 假上游的请求改写与响应反向改写（含 `Location` 反向改写 TC-F03）——74 passed
-- [x] 响应改写优先级落地：`Location` → `Set-Cookie` Domain/Path → HTML/JS/JSON 绝对 URL → 其它内容类型不改写（REQ-007）——`swufe_bridge/addon.py` 按序执行并以 `swufe-debug.detail` 报告
+- [x] 响应改写优先级落地：`Location` → `Set-Cookie` Domain/Path → HTML/JS/JSON 绝对 URL → 其它内容类型不改写（REQ-007）——`bridges/python/swufe_bridge/addon.py` 按序执行并以 `swufe-debug.detail` 报告
 - [x] 防环成立：`webvpn.swufe.edu.cn` / `authserver.swufe.edu.cn` 与已是 WebVPN 形态的请求直通（REQ-008）——L1 `test_ec_004_*`
-- [x] 相关文档已同步（含双语配对）；无阻塞类缺陷——`npm run docs:check` 0 error / 0 warning
+- [x] 相关文档已同步（含双语配对）；无阻塞类缺陷——`pnpm run docs:check` 0 error / 0 warning
 
 ## 风险
 
@@ -45,24 +45,24 @@
 
 | 类别 | 内容 |
 | ---- | ---- |
-| 工程 | `pyproject.toml` + `uv.lock` + `.python-version`（运行期 `mitmproxy==12.2.3`、`cryptography==48.0.1`；dev `pytest==9.1.1`） |
-| 实现 | `swufe_bridge/wrd_codec.py`（T003）、`swufe_bridge/allowlist.py`（T005）、`swufe_bridge/config.py`（T006/T012 数据层）、`swufe_bridge/rewrite.py`（T009–T011 逻辑层）、`swufe_bridge/addon.py`（T008–T012）、`swufe_bridge/sidecar.py`（T007） |
+| 工程 | `bridges/python/pyproject.toml` + `bridges/python/uv.lock` + `bridges/python/.python-version`（运行期 `mitmproxy==12.2.3`、`cryptography==48.0.1`；dev `pytest==9.1.1`） |
+| 实现 | `bridges/python/swufe_bridge/wrd_codec.py`（T003）、`bridges/python/swufe_bridge/allowlist.py`（T005）、`bridges/python/swufe_bridge/config.py`（T006/T012 数据层）、`bridges/python/swufe_bridge/rewrite.py`（T009–T011 逻辑层）、`bridges/python/swufe_bridge/addon.py`（T008–T012）、`bridges/python/swufe_bridge/sidecar.py`（T007） |
 | 控制面 | 方案 A 定稿：配置文件热加载 + `swufe-ready` / `swufe-error` / `swufe-debug` stderr 行 + 退出码（[bridge-control-protocol.md](../../api/bridge-control-protocol.md)）；`--listen-host 127.0.0.1` 由 sidecar 硬编码（无开关） |
-| 测试 | `tests/l0/`（codec/allowlist/config）、`tests/l1/`（请求改写、响应反向改写、日志最小化、配置热更新）、`tests/l2/`（真 mitmdump + curl + 假上游） |
-| CI | [.github/workflows/python-tests.yml](../../../.github/workflows/python-tests.yml)：每次 PR / main 推送跑 `uv sync --frozen` + `uv run pytest tests/l0 -q`（T034） |
+| 测试 | `bridges/python/tests/l0/`（codec/allowlist/config）、`bridges/python/tests/l1/`（请求改写、响应反向改写、日志最小化、配置热更新）、`bridges/python/tests/l2/`（真 mitmdump + curl + 假上游） |
+| CI | [.github/workflows/python-tests.yml](../../../.github/workflows/python-tests.yml)：每次 PR / main 推送跑 `uv sync --frozen --directory bridges/python` + `uv run --directory bridges/python pytest tests/l0 -q`（T034） |
 
 ### 验证命令与结果（2026-09-21）
 
 | 命令 | 结果 |
 | ---- | ---- |
-| `uv sync --frozen` | 通过（lock 与 pyproject 一致；48 packages checked） |
-| `uv run pytest tests/l0 -q` | **74 passed** |
-| `uv run pytest tests/l1 -q` | **74 passed** |
-| `uv run pytest tests/l2 -q` | **6 passed** |
-| `uv run pytest -q` | **154 passed** |
-| `uv run python -m swufe_bridge.wrd_codec decode '<authserver 样本 URL>'` | `https://authserver.swufe.edu.cn/authserver/login?service=http%3A%2F%2Fjwxt.swufe.edu.cn%2Fsso%2Fjziotlogin`（退出码 0） |
-| `npm run docs:check` | 0 error / 0 warning（links + 双语配对 + spec 结构） |
-| `npm run typecheck` | 无 error |
+| `uv sync --frozen --directory bridges/python` | 通过（lock 与 pyproject 一致；48 packages checked） |
+| `uv run --directory bridges/python pytest tests/l0 -q` | **74 passed** |
+| `uv run --directory bridges/python pytest tests/l1 -q` | **74 passed** |
+| `uv run --directory bridges/python pytest tests/l2 -q` | **6 passed** |
+| `uv run --directory bridges/python pytest -q` | **154 passed** |
+| `uv run --directory bridges/python python -m swufe_bridge.wrd_codec decode '<authserver 样本 URL>'` | `https://authserver.swufe.edu.cn/authserver/login?service=http%3A%2F%2Fjwxt.swufe.edu.cn%2Fsso%2Fjziotlogin`（退出码 0） |
+| `pnpm run docs:check` | 0 error / 0 warning（links + 双语配对 + spec 结构） |
+| `pnpm run typecheck` | 无 error |
 
 ### 手工 dev smoke（真实与假上游）
 

@@ -11,19 +11,19 @@
 
 > 「代码位置」为已落地实现的真实路径；尚未实现的组件仍为 `TBD（实现首个任务确定）`。
 > M1（桥核心）已实现 WRD Codec、Bridge Addon（含配置面与 sidecar 入口）与 Allowlist Store 的库层；M2 已落地 Electron 侧全部组件
-> （`app/src/`），Windows 平台适配已实现、真机验证待 M4；M3 补齐捕获方式（进程捕获）、allowlist 增删界面与调试日志面板；M5（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）给 Bridge Addon 增加网关自有命名空间直通与 bootstrap 文档升级。
+> （`apps/desktop/src/`），Windows 平台适配已实现、真机验证待 M4；M3 补齐捕获方式（进程捕获）、allowlist 增删界面与调试日志面板；M5（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）给 Bridge Addon 增加网关自有命名空间直通与 bootstrap 文档升级。
 
 | 组件 | 类型 | 职责（一句话） | 代码位置 | 状态 |
 | ---- | ---- | -------------- | -------- | ---- |
-| App Shell | 进程内模块（Electron Main） | 窗口/托盘（可选）、配置持久化，并作为 Main 侧编排入口暴露 preload IPC | `app/src/main/index.ts`（组合根、单实例锁、退出清理 `shutdown.ts`）、`app/src/main/ipc.ts`（IF-001）、`app/src/main/windows.ts`、`app/src/main/store.ts` | Implemented (M2；托盘未实现) |
-| Login WebView | 进程内模块（Electron Renderer / BrowserWindow） | 承载官方 WebVPN / CAS 登录并保证防环 | `app/src/main/session-broker.ts`（`openLogin`，`persist:swufe-login` 分区 + `setProxy({mode:'direct'})`） | Implemented (M2) |
-| Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与失效检测 | `app/src/main/session-broker.ts`（采集/清除/监视）、`app/src/main/session-probe.ts`（失效信号分类，纯函数） | Implemented (M2；Q-001 的另两个信号留 M3/M4) |
-| Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、在「系统代理 / 指定应用」两种捕获方式间切换、代理冲突检测 | `app/src/main/orchestrator.ts`、`app/src/main/state-machine.ts`、`app/src/main/sidecar.ts`、`app/src/main/platform/`（`exec.ts`、`parse.ts` 与 darwin/win32 适配） | Implemented (M2；Windows 真机验证待 M4) |
-| WRD Codec | 进程内库（App 与 sidecar 共享） | hostname 加解密与 URL 互转（纯函数，无 IO） | `swufe_bridge/wrd_codec.py` | Implemented (M1) |
-| Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入；网关自有根命名空间直通；命中网关 bootstrap 判据的 HTML 升级到网关原生 URL 空间 | `swufe_bridge/addon.py`（响应反向改写纯函数与 bootstrap 判据 `swufe_bridge/rewrite.py`；配置面 `swufe_bridge/config.py`；进程入口 `swufe_bridge/sidecar.py`） | Implemented (M1；M5 增加直通与升级) |
-| Cert Manager | 进程内模块（Electron Main） | 本机 MITM CA 的安装/卸载与状态查询 | `app/src/main/platform/darwin/cert.ts`、`app/src/main/platform/win32/cert.ts`、`app/src/main/platform/ca-files.ts`；CA 生成入口 `swufe_bridge/ca.py` | Implemented (M2；系统信任库写入的真机验证待人工，见 [M2 完成记录](../planning/milestones/M2-desktop-orchestration.md)) |
-| Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | `app/src/main/store.ts`（`<userData>/config.json` 读写与校验）+ `swufe_bridge/allowlist.py`（匹配语义与校验）+ `swufe_bridge/config.py`（`AllowlistStore`） | Implemented (M2；编辑界面已在 M3 落地) |
-| Telemetry UI | 进程内模块（Electron Renderer） | 捕获方式选择、allowlist 增删、状态展示与调试日志面板 | `app/src/renderer/renderer.ts`、`app/static/{index.html,styles.css}`、`app/src/preload/index.ts` | Implemented (M3：状态条/桥开关/证书/代理状态/调试开关 + 捕获方式区、allowlist 编辑与日志面板) |
+| App Shell | 进程内模块（Electron Main） | 窗口/托盘（可选）、配置持久化，并作为 Main 侧编排入口暴露 preload IPC | `apps/desktop/src/main/index.ts`（组合根、单实例锁、退出清理 `shutdown.ts`）、`apps/desktop/src/main/ipc.ts`（IF-001）、`apps/desktop/src/main/windows.ts`、`apps/desktop/src/main/store.ts` | Implemented (M2；托盘未实现) |
+| Login WebView | 进程内模块（Electron Renderer / BrowserWindow） | 承载官方 WebVPN / CAS 登录并保证防环 | `apps/desktop/src/main/session-broker.ts`（`openLogin`，`persist:swufe-login` 分区 + `setProxy({mode:'direct'})`） | Implemented (M2) |
+| Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与失效检测 | `apps/desktop/src/main/session-broker.ts`（采集/清除/监视）、`apps/desktop/src/main/session-probe.ts`（失效信号分类，纯函数） | Implemented (M2；Q-001 的另两个信号留 M3/M4) |
+| Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、在「系统代理 / 指定应用」两种捕获方式间切换、代理冲突检测 | `apps/desktop/src/main/orchestrator.ts`、`apps/desktop/src/main/state-machine.ts`、`apps/desktop/src/main/sidecar.ts`、`apps/desktop/src/main/platform/`（`exec.ts`、`parse.ts` 与 darwin/win32 适配） | Implemented (M2；Windows 真机验证待 M4) |
+| WRD Codec | 进程内库（App 与 sidecar 共享） | hostname 加解密与 URL 互转（纯函数，无 IO） | `bridges/python/swufe_bridge/wrd_codec.py` | Implemented (M1) |
+| Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入；网关自有根命名空间直通；命中网关 bootstrap 判据的 HTML 升级到网关原生 URL 空间 | `bridges/python/swufe_bridge/addon.py`（响应反向改写纯函数与 bootstrap 判据 `bridges/python/swufe_bridge/rewrite.py`；配置面 `bridges/python/swufe_bridge/config.py`；进程入口 `bridges/python/swufe_bridge/sidecar.py`） | Implemented (M1；M5 增加直通与升级) |
+| Cert Manager | 进程内模块（Electron Main） | 本机 MITM CA 的安装/卸载与状态查询 | `apps/desktop/src/main/platform/darwin/cert.ts`、`apps/desktop/src/main/platform/win32/cert.ts`、`apps/desktop/src/main/platform/ca-files.ts`；CA 生成入口 `bridges/python/swufe_bridge/ca.py` | Implemented (M2；系统信任库写入的真机验证待人工，见 [M2 完成记录](../planning/milestones/M2-desktop-orchestration.md)) |
+| Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | `apps/desktop/src/main/store.ts`（`<userData>/config.json` 读写与校验）+ `bridges/python/swufe_bridge/allowlist.py`（匹配语义与校验）+ `bridges/python/swufe_bridge/config.py`（`AllowlistStore`） | Implemented (M2；编辑界面已在 M3 落地) |
+| Telemetry UI | 进程内模块（Electron Renderer） | 捕获方式选择、allowlist 增删、状态展示与调试日志面板 | `apps/desktop/src/renderer/renderer.ts`、`apps/desktop/static/{index.html,styles.css}`、`apps/desktop/src/preload/index.ts` | Implemented (M3：状态条/桥开关/证书/代理状态/调试开关 + 捕获方式区、allowlist 编辑与日志面板) |
 
 ## 组件关系
 

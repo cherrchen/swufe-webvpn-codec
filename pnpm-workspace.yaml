@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+
+# pnpm refuses to run dependency build scripts unless they are reviewed here
+# (ERR_PNPM_IGNORED_BUILDS). esbuild's postinstall links the platform binary.
+# electron 44.x ships no postinstall: its binary is fetched once with
+# `node apps/desktop/node_modules/electron/install.js` (see apps/desktop/README.md);
+# the entry is kept so a future version that adds a build script stays reviewed.
+allowBuilds:
+  electron: true
+  esbuild: true

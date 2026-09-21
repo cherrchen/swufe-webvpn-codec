@@ -131,8 +131,8 @@ flowchart LR
 | 接口 | 测试位置 | 覆盖内容 |
 | ---- | -------- | -------- |
 | IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-D01、TC-D02、TC-C01–C04、TC-E01–E03、TC-B05、TC-H01） | 会话/桥控/allowlist/CA/进程捕获 IPC 的行为与错误码 |
-| IF-002 | L1 `tests/l1/test_addon_reload.py`（配置热更新与失败回退）、L1 `tests/l1/test_addon_capture.py`（local 模式叠加与 `swufe-capture` 上报）+ L2 `tests/l2/test_proxy_end_to_end.py`（`swufe-ready` 行含 `listen_port`、退出码 `2`、回环监听） | 配置文件热加载语义、就绪/诊断行格式与启动失败退出码、进程捕获模式叠加与回报 |
+| IF-002 | L1 `bridges/python/tests/l1/test_addon_reload.py`（配置热更新与失败回退）、L1 `bridges/python/tests/l1/test_addon_capture.py`（local 模式叠加与 `swufe-capture` 上报）+ L2 `bridges/python/tests/l2/test_proxy_end_to_end.py`（`swufe-ready` 行含 `listen_port`、退出码 `2`、回环监听） | 配置文件热加载语义、就绪/诊断行格式与启动失败退出码、进程捕获模式叠加与回报 |
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-A01–A05） | codec 向量与 URL 互转一致 |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-C01–C04） | 冲突拒绝、设置与清除代理 |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-E01–E03） | 安装、卸载与未安装提示 |
-| IF-006 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-F01–F03、TC-G01–G03、TC-D01）+ L1 `tests/l1/test_addon_request.py` / `test_addon_response.py`（网关自有路径直通、bootstrap 升级与不误升级）+ L2 `tests/l2/test_proxy_end_to_end.py` | 上行改写、响应反向改写、网关自有命名空间直通与升级、浏览器验收 |
+| IF-006 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-F01–F03、TC-G01–G03、TC-D01）+ L1 `bridges/python/tests/l1/test_addon_request.py` / `test_addon_response.py`（网关自有路径直通、bootstrap 升级与不误升级）+ L2 `bridges/python/tests/l2/test_proxy_end_to_end.py` | 上行改写、响应反向改写、网关自有命名空间直通与升级、浏览器验收 |

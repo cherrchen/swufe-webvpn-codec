@@ -26,18 +26,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Version comes from the `packageManager` field in package.json.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci --prefix app
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck
-        run: npm --prefix app run typecheck
+        run: pnpm --filter swufe-webvpn-bridge run typecheck
 
       - name: Unit tests
-        run: npm --prefix app run test:unit
+        run: pnpm --filter swufe-webvpn-bridge run test:unit

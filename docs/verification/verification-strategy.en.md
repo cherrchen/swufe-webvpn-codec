@@ -17,7 +17,7 @@ This is the source of truth for what "done" means; project-specific tightening l
 | Automated tests | unit / integration / end-to-end | command + output summary |
 | Manual verification | reproducible steps | steps + observed result |
 | Static checks | build, types, lint, formatting | command + result |
-| Documentation consistency | `npm run docs:check`, documentation update matrix | command + result |
+| Documentation consistency | `pnpm run docs:check`, documentation update matrix | command + result |
 | Compatibility | interface/data/behaviour compatibility check | conclusion + risk notes |
 | Security | input, permissions, secrets, dependency risk | conclusion + mitigations |
 | Review | PR checklist | PR record |
@@ -88,7 +88,7 @@ Additional checks:     Every PR: L0 (codec vectors TC-A01..TC-A05 + allowlist un
                        mitmdump + curl)
                        Before release: L3 acceptance on real hardware (TC-G01..TC-G04, requires the
                        tester's own account)
-Exemptions:            CI currently runs documentation checks only (npm run docs:check) and no code
+Exemptions:            CI currently runs documentation checks only (pnpm run docs:check) and no code
                        tests; code tests join CI once the implementation repository exists
 Required reviewers:    cherrchen
 Release gate:          all P0 cases pass;

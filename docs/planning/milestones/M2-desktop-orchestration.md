@@ -46,31 +46,31 @@
 
 | 类别 | 内容 |
 | ---- | ---- |
-| 工程 | `app/package.json` + `app/package-lock.json`（dev：electron 44.4.3、typescript 5.7、tsx、esbuild、@types/node）；`app/tsconfig.json`（Main，CommonJS）/ `tsconfig.renderer.json`（Renderer，ESM）/ `tsconfig.preload.json`（preload 类型检查）；`app/scripts/run-unit-tests.mjs`（跨平台测试入口）；`app/README.md` |
-| Main 进程 | `app/src/main/`：`index.ts`（组合根 + 单实例锁 + `--user-data-dir`）、`windows.ts`、`ipc.ts`（15 个契约方法 + 事件广播）、`orchestrator.ts`（Proxy Orchestrator）、`state-machine.ts`、`session-broker.ts`、`session-probe.ts`、`session-types.ts`、`sidecar.ts`、`cert-manager` 装配（`platform/index.ts`）、`store.ts`、`constants.ts`、`exec.ts`、`python.ts`、`paths.ts`、`shutdown.ts` |
-| 平台适配 | `app/src/main/platform/`：`parse.ts`（纯解析函数）、`ca-files.ts`、`darwin/system-proxy.ts`（`networksetup`）、`darwin/cert.ts`（`security` + osascript 提权）、`win32/system-proxy.ts`（WinINET 注册表）、`win32/cert.ts`（`certutil -user`）、`index.ts`（平台分支 + 进程枚举） |
-| 渲染层 | `app/src/preload/index.ts`（contextBridge）、`app/src/renderer/renderer.ts`、`app/static/index.html`、`app/static/styles.css`、`app/src/shared/{types,global.d.ts}` |
-| Python 侧新增 | `swufe_bridge/ca.py`（`python -m swufe_bridge.ca --confdir <dir>`：不启动桥也能生成 mitmproxy CA，复用 CertStore，不自研 PKI） |
-| 测试 | `app/test/`（8 个单测文件 + `helpers/fakes.ts`，全部 electron-free）、`app/test/fixtures/portal-stub.mjs`（假上游）、`app/test/fixtures/stub-ca-app.js`（CA 前置被替换的验证入口）；Python 侧新增 `tests/l1/test_ca.py` 与 `tests/l0/test_config.py` 的跨语言配置键用例 |
-| CI | [.github/workflows/app-tests.yml](../../../.github/workflows/app-tests.yml)：每个 PR / main 推送跑 `npm ci --prefix app` + `typecheck` + `test:unit`（不需要 Electron 二进制、不需要显示器） |
+| 工程 | `apps/desktop/package.json` + 仓库根 `pnpm-lock.yaml`（pnpm 11 workspace：`apps/desktop` 是 workspace 项目，锁文件只有仓库根一份；dev：electron 44.4.3、typescript 5.7、tsx、esbuild、@types/node）；`apps/desktop/tsconfig.json`（Main，CommonJS）/ `tsconfig.renderer.json`（Renderer，ESM）/ `tsconfig.preload.json`（preload 类型检查）；`apps/desktop/scripts/run-unit-tests.mjs`（跨平台测试入口）；`apps/desktop/README.md` |
+| Main 进程 | `apps/desktop/src/main/`：`index.ts`（组合根 + 单实例锁 + `--user-data-dir`）、`windows.ts`、`ipc.ts`（15 个契约方法 + 事件广播）、`orchestrator.ts`（Proxy Orchestrator）、`state-machine.ts`、`session-broker.ts`、`session-probe.ts`、`session-types.ts`、`sidecar.ts`、`cert-manager` 装配（`platform/index.ts`）、`store.ts`、`constants.ts`、`exec.ts`、`python.ts`、`paths.ts`、`shutdown.ts` |
+| 平台适配 | `apps/desktop/src/main/platform/`：`parse.ts`（纯解析函数）、`ca-files.ts`、`darwin/system-proxy.ts`（`networksetup`）、`darwin/cert.ts`（`security` + osascript 提权）、`win32/system-proxy.ts`（WinINET 注册表）、`win32/cert.ts`（`certutil -user`）、`index.ts`（平台分支 + 进程枚举） |
+| 渲染层 | `apps/desktop/src/preload/index.ts`（contextBridge）、`apps/desktop/src/renderer/renderer.ts`、`apps/desktop/static/index.html`、`apps/desktop/static/styles.css`、`apps/desktop/src/shared/{types,global.d.ts}` |
+| Python 侧新增 | `bridges/python/swufe_bridge/ca.py`（`python -m swufe_bridge.ca --confdir <dir>`：不启动桥也能生成 mitmproxy CA，复用 CertStore，不自研 PKI） |
+| 测试 | `apps/desktop/test/`（8 个单测文件 + `helpers/fakes.ts`，全部 electron-free）、`apps/desktop/test/fixtures/portal-stub.mjs`（假上游）、`apps/desktop/test/fixtures/stub-ca-app.js`（CA 前置被替换的验证入口）；Python 侧新增 `bridges/python/tests/l1/test_ca.py` 与 `bridges/python/tests/l0/test_config.py` 的跨语言配置键用例 |
+| CI | [.github/workflows/app-tests.yml](../../../.github/workflows/app-tests.yml)：每个 PR / main 推送跑 `pnpm install --frozen-lockfile` + `typecheck` + `test:unit`（不需要 Electron 二进制、不需要显示器） |
 
 ### 验证命令与结果（2026-09-21）
 
 | 命令 | 结果 | 备注 |
 | ---- | ---- | ---- |
-| `uv run pytest tests/l0 -q` | `75 passed` | M1 74 + 跨语言配置键兼容 1 |
-| `uv run pytest tests/l1 -q` | `79 passed` | M1 74 + `tests/l1/test_ca.py` 5 |
-| `uv run pytest tests/l2 -q` | `6 passed` | 与 M1 相同（未改动） |
-| `uv run pytest -q` | `160 passed` | L0+L1+L2 |
-| `npm --prefix app run typecheck` | 无 error | 三个 tsconfig（Main / Renderer / preload） |
-| `npm --prefix app run test:unit` | `55 passed` | 状态机、代理/证书/进程解析、sidecar 控制行、会话探测分类、AppStore、debug 转发、Orchestrator |
-| `npm --prefix app run build` | 通过 | `dist/main`（CommonJS）+ `dist/renderer`（ESM）+ `dist/preload/index.js`（esbuild 单文件包） |
-| `npm run docs:check` | `0 error(s), 0 warning(s)` | 链接 + 双语配对 + spec 结构 |
-| `npm run typecheck` | 无 error | 仓库根文档检查脚本 |
+| `uv run --directory bridges/python pytest tests/l0 -q` | `75 passed` | M1 74 + 跨语言配置键兼容 1 |
+| `uv run --directory bridges/python pytest tests/l1 -q` | `79 passed` | M1 74 + `bridges/python/tests/l1/test_ca.py` 5 |
+| `uv run --directory bridges/python pytest tests/l2 -q` | `6 passed` | 与 M1 相同（未改动） |
+| `uv run --directory bridges/python pytest -q` | `160 passed` | L0+L1+L2 |
+| `pnpm --filter swufe-webvpn-bridge run typecheck` | 无 error | 三个 tsconfig（Main / Renderer / preload） |
+| `pnpm --filter swufe-webvpn-bridge run test:unit` | `55 passed` | 状态机、代理/证书/进程解析、sidecar 控制行、会话探测分类、AppStore、debug 转发、Orchestrator |
+| `pnpm --filter swufe-webvpn-bridge run build` | 通过 | `dist/main`（CommonJS）+ `dist/renderer`（ESM）+ `dist/preload/index.js`（esbuild 单文件包） |
+| `pnpm run docs:check` | `0 error(s), 0 warning(s)` | 链接 + 双语配对 + spec 结构 |
+| `pnpm run typecheck` | 无 error | 仓库根文档检查脚本 |
 
 ### 端到端验证（macOS 实机）
 
-**A. 真实应用（`npm --prefix app start`，`--user-data-dir=/tmp/m2-e2e`，CDP 驱动）**
+**A. 真实应用（`pnpm start`，`--user-data-dir=/tmp/m2-e2e`，CDP 驱动）**
 
 ```text
 1. 启动：状态条「未登录」，开桥开关禁用，证书「未安装」，系统代理「未由本 App 设置」
@@ -83,12 +83,12 @@
 5. 重复启动第二个实例 ⇒ 立即退出（0s，退出码 0），首个实例保持存活（单实例锁）
 ```
 
-**B. CA 前置被替换的验证入口（`app/test/fixtures/stub-ca-app.js`，其余全部真实：真实 `networksetup`、真实 sidecar、真实 IPC/preload/renderer）**
+**B. CA 前置被替换的验证入口（`apps/desktop/test/fixtures/stub-ca-app.js`，其余全部真实：真实 `networksetup`、真实 sidecar、真实 IPC/preload/renderer）**
 
 ```text
-$ node app/test/fixtures/portal-stub.mjs --port 19080 --mode ok &
+$ node apps/desktop/test/fixtures/portal-stub.mjs --port 19080 --mode ok &
 $ SWUFE_VERIFY_USER_DATA=/tmp/m2-e2e SWUFE_VERIFY_CDP_PORT=9223 SWUFE_PROBE_INTERVAL_MS=2000 \
-    app/node_modules/.bin/electron app/test/fixtures/stub-ca-app.js
+    apps/desktop/node_modules/.bin/electron apps/desktop/test/fixtures/stub-ca-app.js
 
 登录 ⇒ 开桥：
   swufe-ready {...}                     # sidecar 就绪（stderr 单行 JSON）
@@ -114,7 +114,7 @@ $ curl -x http://127.0.0.1:8080 … https://example.com/   # 非 allowlist
 退出清理（关闭主窗口）：swufe-quit 开始退出清理（before-quit）→ 退出清理完成
   系统代理 Enabled: No；无 sidecar 进程；config.json 的 systemProxyManagedByApp=false
   （退出时若界面正处于 error 态——如 `CA_MISSING`——同样完成清理；此路径暴露过一次
-   `error → idle → stopping` 的非法状态迁移，已修复并加回归用例 `app/test/orchestrator.test.ts`）
+   `error → idle → stopping` 的非法状态迁移，已修复并加回归用例 `apps/desktop/test/orchestrator.test.ts`）
 
 代理冲突（TC-C01）：先 `networksetup -setwebproxy Wi-Fi 127.0.0.1 7890 && -setwebproxystate Wi-Fi on`，再开桥
   模态「检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。」

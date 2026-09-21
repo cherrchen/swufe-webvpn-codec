@@ -53,6 +53,8 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0006](ADR-0006-local-capture-mode-and-mutual-exclusion.en.md) | Process capture via mitmproxy local mode, mutually exclusive with the system proxy | Accepted | 2026-09-21 | — |
 | [ADR-0007](ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.en.md) | Pass gateway-owned namespaces straight through, and promote bootstrap documents to the gateway's native URL space | Accepted | 2026-09-21 | — |
 | [ADR-0008](ADR-0008-ca-trust-authorization-in-app-session.en.md) | The app process writes CA trust settings (keychain writes keep the elevation) | Accepted | 2026-09-21 | — |
+| [ADR-0009](ADR-0009-monorepo-layout.en.md) | Adopt a path-based monorepo layout: applications in apps/<app>, bridges in bridges/<bridge> | Accepted | 2026-09-21 | — |
+| [ADR-0010](ADR-0010-pnpm-workspaces.en.md) | Switch the Node toolchain to pnpm 11 workspaces: one lockfile and workspace script delegation | Accepted | 2026-09-21 | Supersedes the "keep npm" conclusion of an ADR-0009 alternative row (ADR-0009's layout decision itself stands) |
 
 ## Rules
 

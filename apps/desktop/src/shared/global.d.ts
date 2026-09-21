@@ -2,7 +2,7 @@ import type { SwufeBridgeApi } from './types'
 
 declare global {
   interface Window {
-    /** Injected by app/src/preload/index.ts (contextBridge). */
+    /** Injected by apps/desktop/src/preload/index.ts (contextBridge). */
     swufeBridge: SwufeBridgeApi
   }
 }

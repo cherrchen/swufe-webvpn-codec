@@ -1,7 +1,7 @@
 # Spec 模板（_template）
 
 > 本目录是**模板**，不是某一个 Feature 的 Spec。
-> 它不参与 `npm run spec:check` 校验，也不占用编号；`**/_template/**` 不强制中英双语。
+> 它不参与 `pnpm run spec:check` 校验，也不占用编号；`**/_template/**` 不强制中英双语。
 
 ## 使用方法
 

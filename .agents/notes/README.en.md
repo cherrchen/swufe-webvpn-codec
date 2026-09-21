@@ -62,4 +62,4 @@ When a note yields a long-lived conclusion:
 
 ## Checks
 
-This directory is exempt from bilingual pairing and spec-structure checks, but its Markdown links are still verified by `npm run docs:links`.
+This directory is exempt from bilingual pairing and spec-structure checks, but its Markdown links are still verified by `pnpm run docs:links`.

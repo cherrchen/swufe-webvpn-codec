@@ -8,14 +8,16 @@
  * calls and the real mitmproxy sidecar, is the shipping code path.
  *
  *   SWUFE_VERIFY_USER_DATA=/tmp/m2-e2e SWUFE_VERIFY_CDP_PORT=9223 \
- *     app/node_modules/.bin/electron app/test/fixtures/stub-ca-app.js
+ *     apps/desktop/node_modules/.bin/electron apps/desktop/test/fixtures/stub-ca-app.js
  */
 
 const { app } = require('electron')
 const path = require('node:path')
 
 const appRoot = path.resolve(__dirname, '..', '..')
-const repoRoot = path.resolve(appRoot, '..')
+const repoRoot = path.resolve(appRoot, '..', '..')
+/** Python bridge project: source, venv and tests live under <repo>/bridges/python (ADR-0009). */
+const bridgeRoot = path.join(repoRoot, 'bridges', 'python')
 const userDataDir = process.env.SWUFE_VERIFY_USER_DATA ?? path.join('/tmp', 'm2-e2e')
 const cdpPort = process.env.SWUFE_VERIFY_CDP_PORT
 
@@ -61,7 +63,7 @@ async function start() {
     session,
     systemProxy: createSystemProxy(),
     certManager: stubbedCertManager,
-    sidecarFactory: (options) => new SidecarProcess({ repoRoot, userDataDir, port: options.port }),
+    sidecarFactory: (options) => new SidecarProcess({ bridgeRoot, userDataDir, port: options.port }),
     userDataDir,
   })
   await orchestrator.recoverOnLaunch()

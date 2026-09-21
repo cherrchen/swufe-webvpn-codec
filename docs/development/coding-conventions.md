@@ -14,8 +14,8 @@
 
 ```text
 Primary language:  Python 3（bridge sidecar / WRD codec 权威实现；Electron 应用为 TypeScript）
-Language version:  Python >=3.12（uv 固定 3.13，见 .python-version）
-Package manager:   Node 侧 npm（package-lock.json 已提交）；Python 侧 uv + uv.lock（已提交，需 `uv sync`）
+Language version:  Python >=3.12（uv 固定 3.13，见 bridges/python/.python-version）
+Package manager:   Node 侧 pnpm 11 workspaces（`packageManager` 固定于仓库根 package.json；锁文件为仓库根 `pnpm-lock.yaml`，已提交，`pnpm install` 安装）；Python 侧 uv + bridges/python/uv.lock（已提交，需 `uv sync --directory bridges/python`）
 Formatter:         TBD（本期未引入）
 Linter:            TBD（本期未引入）
 ```
@@ -24,10 +24,10 @@ Linter:            TBD（本期未引入）
 
 | 规则 | 说明 |
 | ---- | ---- |
-| Python 包 | `swufe_bridge/`：sidecar 包——`wrd_codec.py`（codec）、`allowlist.py`（匹配语义与主机名校验）、`config.py`（配置面 + `ConfigWatcher`）、`rewrite.py`（响应反向改写纯函数）、`addon.py`（mitmproxy addon）、`sidecar.py`（进程入口）、`ca.py`（CA 生成入口）。`__init__.py` 只放 docstring、不做 eager import，保证 L0 测试不依赖 mitmproxy |
-| Python 测试分层 | `tests/l0`（无外部依赖：codec/allowlist/config）、`tests/l1`（addon 行为 + 假 flow + CA 入口）、`tests/l2`（真 sidecar + curl + 假上游）。共享 fixture：`tests/conftest.py`（配置工厂，不 import mitmproxy）与 `tests/l1/conftest.py`（flow / addon 工厂） |
-| Electron 应用（TypeScript） | `app/src/main`（Main 进程 + 平台适配 `platform/`）、`app/src/preload`（contextBridge；**沙箱 preload 不能 require 相对路径，必须由 esbuild 打包成单文件**）、`app/src/renderer`（渲染层）、`app/src/shared`（跨进程契约类型与全局声明）；编译产物在 `app/dist/`（不提交），静态资源在 `app/static/` |
-| Electron 测试 | `app/test/*.test.ts`（App 单元，全部 electron-free，靠 `helpers/fakes.ts` 注入平台/进程依赖）、`app/test/fixtures/`（假上游与验证入口，不参与 CI 单测） |
+| Python 包 | `bridges/python/swufe_bridge/`：sidecar 包——`wrd_codec.py`（codec）、`allowlist.py`（匹配语义与主机名校验）、`config.py`（配置面 + `ConfigWatcher`）、`rewrite.py`（响应反向改写纯函数）、`addon.py`（mitmproxy addon）、`sidecar.py`（进程入口）、`ca.py`（CA 生成入口）。`__init__.py` 只放 docstring、不做 eager import，保证 L0 测试不依赖 mitmproxy |
+| Python 测试分层 | `bridges/python/tests/l0`（无外部依赖：codec/allowlist/config）、`bridges/python/tests/l1`（addon 行为 + 假 flow + CA 入口）、`bridges/python/tests/l2`（真 sidecar + curl + 假上游）。共享 fixture：`bridges/python/tests/conftest.py`（配置工厂，不 import mitmproxy）与 `bridges/python/tests/l1/conftest.py`（flow / addon 工厂） |
+| Electron 应用（TypeScript） | `apps/desktop/src/main`（Main 进程 + 平台适配 `platform/`）、`apps/desktop/src/preload`（contextBridge；**沙箱 preload 不能 require 相对路径，必须由 esbuild 打包成单文件**）、`apps/desktop/src/renderer`（渲染层）、`apps/desktop/src/shared`（跨进程契约类型与全局声明）；编译产物在 `apps/desktop/dist/`（不提交），静态资源在 `apps/desktop/static/` |
+| Electron 测试 | `apps/desktop/test/*.test.ts`（App 单元，全部 electron-free，靠 `helpers/fakes.ts` 注入平台/进程依赖）、`apps/desktop/test/fixtures/`（假上游与验证入口，不参与 CI 单测） |
 | 依赖方向 | Python 侧：`addon → rewrite / config / allowlist / wrd_codec`；`config → allowlist`；`sidecar → addon + config`。TypeScript 侧：`main → shared`；`preload → shared`；`renderer → shared`（渲染层不 import Main 代码）。不引入反向依赖（与 [architecture/components.md](../architecture/components.md) 的依赖规则一致） |
 
 ## 3. 命名
@@ -38,7 +38,7 @@ Linter:            TBD（本期未引入）
 | 文件（TypeScript） | Main/共享模块用 camelCase 或语义短名（`orchestrator.ts`、`session-broker.ts`、`state-machine.ts`、`platform/parse.ts`）；类型/接口 PascalCase；测试 `state-machine.test.ts` 等 `<主题>.test.ts` |
 | 类型 | PascalCase：`WrdCodec`、`AllowlistConfig`、`BridgeRuntimeConfig`、`BridgeAddon`、`BridgeStatus`、`ProxyOrchestrator` |
 | 函数 | snake_case（Python，如 `normalize_host`、`encode_url`）/ camelCase（TypeScript，如 `normalizeHost`、`writeRuntimeConfig`）；模块内部辅助以 `_` 前缀（Python：`_build_re`）或 `private`（TS） |
-| 变量 | Python snake_case、TS camelCase；跨面契约常量用 UPPER_SNAKE 集中在模块顶部（Python：`DEFAULT_HOSTS`；TS：`app/src/main/constants.ts` 的 `DEFAULT_BRIDGE_PORT`、`CHANNEL_STATUS`） |
+| 变量 | Python snake_case、TS camelCase；跨面契约常量用 UPPER_SNAKE 集中在模块顶部（Python：`DEFAULT_HOSTS`；TS：`apps/desktop/src/main/constants.ts` 的 `DEFAULT_BRIDGE_PORT`、`CHANNEL_STATUS`） |
 | 常量 | UPPER_SNAKE_CASE |
 | 配置 / 接口字段 | JSON 字段用 camelCase（`includeSwufeWildcard`、`webvpnBase`、`wrdKey`），与 `docs/` 契约保持一致；Python 内部属性用 snake_case（`include_swufe_wildcard`、`webvpn_base`） |
 | stderr 控制行 / 错误码 | 机器可读前缀与错误码保持固定英文（`swufe-ready`、`swufe-error`、`swufe-debug`；`PROXY_CONFLICT`…）；用户可见文案中文 |
@@ -56,7 +56,7 @@ Linter:            TBD（本期未引入）
 - 注释解释「为什么」，不复述「做了什么」。
 - 公开 API 必须有文档注释（docstring 用英文；公开接口契约以 [docs/api/](../api/README.md) 下的文档为准，代码注释需指向对应接口面）。
 - 用户可见文案（错误提示、CLI 帮助）用中文：如 `swufe-error ALLOWLIST_EMPTY allowlist 为空：请添加主机或启用 *.swufe.edu.cn`；机器可读的部分（stderr 行前缀、错误码、JSON 键）保持英文/固定字面量。
-- 数据契约在代码中用类型与校验表达：配置与 allowlist 解析集中在 `swufe_bridge/config.py` / `swufe_bridge/allowlist.py`，其它模块只消费已校验的对象。
+- 数据契约在代码中用类型与校验表达：配置与 allowlist 解析集中在 `bridges/python/swufe_bridge/config.py` / `bridges/python/swufe_bridge/allowlist.py`，其它模块只消费已校验的对象。
 
 ## 5. 错误处理
 
@@ -87,10 +87,10 @@ Linter:            TBD（本期未引入）
 ```text
 Format:    TBD（本期未引入格式化工具）
 Lint:      TBD（本期未引入 linter）
-Type:      TBD（Python 侧未引入类型检查器；Node 侧用 npm run typecheck；App 侧用 npm --prefix app run typecheck）
-Test:      uv run pytest（首次先 uv sync）；App 单元：npm --prefix app run test:unit（首次先 npm --prefix app install）
-Build:     npm --prefix app run build（App 的 Main/Renderer/preload 编译产物，不提交）
-Docs:      npm run docs:check
+Type:      TBD（Python 侧未引入类型检查器；Node 侧用 pnpm run typecheck；App 侧用 pnpm --filter swufe-webvpn-bridge run typecheck）
+Test:      uv run --directory bridges/python pytest（首次先 uv sync --directory bridges/python）；App 单元：pnpm --filter swufe-webvpn-bridge run test:unit（首次先 pnpm install）
+Build:     pnpm --filter swufe-webvpn-bridge run build（App 的 Main/Renderer/preload 编译产物，不提交）
+Docs:      pnpm run docs:check
 ```
 
 > CI 现有三个工作流：文档检查 [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml)、Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml) 与 App 单元/类型 [.github/workflows/app-tests.yml](../../.github/workflows/app-tests.yml)。

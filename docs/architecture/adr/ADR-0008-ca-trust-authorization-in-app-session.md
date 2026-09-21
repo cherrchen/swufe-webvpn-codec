@@ -42,7 +42,7 @@ SecTrustSettingsSetTrustSettings: The authorization was denied since no user int
 
 ## Decision
 
-1. macOS 的 CA 安装由 `app/src/main/platform/darwin/cert.ts` 的 `install()` 分两步顺序执行，且两步必须用不同的授权路径：
+1. macOS 的 CA 安装由 `apps/desktop/src/main/platform/darwin/cert.ts` 的 `install()` 分两步顺序执行，且两步必须用不同的授权路径：
    - **步骤 1（钥匙串，需要 root）**：`runPrivilegedDarwin()` 执行 `security add-certificates -k /Library/Keychains/System.keychain "<caCert>"`。它只写钥匙串，**不碰信任设置**；stdout 报 `already in <keychain>` 时视为成功（幂等）。
    - **步骤 2（信任设置，管理域）**：**应用进程自己**调用 `security add-trusted-cert -d -r trustRoot "<caCert>"`（**不带 `-k`**），授权由 macOS 面向本 App 的会话处理。超时使用 `PRIVILEGE_PROMPT_TIMEOUT_MS`（120s），非 10s 的默认命令超时。
 2. 适用范围与禁令：
@@ -93,7 +93,7 @@ SecTrustSettingsSetTrustSettings: The authorization was denied since no user int
 - 相关 Spec：`specs/001-phase1-local-bridge/`（TC-E01 / TC-E02 / TC-E03）
 - 相关 ADR：[ADR-0003](ADR-0003-electron-gui-for-phase-1.md)（Phase 1 采用 Electron）
 - 相关 Known Issue：`KI-007`（本 ADR 解除）、`KI-010`（卸载后的信任项残留）
-- 实现位置：`app/src/main/platform/darwin/cert.ts`、`app/src/main/exec.ts`、`app/src/main/constants.ts`
+- 实现位置：`apps/desktop/src/main/platform/darwin/cert.ts`、`apps/desktop/src/main/exec.ts`、`apps/desktop/src/main/constants.ts`
 - 外部资料：
   - <https://developer.apple.com/documentation/security/sectrustsettingssettrustsettings(_:_:_:)>
   - <https://developer.apple.com/documentation/security/security-framework-result-codes>

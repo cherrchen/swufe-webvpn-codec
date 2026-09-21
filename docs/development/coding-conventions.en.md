@@ -16,8 +16,8 @@
 
 ```text
 Primary language:  Python 3 (bridge sidecar / authoritative WRD codec; the Electron app is TypeScript)
-Language version:  Python >=3.12 (uv pins 3.13, see .python-version)
-Package manager:   npm on the Node side (package-lock.json is committed); uv + uv.lock on the Python side (committed, run `uv sync`)
+Language version:  Python >=3.12 (uv pins 3.13, see bridges/python/.python-version)
+Package manager:   pnpm 11 workspaces on the Node side (`packageManager` pinned in the root package.json; the lockfile is the root `pnpm-lock.yaml`, committed, installed with `pnpm install`); uv + bridges/python/uv.lock on the Python side (committed, run `uv sync --directory bridges/python`)
 Formatter:         TBD (not introduced in this phase)
 Linter:            TBD (not introduced in this phase)
 ```
@@ -26,10 +26,10 @@ Linter:            TBD (not introduced in this phase)
 
 | Rule | Description |
 | ---- | ----------- |
-| Python package | `swufe_bridge/`: the sidecar package — `wrd_codec.py` (codec), `allowlist.py` (matching semantics and host-name validation), `config.py` (config surface + `ConfigWatcher`), `rewrite.py` (pure reverse-rewrite functions for responses), `addon.py` (mitmproxy addon), `sidecar.py` (process entry point), `ca.py` (CA generation entry). `__init__.py` holds only a docstring and performs no eager import, so L0 tests do not depend on mitmproxy |
-| Python test layers | `tests/l0` (no external dependencies: codec/allowlist/config), `tests/l1` (addon behaviour + fake flows + the CA entry), `tests/l2` (real sidecar + curl + fake upstream). Shared fixtures: `tests/conftest.py` (config factories, no mitmproxy import) and `tests/l1/conftest.py` (flow / addon factories) |
-| Electron app (TypeScript) | `app/src/main` (Main process + platform adapters in `platform/`), `app/src/preload` (contextBridge; **a sandboxed preload cannot require relative paths, so it must be bundled into a single file by esbuild**), `app/src/renderer` (renderer), `app/src/shared` (cross-process contract types and global declarations); build output lives in `app/dist/` (not committed) and static assets in `app/static/` |
-| Electron tests | `app/test/*.test.ts` (app unit tests, all electron-free, with platform/process dependencies injected through `helpers/fakes.ts`), `app/test/fixtures/` (fake upstream and verification entry; not part of the CI unit run) |
+| Python package | `bridges/python/swufe_bridge/`: the sidecar package — `wrd_codec.py` (codec), `allowlist.py` (matching semantics and host-name validation), `config.py` (config surface + `ConfigWatcher`), `rewrite.py` (pure reverse-rewrite functions for responses), `addon.py` (mitmproxy addon), `sidecar.py` (process entry point), `ca.py` (CA generation entry). `__init__.py` holds only a docstring and performs no eager import, so L0 tests do not depend on mitmproxy |
+| Python test layers | `bridges/python/tests/l0` (no external dependencies: codec/allowlist/config), `bridges/python/tests/l1` (addon behaviour + fake flows + the CA entry), `bridges/python/tests/l2` (real sidecar + curl + fake upstream). Shared fixtures: `bridges/python/tests/conftest.py` (config factories, no mitmproxy import) and `bridges/python/tests/l1/conftest.py` (flow / addon factories) |
+| Electron app (TypeScript) | `apps/desktop/src/main` (Main process + platform adapters in `platform/`), `apps/desktop/src/preload` (contextBridge; **a sandboxed preload cannot require relative paths, so it must be bundled into a single file by esbuild**), `apps/desktop/src/renderer` (renderer), `apps/desktop/src/shared` (cross-process contract types and global declarations); build output lives in `apps/desktop/dist/` (not committed) and static assets in `apps/desktop/static/` |
+| Electron tests | `apps/desktop/test/*.test.ts` (app unit tests, all electron-free, with platform/process dependencies injected through `helpers/fakes.ts`), `apps/desktop/test/fixtures/` (fake upstream and verification entry; not part of the CI unit run) |
 | Dependency direction | Python: `addon → rewrite / config / allowlist / wrd_codec`; `config → allowlist`; `sidecar → addon + config`. TypeScript: `main → shared`; `preload → shared`; `renderer → shared` (the renderer never imports Main code). No reverse dependencies (consistent with the dependency rules in [architecture/components.md](../architecture/components.md)) |
 
 ## 3. Naming
@@ -40,7 +40,7 @@ Linter:            TBD (not introduced in this phase)
 | Files (TypeScript) | Main/shared modules use camelCase or short semantic names (`orchestrator.ts`, `session-broker.ts`, `state-machine.ts`, `platform/parse.ts`); types/interfaces are PascalCase; tests are `<topic>.test.ts` (e.g. `state-machine.test.ts`) |
 | Types | PascalCase: `WrdCodec`, `AllowlistConfig`, `BridgeRuntimeConfig`, `BridgeAddon`, `BridgeStatus`, `ProxyOrchestrator` |
 | Functions | snake_case (Python, e.g. `normalize_host`, `encode_url`) / camelCase (TypeScript, e.g. `normalizeHost`, `writeRuntimeConfig`); module-internal helpers use a `_` prefix (Python: `_build_re`) or `private` (TS) |
-| Variables | snake_case in Python, camelCase in TS; contract constants shared across surfaces are gathered in UPPER_SNAKE at the top of the module (Python: `DEFAULT_HOSTS`; TS: `DEFAULT_BRIDGE_PORT`, `CHANNEL_STATUS` in `app/src/main/constants.ts`) |
+| Variables | snake_case in Python, camelCase in TS; contract constants shared across surfaces are gathered in UPPER_SNAKE at the top of the module (Python: `DEFAULT_HOSTS`; TS: `DEFAULT_BRIDGE_PORT`, `CHANNEL_STATUS` in `apps/desktop/src/main/constants.ts`) |
 | Constants | UPPER_SNAKE_CASE |
 | Config / interface fields | JSON fields use camelCase (`includeSwufeWildcard`, `webvpnBase`, `wrdKey`), consistent with the `docs/` contracts; Python-internal attributes use snake_case (`include_swufe_wildcard`, `webvpn_base`) |
 | stderr control lines / error codes | Machine-readable prefixes and error codes stay fixed English (`swufe-ready`, `swufe-error`, `swufe-debug`; `PROXY_CONFLICT`…); user-facing copy is Chinese |
@@ -58,7 +58,7 @@ The table above records the conventions actually in place after M1/M2 landed. Cr
 - Comments explain *why*, never restate *what*.
 - Public APIs must carry doc comments (docstrings in English; public interface contracts live in [docs/api/](../api/README.md), and code comments must point at the matching interface surface).
 - User-facing text (error messages, CLI help) is written in Chinese: e.g. `swufe-error ALLOWLIST_EMPTY allowlist 为空：请添加主机或启用 *.swufe.edu.cn`; machine-readable parts (stderr line prefixes, error codes, JSON keys) stay English/fixed literals.
-- Data contracts are expressed in code through types and validation: config and allowlist parsing is centralised in `swufe_bridge/config.py` / `swufe_bridge/allowlist.py`, and other modules only consume already-validated objects.
+- Data contracts are expressed in code through types and validation: config and allowlist parsing is centralised in `bridges/python/swufe_bridge/config.py` / `bridges/python/swufe_bridge/allowlist.py`, and other modules only consume already-validated objects.
 
 ## 5. Error handling
 
@@ -89,10 +89,10 @@ The table above records the conventions actually in place after M1/M2 landed. Cr
 ```text
 Format:    TBD (no formatter introduced in this phase)
 Lint:      TBD (no linter introduced in this phase)
-Type:      TBD (no type checker on the Python side; `npm run typecheck` on the Node side; `npm --prefix app run typecheck` for the app)
-Test:      uv run pytest (run `uv sync` first); app unit tests: `npm --prefix app run test:unit` (run `npm --prefix app install` first)
-Build:     npm --prefix app run build (app Main/Renderer/preload build output; not committed)
-Docs:      npm run docs:check
+Type:      TBD (no type checker on the Python side; `pnpm run typecheck` on the Node side; `pnpm --filter swufe-webvpn-bridge run typecheck` for the app)
+Test:      uv run --directory bridges/python pytest (run `uv sync --directory bridges/python` first); app unit tests: `pnpm --filter swufe-webvpn-bridge run test:unit` (run `pnpm install` first)
+Build:     pnpm --filter swufe-webvpn-bridge run build (app Main/Renderer/preload build output; not committed)
+Docs:      pnpm run docs:check
 ```
 
 > CI has three workflows: the documentation check [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml), Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml) and app unit tests/types [.github/workflows/app-tests.yml](../../.github/workflows/app-tests.yml).

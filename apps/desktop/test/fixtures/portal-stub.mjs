@@ -1,6 +1,6 @@
 // Minimal stand-in for webvpn.swufe.edu.cn / a WebVPN upstream, used by the app smoke runs.
 //
-//   node app/test/fixtures/portal-stub.mjs --port 19080 [--mode ok|expired]
+//   node apps/desktop/test/fixtures/portal-stub.mjs --port 19080 [--mode ok|expired]
 //
 // GET  /            → ok: 200 + Set-Cookie: wrdvpn_session=STUB-SESSION; expired: 302 → /login
 // GET  /login       → tiny login page (form POST /login sets the cookie and redirects to /)

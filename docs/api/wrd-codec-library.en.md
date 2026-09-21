@@ -101,7 +101,7 @@ Defaults: `webvpnHost = webvpn.swufe.edu.cn`, `key = iv = wrdvpnisthebest!`.
 
 ## Python implementation mapping
 
-Authoritative implementation: `swufe_bridge/wrd_codec.py` (landed in M1).
+Authoritative implementation: `bridges/python/swufe_bridge/wrd_codec.py` (landed in M1).
 
 ```python
 class WrdCodec:
@@ -117,8 +117,8 @@ class WrdCodec:
 - `key` / `iv` accept `str` (encoded as UTF-8) or `bytes` and must be 16 bytes long; the defaults come from the module constants `DEFAULT_KEY` / `DEFAULT_IV` / `DEFAULT_WEBVPN_HOST`.
 - AES implementation: `cryptography`'s `Cipher(algorithms.AES(key), CFB(iv))` (i.e. CFB128, equivalent to the prototype's `segment_size=128`; TC-A02 is the gate vector); pycryptodome is not used (see [dependency-policy.md](../development/dependency-policy.md)).
 - Errors uniformly raise `WrdCodecError` (a `ValueError` subclass), with messages kept from the prototype: `WRD AES-128 key must be 16 bytes`, `WRD AES-128 IV must be 16 bytes`, `unsupported scheme: ...`, `missing hostname`, `host token too short or not hex`, `invalid WebVPN path`, `WebVPN path missing scheme or host token`, `bad scheme token: ...`; in addition, when the bytes decrypted from a token are not valid UTF-8, a `WrdCodecError` is raised too (the usual outcome of a wrong key).
-- CLI: `uv run python -m swufe_bridge.wrd_codec encode <ordinary-url>` / `decode <webvpn-url>` (optional `--key` / `--iv` / `--webvpn-host`; on failure it prints `error: <message>` and returns `2`).
-- Tests: `tests/l0/test_wrd_codec.py` (TC-A01..TC-A05 plus the error branches).
+- CLI: `uv run --directory bridges/python python -m swufe_bridge.wrd_codec encode <ordinary-url>` / `decode <webvpn-url>` (optional `--key` / `--iv` / `--webvpn-host`; on failure it prints `error: <message>` and returns `2`).
+- Tests: `bridges/python/tests/l0/test_wrd_codec.py` (TC-A01..TC-A05 plus the error branches).
 
 ## Errors and boundaries
 

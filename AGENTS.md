@@ -20,10 +20,12 @@ Status:           Phase 1 已交付（M1 桥核心 / M2 桌面编排 / M3 体验
                   教务浏览器验收（2026-09-21 修复 KI-011 后复验 TC-G01/G02 通过，见 ADR-0007）；Spec 001 为
                   `Implemented`。未完成：Windows 侧真机项延期（KI-001）、KI-013（TUN 干扰）/KI-014（CAS 主题资源被
                   服务端截断）未决，故未到 `Verified`（KI-007 的 CA 自动安装已修复，见 ADR-0008）
-Primary language: Python 3（bridge sidecar/Addon、WRD codec，见 `swufe_bridge/`）+ TypeScript（Electron 应用，M2 起）；
+Primary language: Python 3（bridge sidecar/Addon、WRD codec，见 `bridges/python/swufe_bridge/`）+ TypeScript（Electron 应用，M2 起）；
                   文档（`docs/` + `specs/`）与 Node 文档检查脚本是主体
-Repository type:  Documentation-first（docs/ + specs/）+ 实现（Python 桥 `swufe_bridge/`、Electron 应用 `app/`、
-                  `tests/`）+ Node 文档检查脚本
+Repository type:  Documentation-first（docs/ + specs/）+ 实现（Python 桥 `bridges/python/`、Electron 应用 `apps/desktop/`）
+                  + Node 文档检查脚本
+Layout:           Monorepo：`apps/` 每个应用一个目录（现为 `desktop/`）、`bridges/` 每个桥实现一个目录（现为 `python/`）；
+                  布局决策见 ADR-0009（docs/architecture/adr/ADR-0009-monorepo-layout.md）
 Owner:            cherrchen
 ```
 
@@ -43,6 +45,7 @@ Owner:            cherrchen
 | 文档规则与语言要求 | [docs/development/documentation-rules.md](docs/development/documentation-rules.md) |
 | Agent 规则与工作流 | 本文件 + [docs/agent/](docs/agent/README.md) |
 | 验证与完成标准 | [docs/verification/](docs/verification/README.md) |
+| 仓库目录布局（`apps/` + `bridges/`） | [ADR-0009](docs/architecture/adr/ADR-0009-monorepo-layout.md) |
 | 长期计划 | [docs/planning/roadmap.md](docs/planning/roadmap.md) |
 
 **如果一个事实不在上表中，它就不是 Source of Truth。** 不要在没有出处的情况下把它当成项目事实。

@@ -48,31 +48,31 @@ Wrap the bridge in the Electron app so the app performs the "log in → start br
 
 | Category | Contents |
 | ---- | ---- |
-| Tooling | `app/package.json` + `app/package-lock.json` (dev: electron 44.4.3, typescript 5.7, tsx, esbuild, @types/node); `app/tsconfig.json` (Main, CommonJS) / `tsconfig.renderer.json` (Renderer, ESM) / `tsconfig.preload.json` (preload type check); `app/scripts/run-unit-tests.mjs` (cross-platform test entry); `app/README.md` |
-| Main process | `app/src/main/`: `index.ts` (composition root + single-instance lock + `--user-data-dir`), `windows.ts`, `ipc.ts` (15 contract methods + event broadcasts), `orchestrator.ts` (Proxy Orchestrator), `state-machine.ts`, `session-broker.ts`, `session-probe.ts`, `session-types.ts`, `sidecar.ts`, cert-manager assembly (`platform/index.ts`), `store.ts`, `constants.ts`, `exec.ts`, `python.ts`, `paths.ts`, `shutdown.ts` |
-| Platform adapters | `app/src/main/platform/`: `parse.ts` (pure parsers), `ca-files.ts`, `darwin/system-proxy.ts` (`networksetup`), `darwin/cert.ts` (`security` + osascript privilege escalation), `win32/system-proxy.ts` (WinINET registry), `win32/cert.ts` (`certutil -user`), `index.ts` (platform branching + process enumeration) |
-| Renderer | `app/src/preload/index.ts` (contextBridge), `app/src/renderer/renderer.ts`, `app/static/index.html`, `app/static/styles.css`, `app/src/shared/{types,global.d.ts}` |
-| New Python entry | `swufe_bridge/ca.py` (`python -m swufe_bridge.ca --confdir <dir>`: generate the mitmproxy CA without starting the bridge; reuses CertStore, no home-grown PKI) |
-| Tests | `app/test/` (8 unit files + `helpers/fakes.ts`, all electron-free), `app/test/fixtures/portal-stub.mjs` (fake upstream), `app/test/fixtures/stub-ca-app.js` (verification entry with the CA precondition replaced); on the Python side `tests/l1/test_ca.py` and a cross-language config-key case in `tests/l0/test_config.py` |
-| CI | [.github/workflows/app-tests.yml](../../../.github/workflows/app-tests.yml): every PR / main push runs `npm ci --prefix app` + `typecheck` + `test:unit` (no Electron binary, no display needed) |
+| Tooling | `apps/desktop/package.json` + the root `pnpm-lock.yaml` (pnpm 11 workspace: `apps/desktop` is a workspace project and the lockfile exists only at the repository root; dev: electron 44.4.3, typescript 5.7, tsx, esbuild, @types/node); `apps/desktop/tsconfig.json` (Main, CommonJS) / `tsconfig.renderer.json` (Renderer, ESM) / `tsconfig.preload.json` (preload type check); `apps/desktop/scripts/run-unit-tests.mjs` (cross-platform test entry); `apps/desktop/README.md` |
+| Main process | `apps/desktop/src/main/`: `index.ts` (composition root + single-instance lock + `--user-data-dir`), `windows.ts`, `ipc.ts` (15 contract methods + event broadcasts), `orchestrator.ts` (Proxy Orchestrator), `state-machine.ts`, `session-broker.ts`, `session-probe.ts`, `session-types.ts`, `sidecar.ts`, cert-manager assembly (`platform/index.ts`), `store.ts`, `constants.ts`, `exec.ts`, `python.ts`, `paths.ts`, `shutdown.ts` |
+| Platform adapters | `apps/desktop/src/main/platform/`: `parse.ts` (pure parsers), `ca-files.ts`, `darwin/system-proxy.ts` (`networksetup`), `darwin/cert.ts` (`security` + osascript privilege escalation), `win32/system-proxy.ts` (WinINET registry), `win32/cert.ts` (`certutil -user`), `index.ts` (platform branching + process enumeration) |
+| Renderer | `apps/desktop/src/preload/index.ts` (contextBridge), `apps/desktop/src/renderer/renderer.ts`, `apps/desktop/static/index.html`, `apps/desktop/static/styles.css`, `apps/desktop/src/shared/{types,global.d.ts}` |
+| New Python entry | `bridges/python/swufe_bridge/ca.py` (`python -m swufe_bridge.ca --confdir <dir>`: generate the mitmproxy CA without starting the bridge; reuses CertStore, no home-grown PKI) |
+| Tests | `apps/desktop/test/` (8 unit files + `helpers/fakes.ts`, all electron-free), `apps/desktop/test/fixtures/portal-stub.mjs` (fake upstream), `apps/desktop/test/fixtures/stub-ca-app.js` (verification entry with the CA precondition replaced); on the Python side `bridges/python/tests/l1/test_ca.py` and a cross-language config-key case in `bridges/python/tests/l0/test_config.py` |
+| CI | [.github/workflows/app-tests.yml](../../../.github/workflows/app-tests.yml): every PR / main push runs `pnpm install --frozen-lockfile` + `typecheck` + `test:unit` (no Electron binary, no display needed) |
 
 ### Verification commands and results (2026-09-21)
 
 | Command | Result | Note |
 | ---- | ---- | ---- |
-| `uv run pytest tests/l0 -q` | `75 passed` | M1 74 + 1 cross-language config key |
-| `uv run pytest tests/l1 -q` | `79 passed` | M1 74 + 5 in `tests/l1/test_ca.py` |
-| `uv run pytest tests/l2 -q` | `6 passed` | unchanged from M1 |
-| `uv run pytest -q` | `160 passed` | L0+L1+L2 |
-| `npm --prefix app run typecheck` | no error | all three tsconfigs (Main / Renderer / preload) |
-| `npm --prefix app run test:unit` | `55 passed` | state machine, proxy/cert/process parsers, sidecar control lines, probe classification, AppStore, debug relay, orchestrator |
-| `npm --prefix app run build` | passed | `dist/main` (CommonJS) + `dist/renderer` (ESM) + `dist/preload/index.js` (esbuild single-file bundle) |
-| `npm run docs:check` | `0 error(s), 0 warning(s)` | links + bilingual pairs + spec structure |
-| `npm run typecheck` | no error | root documentation check scripts |
+| `uv run --directory bridges/python pytest tests/l0 -q` | `75 passed` | M1 74 + 1 cross-language config key |
+| `uv run --directory bridges/python pytest tests/l1 -q` | `79 passed` | M1 74 + 5 in `bridges/python/tests/l1/test_ca.py` |
+| `uv run --directory bridges/python pytest tests/l2 -q` | `6 passed` | unchanged from M1 |
+| `uv run --directory bridges/python pytest -q` | `160 passed` | L0+L1+L2 |
+| `pnpm --filter swufe-webvpn-bridge run typecheck` | no error | all three tsconfigs (Main / Renderer / preload) |
+| `pnpm --filter swufe-webvpn-bridge run test:unit` | `55 passed` | state machine, proxy/cert/process parsers, sidecar control lines, probe classification, AppStore, debug relay, orchestrator |
+| `pnpm --filter swufe-webvpn-bridge run build` | passed | `dist/main` (CommonJS) + `dist/renderer` (ESM) + `dist/preload/index.js` (esbuild single-file bundle) |
+| `pnpm run docs:check` | `0 error(s), 0 warning(s)` | links + bilingual pairs + spec structure |
+| `pnpm run typecheck` | no error | root documentation check scripts |
 
 ### End-to-end verification (real macOS machine)
 
-**A. The real app (`npm --prefix app start`, `--user-data-dir=/tmp/m2-e2e`, driven over CDP)**
+**A. The real app (`pnpm start`, `--user-data-dir=/tmp/m2-e2e`, driven over CDP)**
 
 ```text
 1. Start: status bar "未登录", bridge switch disabled, certificate "未安装", system proxy "未由本 App 设置"
@@ -86,12 +86,12 @@ Wrap the bridge in the Electron app so the app performs the "log in → start br
 5. Launching a second instance ⇒ exits immediately (0s, exit code 0) while the first keeps running (single-instance lock)
 ```
 
-**B. Verification entry with the CA precondition replaced (`app/test/fixtures/stub-ca-app.js`; everything else real: real `networksetup`, real sidecar, real IPC/preload/renderer)**
+**B. Verification entry with the CA precondition replaced (`apps/desktop/test/fixtures/stub-ca-app.js`; everything else real: real `networksetup`, real sidecar, real IPC/preload/renderer)**
 
 ```text
-$ node app/test/fixtures/portal-stub.mjs --port 19080 --mode ok &
+$ node apps/desktop/test/fixtures/portal-stub.mjs --port 19080 --mode ok &
 $ SWUFE_VERIFY_USER_DATA=/tmp/m2-e2e SWUFE_VERIFY_CDP_PORT=9223 SWUFE_PROBE_INTERVAL_MS=2000 \
-    app/node_modules/.bin/electron app/test/fixtures/stub-ca-app.js
+    apps/desktop/node_modules/.bin/electron apps/desktop/test/fixtures/stub-ca-app.js
 
 login ⇒ start bridge:
   swufe-ready {...}                     # sidecar ready (single-line JSON on stderr)
@@ -119,7 +119,7 @@ quit cleanup (closing the main window): swufe-quit 开始退出清理（before-q
   system proxy Enabled: No; no sidecar process; config.json `systemProxyManagedByApp=false`
   (quitting while the UI is in the `error` state — e.g. `CA_MISSING` — cleans up as well; that path once
   exposed an illegal `error → idle → stopping` transition, now fixed with the regression test
-  `app/test/orchestrator.test.ts`)
+  `apps/desktop/test/orchestrator.test.ts`)
 
 proxy conflict (TC-C01): first `networksetup -setwebproxy Wi-Fi 127.0.0.1 7890 && -setwebproxystate Wi-Fi on`, then start
   modal "检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。"

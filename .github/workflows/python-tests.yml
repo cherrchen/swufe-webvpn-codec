@@ -29,9 +29,12 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+          cache-dependency-glob: bridges/python/uv.lock
 
       - name: Install dependencies
+        working-directory: bridges/python
         run: uv sync --frozen
 
       - name: Run L0 tests
+        working-directory: bridges/python
         run: uv run pytest tests/l0 -q

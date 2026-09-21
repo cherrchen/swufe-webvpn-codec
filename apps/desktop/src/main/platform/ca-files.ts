@@ -23,8 +23,8 @@ export function caPaths(confdir: string): CaFiles {
 }
 
 /** Idempotent: `python -m swufe_bridge.ca --confdir <dir>`; returns the PEM cert path. */
-export async function ensureCaFiles(confdir: string, repoRoot: string): Promise<string> {
-  const python = resolvePythonCommand(repoRoot)
+export async function ensureCaFiles(confdir: string, bridgeRoot: string): Promise<string> {
+  const python = resolvePythonCommand(bridgeRoot)
   const result = await run(python.command, [...python.args, '-m', 'swufe_bridge.ca', '--confdir', confdir])
   if (result.code !== 0) {
     const reason = result.stderr.trim().split('\n').filter(Boolean).at(-1) ?? `退出码 ${result.code}`

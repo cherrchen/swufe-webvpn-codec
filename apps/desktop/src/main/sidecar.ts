@@ -31,7 +31,8 @@ export interface Sidecar {
 }
 
 export interface SidecarOptions {
-  repoRoot: string
+  /** Python bridge project root (`<repo>/bridges/python`). */
+  bridgeRoot: string
   userDataDir: string
   port: number
 }
@@ -185,7 +186,7 @@ export class SidecarProcess implements Sidecar {
   }
 
   async start(): Promise<void> {
-    const python = resolvePythonCommand(this.options.repoRoot)
+    const python = resolvePythonCommand(this.options.bridgeRoot)
     const args = [
       ...python.args,
       '-m',
@@ -198,7 +199,7 @@ export class SidecarProcess implements Sidecar {
       join(this.options.userDataDir, CONFDIR_NAME),
     ]
     const child = spawn(python.command, args, {
-      cwd: this.options.repoRoot,
+      cwd: this.options.bridgeRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     this.child = child

@@ -49,7 +49,7 @@ Measured additions this round: **the TUN / virtual-interface mode of any other p
 
 **Scope**: fixing `KI-011` (the gateway's client-side shim is incompatible with the transparent bridge) and re-verifying it on a real macOS machine; the fix is described in [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md) (gateway-owned namespaces passed straight through + bootstrap documents promoted to the gateway's native URL space).
 
-**Result**: TC-G01 passes (entry `http://jwxt.swufe.edu.cn/` → bridge log `detail=promoted` → the gateway-native home page renders in full), TC-G02 passes (the in-site "Student Grade Query" is interactive and links do not jump away); non-jwxt hosts (`www.swufe.edu.cn`) stay in the ordinary URL space; `/wengine-vpn/js/main.js` through the bridge is 200 / 376 922 B (404 through the bridge before the fix); `lib.swufe.edu.cn` is promoted as well because it too is a bootstrap page (expected). Regression: `uv run pytest -q` = 198 passed, app unit tests 71 passed, `docs:check` 0 error / 0 warning, and after stopping the bridge neither the system proxy nor any process is left behind.
+**Result**: TC-G01 passes (entry `http://jwxt.swufe.edu.cn/` → bridge log `detail=promoted` → the gateway-native home page renders in full), TC-G02 passes (the in-site "Student Grade Query" is interactive and links do not jump away); non-jwxt hosts (`www.swufe.edu.cn`) stay in the ordinary URL space; `/wengine-vpn/js/main.js` through the bridge is 200 / 376 922 B (404 through the bridge before the fix); `lib.swufe.edu.cn` is promoted as well because it too is a bootstrap page (expected). Regression: `uv run --directory bridges/python pytest -q` = 198 passed, app unit tests 71 passed, `docs:check` 0 error / 0 warning, and after stopping the bridge neither the system proxy nor any process is left behind.
 
 **Evidence**: the "M5 (`KI-011` fix) run record" in [specs/001-phase1-local-bridge/verification.md](../../../specs/001-phase1-local-bridge/verification.md); redacted snapshot `specs/001-phase1-local-bridge/evidence/acceptance-macos/acceptance-darwin-20260921-154657.md`.
 
@@ -61,14 +61,14 @@ Measured additions this round: **the TUN / virtual-interface mode of any other p
 
 **Run date**: 2026-09-21 (macOS local machine, `darwin 24.6.0`, app started with `--user-data-dir=/tmp/m4-acceptance` and `SWUFE_PROBE_INTERVAL_MS=8000`).
 
-**Method**: the real app driven over CDP (`--remote-debugging-port=9222`); the decisive browser observations were made by hand by cherrchen (automated navigation wedged repeatedly in this environment). Both platforms share the redacted evidence collector `npm run acceptance:check` (T044).
+**Method**: the real app driven over CDP (`--remote-debugging-port=9222`); the decisive browser observations were made by hand by cherrchen (automated navigation wedged repeatedly in this environment). Both platforms share the redacted evidence collector `pnpm run acceptance:check` (T044).
 
 **Evidence**:
 - "M4 双平台验收执行手册" + "M4 结果表" + "M4 教务浏览器验收记录" + the M4 rows of "执行的命令与结果" in [specs/001-phase1-local-bridge/verification.md](../../../specs/001-phase1-local-bridge/verification.md);
 - redacted snapshots: `specs/001-phase1-local-bridge/evidence/acceptance-macos/` (7) and `evidence/kit-selfcheck/` (5, T044 self-check);
 - defect ledger: [known-issues.md](../../../specs/001-phase1-local-bridge/known-issues.md) (`KI-001`..`KI-013`).
 
-**Passing**: TC-D01/D02/D03/D04, TC-C01/C02/C03/C04, TC-E01 (via the app's own manual command)/E02/E03, TC-F01/F04, TC-G04, TC-H01/H02, TC-B05; `uv run pytest -q` = 190 passed, `npm --prefix app run test:unit` = 71 passed, both typechecks clean, `npm run docs:check` = 0 error / 0 warning.
+**Passing**: TC-D01/D02/D03/D04, TC-C01/C02/C03/C04, TC-E01 (via the app's own manual command)/E02/E03, TC-F01/F04, TC-G04, TC-H01/H02, TC-B05; `uv run --directory bridges/python pytest -q` = 190 passed, `pnpm --filter swufe-webvpn-bridge run test:unit` = 71 passed, both typechecks clean, `pnpm run docs:check` = 0 error / 0 warning.
 
 **Failing**: TC-G01 and TC-G02 (browser acceptance). Root cause (`KI-011`): this deployment's gateway injects a client-side shim into every HTML response (`__vpn_*` plus `<script src="/wengine-vpn/js/main.js">`) that expects the browser to live in the WebVPN URL space; the transparent bridge token-prefixes that relative path, so it 404s through the bridge (the gateway root serves it: 200 / 376,922B) - the home page stays blank and the real page renders but is not interactive. The three candidate fixes (serve gateway-owned paths without a token / strip the shim from HTML / accept operating the site in portal form) all change public contracts and need a cherrchen decision plus an ADR.
 

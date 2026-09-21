@@ -9,14 +9,14 @@
 | 项 | 值 |
 | --- | --- |
 | 阶段 | Phase 1：M1–M4 已交付，**macOS 侧验收全部通过（含教务浏览器验收）**——2026-09-21 `KI-011` 修复（[ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）后复验 TC-G01/TC-G02 通过；Spec 001 状态 `Implemented`。未完成：Windows 侧真机项延期（`KI-001`）、`KI-013`（TUN 干扰）/`KI-014`（CAS 主题资源被服务端截断）未决，故未到 `Verified`（`KI-007` 的 CA 自动安装已于 2026-09-21 修复，见 [ADR-0008](docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)；见 [verification.md](specs/001-phase1-local-bridge/verification.md)） |
-| 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)；含桥实现（[swufe_bridge/](swufe_bridge/wrd_codec.py)、[tests/](tests/l0/test_wrd_codec.py)）与桌面应用（[app/](app/README.md)） |
+| 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)；含桥实现（[bridges/python/](bridges/python/swufe_bridge/wrd_codec.py)、[tests](bridges/python/tests/l0/test_wrd_codec.py)）与桌面应用（[apps/desktop/](apps/desktop/README.md)） |
 | 第一期 Feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |
 | License | [MIT](LICENSE) |
 | 文档版本 | 1.0 |
 | 初始化日期 | 2026-09-20 |
 
-本仓库以**文档为主体**（`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程），并含 M1–M4 交付的实现（桥核心、桌面编排、体验打磨、验收修复）：桌面应用 `npm --prefix app start`（先 `npm --prefix app install`）；无桌面壳时也可用 `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` 直接起桥（见 [桥控制协议](docs/api/bridge-control-protocol.md)）。
+本仓库以**文档为主体**（`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程），并含 M1–M4 交付的实现（桥核心、桌面编排、体验打磨、验收修复）：桌面应用 `pnpm start`（先 `pnpm install`）；无桌面壳时也可用 `uv run --directory bridges/python python -m swufe_bridge.sidecar --config <bridge-config.json>` 直接起桥（见 [桥控制协议](docs/api/bridge-control-protocol.md)）。
 
 ## 1. 它解决什么问题
 
@@ -75,9 +75,10 @@ flowchart TD
 │   ├── verification/      #   验证策略与完成标准
 │   ├── security/  operations/  planning/
 │   └── archive/           #   归档的历史设计资料（不是当前事实来源）
-├── swufe_bridge/          # M1 桥实现：WRD codec、allowlist、配置、响应反向改写、mitmproxy addon、sidecar 入口、CA 生成入口
-├── tests/                 #   L0/L1/L2 测试（codec/allowlist/config、addon 行为、真 sidecar + 假上游）
-├── app/                   # M2 桌面应用（Electron）：Main/preload/renderer、平台适配（系统代理/证书）、单元测试与验证 fixture
+├── apps/                  # 应用：每个应用一个目录
+│   └── desktop/           #   Electron 桌面应用（Main/preload/renderer、平台适配（系统代理/证书）、单元测试与验证 fixture）
+├── bridges/               # 桥实现：每个实现一个目录
+│   └── python/            #   Python 桥（WRD codec、allowlist、配置、响应反向改写、mitmproxy addon、sidecar 入口、CA 生成入口、L0/L1/L2 测试）
 ├── specs/                 # Layer 3：Feature Spec
 │   ├── 001-phase1-local-bridge/   # 第一期本机桥：spec/design/plan/tasks/verification
 │   └── _template/         #   Spec 模板骨架
@@ -87,6 +88,8 @@ flowchart TD
 ├── scripts/               # Layer 4：文档检查（Node.js + TypeScript）
 └── .github/               # CI、PR 模板、Issue 模板
 ```
+
+顶层布局（`apps/` 应用 + `bridges/` 桥实现）的决策见 [ADR-0009](docs/architecture/adr/ADR-0009-monorepo-layout.md)。
 
 ## 5. 新 Session / 新 Agent 从哪读起
 
@@ -115,16 +118,20 @@ docs/overview/project-overview.md
 ## 6. 本地校验
 
 ```bash
-npm install
-npm run docs:check   # 链接 + 双语配对 + spec 结构，一次跑完
+pnpm install          # 安装全部 workspace 项目（根 + apps/desktop）
+pnpm run docs:check   # 链接 + 双语配对 + spec 结构，一次跑完
 
-# 桌面应用（app/）：类型检查与单元测试
-npm --prefix app install
-npm --prefix app run typecheck
-npm --prefix app run test:unit
+# 桌面应用（apps/desktop/）：类型检查与单元测试
+pnpm --filter swufe-webvpn-bridge run typecheck
+pnpm --filter swufe-webvpn-bridge run test:unit
+
+# 桌面应用：构建与启动（根目录别名，等价于 apps/desktop/ 的 build / start）
+pnpm run build        # 编译 Main + Renderer + preload
+pnpm run dev          # build + 启动（pnpm start 同义）
+pnpm start --user-data-dir=/tmp/swufe-dev   # 参数原样传给 Electron
 ```
 
-单项命令：`npm run docs:links`、`npm run docs:i18n`、`npm run spec:check`、`npm run typecheck`（各自只读 Markdown / TypeScript，不构建应用）。
+单项命令：`pnpm run docs:links`、`pnpm run docs:i18n`、`pnpm run spec:check`、`pnpm run typecheck`（各自只读 Markdown / TypeScript，不构建应用）。
 
 CI 配置见 [.github/workflows/](.github/workflows)：`docs-check.yml`（文档检查）与 `python-tests.yml`（Python L0）在 `pull_request` 与 push 到 `main` 时执行；`app-tests.yml` 执行 App 的类型检查与单元测试。均不做部署与发布。
 

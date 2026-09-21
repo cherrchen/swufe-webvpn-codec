@@ -14,8 +14,8 @@
  * `redaction-self-check` section fails the run if any collected secret is present.
  *
  * Usage:
- *   npm run acceptance:check -- --out <dir> [--port 8080] [--host jwxt.swufe.edu.cn]
- *                               [--user-data-dir <dir>] [--save-body]
+ *   pnpm run acceptance:check --out <dir> [--port 8080] [--host jwxt.swufe.edu.cn]
+ *                             [--user-data-dir <dir>] [--save-body]
  */
 
 import { spawnSync } from 'node:child_process'
@@ -45,7 +45,7 @@ interface Options {
   saveBody: boolean
 }
 
-const USAGE = `用法: npm run acceptance:check -- --out <dir> [--port 8080] [--host jwxt.swufe.edu.cn] [--scheme https] [--user-data-dir <dir>] [--save-body]
+const USAGE = `用法: pnpm run acceptance:check --out <dir> [--port 8080] [--host jwxt.swufe.edu.cn] [--scheme https] [--user-data-dir <dir>] [--save-body]
 
   --out             必填：报告输出目录
   --port            本机桥端口（默认 8080）

@@ -51,6 +51,8 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0006](ADR-0006-local-capture-mode-and-mutual-exclusion.md) | mitmproxy local 模式做进程捕获，且与系统代理互斥 | Accepted | 2026-09-21 | — |
 | [ADR-0007](ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md) | 网关自有命名空间直通，且 bootstrap 文档升级到网关原生 URL 空间 | Accepted | 2026-09-21 | — |
 | [ADR-0008](ADR-0008-ca-trust-authorization-in-app-session.md) | CA 信任设置由应用进程写入（钥匙串写入保留提权） | Accepted | 2026-09-21 | — |
+| [ADR-0009](ADR-0009-monorepo-layout.md) | 仓库改为路径式 monorepo：应用入 apps/<app>、桥入 bridges/<bridge> | Accepted | 2026-09-21 | — |
+| [ADR-0010](ADR-0010-pnpm-workspaces.md) | Node 工具链切换到 pnpm 11 workspaces：单一锁文件与 workspace 脚本转发 | Accepted | 2026-09-21 | 取代 ADR-0009 备选表中「继续用 npm」一行的结论（ADR-0009 的布局决策本身仍有效） |
 
 ## 规则
 

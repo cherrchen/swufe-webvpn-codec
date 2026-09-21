@@ -15,7 +15,7 @@
 | ---- | ----------- | ----- |
 | Node.js | ≥ 22 (v24.18.0 verified locally) | Required by both the app (Electron) and the repository scripts (`scripts/`) |
 | `uv` | Any recent version | Creates the repository-root Python environment and runs the sidecar/CA entry points |
-| Python environment | `uv sync` executed at the repository root (produces `.venv/`) | The app starts the bridge with `<repo>/.venv/bin/python -m swufe_bridge.sidecar` by default |
+| Python environment | `uv sync --directory bridges/python` executed at the repository root (produces `bridges/python/.venv/`) | The app starts the bridge with `<repo>/bridges/python/.venv/bin/python -m swufe_bridge.sidecar` by default |
 | Platform | macOS or Windows | Linux is out of scope for Phase 1 |
 | Network | Reachable `https://webvpn.swufe.edu.cn` | The registrar host `jwxt.swufe.edu.cn` is not directly reachable off campus; WebVPN is required |
 | Proxy tooling | **TUN / virtual-interface mode of any other proxy tool must be off** (Clash, mihomo, sing-box, Stash, …) | Measured: TUN fake-ip DNS (`198.18.0.0/15`) makes upstream connections through the bridge hang; `PROXY_CONFLICT` only detects the system proxy, not TUN (see `KI-013`) |
@@ -24,29 +24,30 @@
 ## 2. First-time setup
 
 ```bash
-uv sync                        # repository root: creates .venv/ (sidecar, WRD codec, CA entry point)
-npm install --prefix app       # app/: Electron / TypeScript / esbuild / tsx
+uv sync --directory bridges/python   # creates bridges/python/.venv/ (sidecar, WRD codec, CA entry point)
+pnpm install                         # installs every workspace project (repository root + apps/desktop/: Electron / TypeScript / esbuild / tsx)
 ```
 
-- If a registry mirror skips package install scripts and `app/node_modules/electron/dist` is missing, run `node app/node_modules/electron/install.js` once.
-- Afterwards the daily command is just `npm --prefix app start` (it builds first, then launches).
+- `pnpm install` does not download the Electron binary: if `apps/desktop/node_modules/electron/dist` is missing, fetch it once with `node apps/desktop/node_modules/electron/install.js`.
+- Afterwards the daily command is just `pnpm start` (it builds first, then launches).
 
 ## 3. Starting
 
 ```bash
-npm --prefix app start                                        # default userData
-npm --prefix app start -- --user-data-dir=/tmp/swufe-dev      # isolated profile
+pnpm start                                        # default userData
+pnpm start --user-data-dir=/tmp/swufe-dev         # isolated profile
 ```
 
-- `npm start` = `npm run build && electron .`; everything after `--` is passed to Electron unchanged.
+- `pnpm start` = `pnpm run build && electron .` (the root script forwards to `apps/desktop`); everything after it is passed to Electron unchanged.
+  **Never write `pnpm run start -- --user-data-dir=…`**: pnpm inserts its own `--` separator, so Electron receives a literal `--` and stops parsing Chromium switches (e.g. `--remote-debugging-port` silently does nothing).
 - An isolated profile (`--user-data-dir`) keeps day-to-day configuration clean and is recommended for acceptance and re-runs; it isolates `config.json`, `bridge-config.json`, the `mitmproxy/` CA and the login partition together.
-- Environment variables (equivalent overrides, see [app/README.md](../../app/README.md)):
+- Environment variables (equivalent overrides, see [apps/desktop/README.md](../../apps/desktop/README.md)):
 
 | Variable | Effect |
 | -------- | ------ |
 | `SWUFE_USER_DATA_DIR` | Equivalent to `--user-data-dir <dir>` |
-| `SWUFE_REPO_ROOT` | Overrides the repository root (defaults to the app directory's parent) |
-| `SWUFE_PYTHON` | Interpreter for the sidecar / CA entry point (default `<repo>/.venv/bin/python`, falling back to `uv run --project <repo> python`) |
+| `SWUFE_REPO_ROOT` | Overrides the repository root (defaults to two levels above the app directory, i.e. the repository root) |
+| `SWUFE_PYTHON` | Interpreter for the sidecar / CA entry point (default `<repo>/bridges/python/.venv/bin/python`, falling back to `uv run --project <repo>/bridges/python python`) |
 | `SWUFE_PROBE_INTERVAL_MS` | Session-expiry probe interval (default 30000ms; acceptance runs may lower it, e.g. 8000) |
 
 ## 4. Operations that need administrator rights
@@ -62,7 +63,7 @@ npm --prefix app start -- --user-data-dir=/tmp/swufe-dev      # isolated profile
 ## 5. Verification and self-check
 
 ```bash
-npm run acceptance:check -- --out <dir> --user-data-dir <profile>
+pnpm run acceptance:check --out <dir> --user-data-dir <profile>
 ```
 
 - The script collects one redacted acceptance-evidence report (`<dir>/acceptance-<platform>-<timestamp>.md`): OS/version, key fields of `config.json` and `bridge-config.json`, CA files and trust store, the system-proxy state per network service, whether the bridge port is listening, proxied-versus-direct curl control requests, and leftover sidecar processes.
@@ -80,7 +81,7 @@ npm run acceptance:check -- --out <dir> --user-data-dir <profile>
 | Bridge start refused with `ALLOWLIST_EMPTY` | Empty allowlist | Add at least one host, or tick `*.swufe.edu.cn` |
 | Status bar shows "error" with `BRIDGE_CRASH` | The sidecar exited abnormally, or `bridgePort` is taken | Turn on "debug log" to read the bridge output; if the port is taken, change `settings.bridgePort` in `<userData>/config.json` and retry |
 | `swufe-error CONFIG_INVALID` | Invalid runtime config (e.g. a comma inside `capture.processes`) | Fix the corresponding setting in `<userData>/config.json` and switch the bridge on again |
-| The sidecar does not start / python not found | The repository root was never `uv sync`ed, or `SWUFE_PYTHON` points at a missing interpreter | Run `uv sync` at the repository root, or fix `SWUFE_PYTHON` |
+| The sidecar does not start / python not found | `bridges/python` was never synced, or `SWUFE_PYTHON` points at a missing interpreter | Run `uv sync --directory bridges/python` from the repository root, or fix `SWUFE_PYTHON` |
 | The system proxy still points at the bridge after quitting | The previous run ended with `kill -TERM` / `kill -9`, so the JS cleanup never ran (recorded as a known issue) | The next launch clears it via `recoverOnLaunch()` using the "set by this app" marker; manually: `networksetup -setwebproxystate <service> off` (Windows: set `ProxyEnable` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` to 0) |
 | The UI reports "process capture: failed" | Network extension not authorized / authorization timed out (macOS) | Allow it under System Settings → General → Login Items & Extensions as the UI explains, then click "retry". A capture failure does not affect the system-proxy path (the bridge stays "running") |
 
@@ -110,7 +111,7 @@ npm run acceptance:check -- --out <dir> --user-data-dir <profile>
 ## 9. Related
 
 - Configuration keys and locations ⇒ section 2 of [README.md](README.md)
-- App-side commands and limits ⇒ [app/README.md](../../app/README.md)
+- App-side commands and limits ⇒ [apps/desktop/README.md](../../apps/desktop/README.md)
 - Bridge control protocol (`swufe-ready` / `swufe-error` / `swufe-debug` / `swufe-capture`) ⇒ [bridge-control-protocol.md](../api/bridge-control-protocol.md)
 - Security constraints (cookies, CA private key, permissions) ⇒ [security/README.md](../security/README.md)
 - Acceptance procedure and result table ⇒ [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)

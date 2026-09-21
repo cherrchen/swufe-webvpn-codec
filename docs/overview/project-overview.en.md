@@ -51,8 +51,8 @@ Out of scope: NG-001..NG-008, see goals-and-non-goals.md
 ## Delivery shape
 
 ```text
-Repository type:  Documentation-first (docs/ + specs/) + the M1 bridge implementation (swufe_bridge/, tests/)
-Primary language: Python 3 (bridge sidecar / addon, authoritative WRD codec, see swufe_bridge/)
+Repository type:  Documentation-first (docs/ + specs/) + the M1 bridge implementation (bridges/python/swufe_bridge/, bridges/python/tests/)
+Primary language: Python 3 (bridge sidecar / addon, authoritative WRD codec, see bridges/python/swufe_bridge/)
                   + TypeScript (Electron app, IPC declared in TS; from M2)
                   Docs are Markdown plus Node documentation checks
 License:          MIT

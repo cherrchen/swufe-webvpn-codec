@@ -55,7 +55,7 @@ Triggers are defined only in [docs/architecture/adr/README.md](docs/architecture
 ## 6. Local checks before submitting
 
 ```bash
-npm run docs:check
+pnpm run docs:check
 ```
 
 Branch naming and commit message conventions are project-local and defined in [docs/development/development-workflow.md](docs/development/development-workflow.md).

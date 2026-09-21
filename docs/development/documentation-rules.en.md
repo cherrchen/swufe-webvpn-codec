@@ -73,7 +73,7 @@ Every diagram needs prose around it, and the prose alone must carry the conclusi
 ## 6. Link rules
 
 - Use relative paths for in-repository links (`../architecture/overview.md`);
-- Links must point at files that exist; enforced by `npm run docs:links`;
+- Links must point at files that exist; enforced by `pnpm run docs:links`;
 - Prefer linking to a concrete file rather than a directory (directory links break more often on refactors);
 - External material uses a full URL plus a note on the title and why it is useful.
 
@@ -114,7 +114,7 @@ A coding agent must not:
 ## 10. Validation
 
 ```bash
-npm run docs:check   # links + bilingual pairs + spec structure
+pnpm run docs:check   # links + bilingual pairs + spec structure
 ```
 
 Rules and checks map one-to-one: adding a check requires updating this file.

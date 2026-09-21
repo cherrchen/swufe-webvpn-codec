@@ -21,7 +21,7 @@
 1. **Requirement coverage**：逐条对照 `specs/<id>/spec.md` 的 Acceptance Criteria 与 `verification.md` 映射，检查是否都有对应验证。
 2. **Tests**：运行相关测试；无法运行时说明原因与替代验证方式。
 3. **Lint / 类型 / 构建**：在项目已配置的前提下运行；未配置则说明。
-4. **文档一致性**：运行 `npm run docs:check`；并逐项检查 [Documentation Update Matrix](../../../docs/development/documentation-rules.md)。
+4. **文档一致性**：运行 `pnpm run docs:check`；并逐项检查 [Documentation Update Matrix](../../../docs/development/documentation-rules.md)。
 5. **Backward compatibility**：接口、数据、配置、行为四个维度是否受影响；破坏性变更是否已声明。
 6. **Security implications**：信任边界、输入校验、认证授权、密钥、敏感数据、依赖风险（对照 [security/](../../../docs/security/README.md)）。
 7. **回归确认**（Bug 修复）：原复现步骤是否不再触发；是否补了可复现的验证。

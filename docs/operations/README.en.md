@@ -51,16 +51,16 @@ Artifact:      Electron installer (macOS / Windows) + mitmproxy sidecar
 Method:        The user installs and runs it locally; the app launches the
                mitmproxy sidecar as a child process on startup
                Development equivalent: local Node + Python venv + mitmdump
-               (from M2: run `uv sync` in the repository root, then
-               `npm --prefix app install && npm --prefix app start`; the app spawns the sidecar via
-               `<repo>/.venv/bin/python -m swufe_bridge.sidecar`, see [app/README.md](../../app/README.md);
+               (from M2: run `uv sync --directory bridges/python` from the repository root, then
+               `pnpm install && pnpm start`; the app spawns the sidecar via
+               `<repo>/bridges/python/.venv/bin/python -m swufe_bridge.sidecar`, see [apps/desktop/README.md](../../apps/desktop/README.md);
                the full procedure - prerequisites / start / administrator operations / self-check /
                troubleshooting / reset - is in [development-run.md](development-run.md))
 Distribution:  TBD - embedded Python runtime versus an external mitmproxy
                executable is not yet chosen (size/signing trade-off, see
                ADR-0002, decided during implementation)
 Release flow:  TBD - there is no release pipeline yet; the current CI runs
-               documentation checks (npm run docs:check) and the Python L0
+               documentation checks (pnpm run docs:check) and the Python L0
                tests (.github/workflows/python-tests.yml); packaging and
                distribution are not implemented yet (tasks T041/T042, phase 7
                and unbound to any milestone)

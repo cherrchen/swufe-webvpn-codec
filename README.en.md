@@ -9,14 +9,14 @@
 | Item | Value |
 | --- | --- |
 | Stage | Phase 1: M1–M4 delivered and **the macOS-side acceptance, including the academic-affairs browser acceptance, fully passes** — after the `KI-011` fix ([ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)) the 2026-09-21 re-verification passes TC-G01/TC-G02; spec 001 is `Implemented`. Not done: the Windows real-machine items are deferred (`KI-001`) and `KI-013` (TUN interference) and `KI-014` (CAS theme assets truncated by the server) are unresolved, so the spec is not `Verified` yet (`KI-007`, the automatic CA install, was fixed on 2026-09-21 — see [ADR-0008](docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.en.md); see [verification.md](specs/001-phase1-local-bridge/verification.md)) |
-| Repository type | Documentation-first: [docs/](docs/README.en.md) + [specs/](specs/README.en.md); plus the bridge implementation ([swufe_bridge/](swufe_bridge/wrd_codec.py), [tests/](tests/l0/test_wrd_codec.py)) and the desktop app ([app/](app/README.md)) |
+| Repository type | Documentation-first: [docs/](docs/README.en.md) + [specs/](specs/README.en.md); plus the bridge implementation ([bridges/python/](bridges/python/swufe_bridge/wrd_codec.py), [tests](bridges/python/tests/l0/test_wrd_codec.py)) and the desktop app ([apps/desktop/](apps/desktop/README.md)) |
 | Phase 1 feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |
 | License | [MIT](LICENSE) |
 | Documentation version | 1.0 |
 | Initialised | 2026-09-20 |
 
-The repository is **documentation-first** (`docs/` holds long-lived project facts, `specs/` records individual features end to end) and already contains the M1–M4 implementation (bridge core, desktop orchestration, experience polish and the acceptance fixes): without any desktop shell you can start the bridge with `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` (see the [bridge control protocol](docs/api/bridge-control-protocol.en.md)).
+The repository is **documentation-first** (`docs/` holds long-lived project facts, `specs/` records individual features end to end) and already contains the M1–M4 implementation (bridge core, desktop orchestration, experience polish and the acceptance fixes): without any desktop shell you can start the bridge with `uv run --directory bridges/python python -m swufe_bridge.sidecar --config <bridge-config.json>` (see the [bridge control protocol](docs/api/bridge-control-protocol.en.md)).
 
 ## 1. What problem it solves
 
@@ -75,9 +75,10 @@ flowchart TD
 │   ├── verification/      #   verification strategy and definition of done
 │   ├── security/  operations/  planning/
 │   └── archive/           #   archived historical design material (not a source of truth)
-├── swufe_bridge/          # M1 bridge implementation: WRD codec, allowlist, config, response reverse rewriting, mitmproxy addon, sidecar entry, CA generation entry
-├── app/                   # M2 desktop app (Electron): Main/preload/renderer, platform adapters (system proxy/certificate), unit tests and verification fixtures
-├── tests/                 #   L0/L1/L2 tests (codec/allowlist/config, addon behaviour, real sidecar + fake upstream)
+├── apps/                  # applications: one directory per app
+│   └── desktop/           #   Electron desktop app (Main/preload/renderer, platform adapters (system proxy/certificate), unit tests and verification fixtures)
+├── bridges/               # bridge implementations: one directory per implementation
+│   └── python/            #   Python bridge (WRD codec, allowlist, config, response reverse rewriting, mitmproxy addon, sidecar entry, CA generation entry, L0/L1/L2 tests)
 ├── specs/                 # Layer 3: feature specs
 │   ├── 001-phase1-local-bridge/   # Phase 1 local bridge: spec/design/plan/tasks/verification
 │   └── _template/         #   spec skeleton
@@ -87,6 +88,8 @@ flowchart TD
 ├── scripts/               # Layer 4: documentation checks (Node.js + TypeScript)
 └── .github/               # CI, PR template, issue templates
 ```
+
+The top-level layout (`apps/` applications + `bridges/` bridge implementations) is decided in [ADR-0009](docs/architecture/adr/ADR-0009-monorepo-layout.en.md).
 
 ## 5. Where a new session / agent starts
 
@@ -115,16 +118,20 @@ Read per task class (docs/agent/context-routing.en.md)
 ## 6. Local checks
 
 ```bash
-npm install
-npm run docs:check   # links + bilingual pairs + spec structure in one run
+pnpm install          # installs every workspace project (root + apps/desktop)
+pnpm run docs:check   # links + bilingual pairs + spec structure in one run
 
-# Desktop app (app/): type check and unit tests
-npm --prefix app install
-npm --prefix app run typecheck
-npm --prefix app run test:unit
+# Desktop app (apps/desktop/): type check and unit tests
+pnpm --filter swufe-webvpn-bridge run typecheck
+pnpm --filter swufe-webvpn-bridge run test:unit
+
+# Desktop app: build and launch (root aliases for apps/desktop/'s build / start)
+pnpm run build        # compile Main + Renderer + preload
+pnpm run dev          # build + launch (same as pnpm start)
+pnpm start --user-data-dir=/tmp/swufe-dev   # arguments go to Electron unchanged
 ```
 
-Individual commands: `npm run docs:links`, `npm run docs:i18n`, `npm run spec:check`, `npm run typecheck` (each reads Markdown / TypeScript only; none of them builds the application).
+Individual commands: `pnpm run docs:links`, `pnpm run docs:i18n`, `pnpm run spec:check`, `pnpm run typecheck` (each reads Markdown / TypeScript only; none of them builds the application).
 
 CI lives in [.github/workflows/](.github/workflows): `docs-check.yml` (documentation checks) and `python-tests.yml` (Python L0) run on `pull_request` and pushes to `main`, and `app-tests.yml` type-checks the app and runs its unit tests. None of them deploy or release.
 

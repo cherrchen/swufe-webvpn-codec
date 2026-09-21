@@ -71,7 +71,7 @@ flowchart LR
 ## 6. 链接规则
 
 - 使用相对路径链接仓库内文件（`../architecture/overview.md`）；
-- 链接必须指向真实存在的文件；由 `npm run docs:links` 检查；
+- 链接必须指向真实存在的文件；由 `pnpm run docs:links` 检查；
 - 尽量链接到具体文件而非目录（目录链接在重构时更易失效）；
 - 外部资料使用完整 URL，并在旁边注明资料标题与访问价值。
 
@@ -112,7 +112,7 @@ Coding Agent 不得：
 ## 10. 校验
 
 ```bash
-npm run docs:check   # 链接 + 双语配对 + spec 结构
+pnpm run docs:check   # 链接 + 双语配对 + spec 结构
 ```
 
 规则与检查保持一一对应：新增检查项时，必须同步更新本文件。

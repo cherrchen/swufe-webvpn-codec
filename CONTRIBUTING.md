@@ -55,7 +55,7 @@ Bug:      Bug → Reproduce → Root Cause → Fix → Test → Documentation Im
 ## 6. 提交前本地检查
 
 ```bash
-npm run docs:check
+pnpm run docs:check
 ```
 
 分支命名与提交信息约定属于项目本地配置，定义在 [docs/development/development-workflow.md](docs/development/development-workflow.md)。

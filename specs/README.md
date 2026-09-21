@@ -77,5 +77,5 @@ Draft → Approved → In Progress → Implemented → Verified → Archived
 ## 校验
 
 ```bash
-npm run spec:check   # 结构 + 必需章节
+pnpm run spec:check   # 结构 + 必需章节
 ```

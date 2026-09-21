@@ -15,7 +15,7 @@
 | -- | ---- | ---- |
 | Node.js | ≥ 22（本机实测 v24.18.0） | 应用（Electron）与仓库脚本（`scripts/`）都要求 |
 | `uv` | 任意近期版本 | 用于创建仓库根的 Python 环境并运行 sidecar/CA 入口 |
-| Python 环境 | 仓库根执行过 `uv sync`（生成 `.venv/`） | 应用默认用 `<repo>/.venv/bin/python -m swufe_bridge.sidecar` 拉起桥 |
+| Python 环境 | 仓库根执行过 `uv sync --directory bridges/python`（生成 `bridges/python/.venv/`） | 应用默认用 `<repo>/bridges/python/.venv/bin/python -m swufe_bridge.sidecar` 拉起桥 |
 | 平台 | macOS 或 Windows | Linux 不在第一期范围 |
 | 网络 | 能访问 `https://webvpn.swufe.edu.cn` | 教务 `jwxt.swufe.edu.cn` 在校园网外不可直连，必须经 WebVPN |
 | 代理工具 | **必须先关闭其它代理工具的 TUN / 虚拟网卡模式**（Clash、mihomo、sing-box、Stash 等） | 实测：TUN 的 fake-ip DNS（`198.18.0.0/15`）会让经桥的上游连接挂起；`PROXY_CONFLICT` 只检测系统代理，检测不到 TUN（见 `KI-013`） |
@@ -24,30 +24,31 @@
 ## 2. 首次准备
 
 ```bash
-uv sync                        # 仓库根：创建 .venv/（sidecar、WRD codec、CA 生成入口）
-npm install --prefix app       # app/：Electron / TypeScript / esbuild / tsx
+uv sync --directory bridges/python   # 创建 bridges/python/.venv/（sidecar、WRD codec、CA 生成入口）
+pnpm install                         # 安装全部 workspace 项目（仓库根 + apps/desktop/：Electron / TypeScript / esbuild / tsx）
 ```
 
-- 若镜像不执行包的 install 脚本、`app/node_modules/electron/dist` 缺失，手动补一次：
-  `node app/node_modules/electron/install.js`。
-- 之后日常只需 `npm --prefix app start`（它会先 build 再启动）。
+- `pnpm install` 不下载 Electron 二进制：若 `apps/desktop/node_modules/electron/dist` 缺失，手动补一次
+  `node apps/desktop/node_modules/electron/install.js`。
+- 之后日常只需 `pnpm start`（它会先 build 再启动）。
 
 ## 3. 启动
 
 ```bash
-npm --prefix app start                                        # 使用默认 userData
-npm --prefix app start -- --user-data-dir=/tmp/swufe-dev      # 使用隔离 profile
+pnpm start                                        # 使用默认 userData
+pnpm start --user-data-dir=/tmp/swufe-dev         # 使用隔离 profile
 ```
 
-- `npm start` = `npm run build && electron .`；`--` 之后的参数原样传给 Electron。
+- `pnpm start` = `pnpm run build && electron .`（仓库根脚本转发到 `apps/desktop`）；其后的参数原样传给 Electron。
+  **不要写成 `pnpm run start -- --user-data-dir=…`**：pnpm 会插入自己的 `--` 分隔符，Electron 收到字面 `--` 后不再解析 Chromium 开关（例如 `--remote-debugging-port` 会静默失效）。
 - 隔离 profile（`--user-data-dir`）不污染日常配置，验收与复验都推荐使用；它同时隔离 `config.json`、`bridge-config.json`、`mitmproxy/` CA 与登录分区。
-- 环境变量（等价覆盖，见 [app/README.md](../../app/README.md)）：
+- 环境变量（等价覆盖，见 [apps/desktop/README.md](../../apps/desktop/README.md)）：
 
 | 变量 | 作用 |
 | ---- | ---- |
 | `SWUFE_USER_DATA_DIR` | 等价于 `--user-data-dir <dir>` |
-| `SWUFE_REPO_ROOT` | 覆盖仓库根路径（默认取应用目录的上一级） |
-| `SWUFE_PYTHON` | 指定运行 sidecar / CA 生成入口的解释器（默认 `<repo>/.venv/bin/python`，缺失时回退 `uv run --project <repo> python`） |
+| `SWUFE_REPO_ROOT` | 覆盖仓库根路径（默认取应用目录上两级，即仓库根） |
+| `SWUFE_PYTHON` | 指定运行 sidecar / CA 生成入口的解释器（默认 `<repo>/bridges/python/.venv/bin/python`，缺失时回退 `uv run --project <repo>/bridges/python python`） |
 | `SWUFE_PROBE_INTERVAL_MS` | 会话过期探测间隔（默认 30000ms；验收时可调小，如 8000） |
 
 ## 4. 需要管理员权限的操作
@@ -63,7 +64,7 @@ npm --prefix app start -- --user-data-dir=/tmp/swufe-dev      # 使用隔离 pro
 ## 5. 验证与自检
 
 ```bash
-npm run acceptance:check -- --out <dir> --user-data-dir <profile>
+pnpm run acceptance:check --out <dir> --user-data-dir <profile>
 ```
 
 - 该脚本采集一份脱敏的验收证据报告（`<dir>/acceptance-<platform>-<时间戳>.md`）：OS/版本、`config.json` 与 `bridge-config.json` 的关键字段、CA 文件与系统信任库、每个网络服务的系统代理状态、桥端口是否在监听、经桥与直连的 curl 对照、sidecar 残留进程。
@@ -81,7 +82,7 @@ npm run acceptance:check -- --out <dir> --user-data-dir <profile>
 | 开桥被拒 + `ALLOWLIST_EMPTY` | allowlist 为空 | 添加至少一个主机，或勾选 `*.swufe.edu.cn` |
 | 状态条「错误」+ `BRIDGE_CRASH` | sidecar 异常退出，或 `bridgePort` 被占用 | 打开「调试日志」查看桥输出；若是端口占用，修改 `<userData>/config.json` 的 `settings.bridgePort` 后重试 |
 | `swufe-error CONFIG_INVALID` | 运行时配置非法（如 `capture.processes` 含逗号） | 修正 `<userData>/config.json` 的对应设置后重新开桥 |
-| sidecar 起不来 / 提示找不到 python | 仓库根未 `uv sync`，或 `SWUFE_PYTHON` 指向不存在的解释器 | 在仓库根执行 `uv sync`，或修正 `SWUFE_PYTHON` |
+| sidecar 起不来 / 提示找不到 python | `bridges/python` 未执行过 `uv sync`，或 `SWUFE_PYTHON` 指向不存在的解释器 | 在仓库根执行 `uv sync --directory bridges/python`，或修正 `SWUFE_PYTHON` |
 | 关闭应用后系统代理仍指向本桥 | 上次以 `kill -TERM` / `kill -9` 结束，未触发 JS 清理（已记入已知问题） | 下次启动时 `recoverOnLaunch()` 会依据「由本 App 设置」标记自动清除；也可手动 `networksetup -setwebproxystate <服务> off`（Windows：把 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyEnable` 置 0） |
 | 界面显示「进程捕获：启用失败」 | 系统扩展未授权 / 授权超时（macOS） | 按界面引导在「系统设置 → 通用 → 登录项与扩展」中允许，然后点「重试」。捕获失败不影响系统代理路径（桥仍为「桥接中」） |
 
@@ -111,7 +112,7 @@ npm run acceptance:check -- --out <dir> --user-data-dir <profile>
 ## 9. 相关
 
 - 配置项与存储位置 ⇒ [README.md](README.md) 第 2 节
-- 应用侧命令与限制 ⇒ [app/README.md](../../app/README.md)
+- 应用侧命令与限制 ⇒ [apps/desktop/README.md](../../apps/desktop/README.md)
 - 桥控制协议（`swufe-ready` / `swufe-error` / `swufe-debug` / `swufe-capture`）⇒ [bridge-control-protocol.md](../api/bridge-control-protocol.md)
 - 安全约束（Cookie、CA 私钥、权限）⇒ [security/README.md](../security/README.md)
 - 验收手册与结果表 ⇒ [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)

@@ -14,7 +14,7 @@
 | Layer | Goal | Scope | Cost | When it is mandatory | Where it runs |
 | ----- | ---- | ----- | ---- | -------------------- | ------------- |
 | L0 unit | behaviour and boundaries of WRD codec vectors and the allowlist matching function | no external deps | low | every PR (regression baseline) | CI |
-| App unit | Electron-side modules: bridge state machine, proxy/certificate/process output parsers, sidecar control-line parsing, session-probe classification, config store, Proxy Orchestrator orchestration (platform and process dependencies injected as fakes) | no Electron runtime dependency (`app/test` is entirely electron-free) | low | every PR (same batch as L0) | CI |
+| App unit | Electron-side modules: bridge state machine, proxy/certificate/process output parsers, sidecar control-line parsing, session-probe classification, config store, Proxy Orchestrator orchestration (platform and process dependencies injected as fakes) | no Electron runtime dependency (`apps/desktop/test` is entirely electron-free) | low | every PR (same batch as L0) | CI |
 | L1 component | request/response rewriting behaviour of the bridge addon against recorded traffic or a fake upstream | addon + fake upstream | medium | rewriting logic, cookie injection or routing changes | local |
 | L2 integration | end-to-end rewriting chain: `mitmdump` + curl through the local proxy against a fake WebVPN | sidecar + fake upstream + real proxy flow | medium | proxy set/clear, configuration delivery, rewriting chain changes | local |
 | L3 system | the full user path on real hardware: real WebVPN + browser acceptance of the registrar site | whole app (Electron + sidecar) | high | before a release; requires the tester's own account | manual (macOS / Windows test machines) |
@@ -22,7 +22,7 @@
 
 **Regression policy**: L0 runs on every PR; L1/L2 run locally when the relevant module changes; L3 runs before a release. The case set (TC-A01..TC-H02) and priorities live in the phase 1 spec's `verification.md`; the release gate is section 6 of [docs/verification/verification-strategy.md](../verification/verification-strategy.md).
 
-**How L3 is executed (from M4 on)**: follow the "M4 双平台验收执行手册" in [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) step by step (each step names the executor, command, expectation and where its evidence lands); both platforms share `npm run acceptance:check` to collect redacted evidence (OS / proxy / trust store / CA permissions / bridge liveness / curl controls plus `redaction-self-check`) and to fill the manual's result table. Prerequisite: **turn off the TUN / virtual-interface mode of any other proxy tool first** (`KI-013`); the actions that need a human (administrator password, CAS/MFA login, system-extension authorization) are performed by the tester. The login step may hit `KI-014` (CAS theme static assets truncated by the server, leaving the login window unstyled): reloading the login window is enough to continue, and this is external-service behaviour.
+**How L3 is executed (from M4 on)**: follow the "M4 双平台验收执行手册" in [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) step by step (each step names the executor, command, expectation and where its evidence lands); both platforms share `pnpm run acceptance:check` to collect redacted evidence (OS / proxy / trust store / CA permissions / bridge liveness / curl controls plus `redaction-self-check`) and to fill the manual's result table. Prerequisite: **turn off the TUN / virtual-interface mode of any other proxy tool first** (`KI-013`); the actions that need a human (administrator password, CAS/MFA login, system-extension authorization) are performed by the tester. The login step may hit `KI-014` (CAS theme static assets truncated by the server, leaving the login window unstyled): reloading the login window is enough to continue, and this is external-service behaviour.
 
 ## 2. Coverage expectations
 
@@ -41,19 +41,19 @@ Coverage is a reference metric, not the goal. **Must be covered**:
 - stopping the bridge, clearing the proxy and stopping capture on session expiry (TC-D03);
 - loop prevention: login traffic is never re-wrapped by WRD (TC-D04);
 - the critical redirects of response reverse rewriting (`Location` and in-registrar navigation, TC-F03 / TC-G02);
-- gateway-owned namespace passthrough (paths beginning with `/wengine-vpn/` or `/authserver/` take no token, are fetched from the gateway root and their responses are not reverse-rewritten) and the boundaries of the bootstrap promotion predicate (`text/html` + ≤ 8192 B + containing both markers; a large page carrying the same injection **must not** be promoted), covered in the L1 `tests/l1/test_addon_request.py` / `test_addon_response.py`, with one end-to-end case in the L2 `tests/l2/test_proxy_end_to_end.py` (ADR-0007);
-- process capture (REQ-003): mode-set derivation, rollback on failure and the no-retry semantics of `swufe_bridge.capture` in L0 unit tests (`tests/l0/test_capture.py`), and the addon's capture loop in an L1 test with injected fakes (`tests/l1/test_addon_capture.py` — automated tests **must never** really enable local mode); the real scope and "switching back to the system proxy stops it" belong to L3 manual verification (the tester has to confirm the OS authorisation prompt in person).
+- gateway-owned namespace passthrough (paths beginning with `/wengine-vpn/` or `/authserver/` take no token, are fetched from the gateway root and their responses are not reverse-rewritten) and the boundaries of the bootstrap promotion predicate (`text/html` + ≤ 8192 B + containing both markers; a large page carrying the same injection **must not** be promoted), covered in the L1 `bridges/python/tests/l1/test_addon_request.py` / `test_addon_response.py`, with one end-to-end case in the L2 `bridges/python/tests/l2/test_proxy_end_to_end.py` (ADR-0007);
+- process capture (REQ-003): mode-set derivation, rollback on failure and the no-retry semantics of `swufe_bridge.capture` in L0 unit tests (`bridges/python/tests/l0/test_capture.py`), and the addon's capture loop in an L1 test with injected fakes (`bridges/python/tests/l1/test_addon_capture.py` — automated tests **must never** really enable local mode); the real scope and "switching back to the system proxy stops it" belong to L3 manual verification (the tester has to confirm the OS authorisation prompt in person).
 
 Requirement acceptance criteria, reproductions of fixed bugs, and boundaries and error paths must also be covered.
 
 ## 3. Naming and organisation
 
 ```text
-Location:  tests/l0 (unit: codec, allowlist, config), tests/l1 (component: addon request/response
-           rewriting, logging, hot reload), tests/l2 (integration: real mitmdump + curl + fake upstream);
-           shared fixtures: tests/conftest.py (config factory, no mitmproxy import) and
-           tests/l1/conftest.py (flow / addon factories);
-           app/test (app unit: `*.test.ts` + `helpers/fakes.ts`, Node's built-in test runner + tsx;
+Location:  bridges/python/tests/l0 (unit: codec, allowlist, config), bridges/python/tests/l1 (component: addon request/response
+           rewriting, logging, hot reload), bridges/python/tests/l2 (integration: real mitmdump + curl + fake upstream);
+           shared fixtures: bridges/python/tests/conftest.py (config factory, no mitmproxy import) and
+           bridges/python/tests/l1/conftest.py (flow / addon factories);
+           apps/desktop/test (app unit: `*.test.ts` + `helpers/fakes.ts`, Node's built-in test runner + tsx;
            `fixtures/` holds the fake upstream and the verification entry, which are not part of the CI unit run)
 Naming:    files test_<topic>.py; functions test_<behaviour> (the case id goes into the function name,
            e.g. test_tc_f01_allowlisted_request_is_rewritten_end_to_end);
@@ -74,21 +74,21 @@ Structure: Arrange / Act / Assert (split with comments when useful)
 ## 5. How to run
 
 ```text
-Run all:        uv sync && uv run pytest (L0+L1+L2; no internet access needed)
-Run one file:   uv run pytest tests/l1/test_addon_request.py
-Run with watch: uv run pytest -f (requires the pytest-xdist plugin; not adopted this phase — when it is
-                not installed, re-run uv run pytest manually)
-App unit:       npm --prefix app run test:unit (run `npm --prefix app install` first)
-App typecheck:  npm --prefix app run typecheck
-CI test job:    L0: .github/workflows/python-tests.yml (runs uv sync --frozen + uv run pytest tests/l0 -q
+Run all:        uv sync --directory bridges/python && uv run --directory bridges/python pytest (L0+L1+L2; no internet access needed)
+Run one file:   uv run --directory bridges/python pytest tests/l1/test_addon_request.py
+Run with watch: uv run --directory bridges/python pytest -f (requires the pytest-xdist plugin; not adopted this phase — when it is
+                not installed, re-run uv run --directory bridges/python pytest manually)
+App unit:       pnpm --filter swufe-webvpn-bridge run test:unit (run `pnpm install` first)
+App typecheck:  pnpm --filter swufe-webvpn-bridge run typecheck
+CI test job:    L0: .github/workflows/python-tests.yml (runs uv sync --frozen --directory bridges/python + uv run --directory bridges/python pytest tests/l0 -q
                 on pull_request and pushes to main);
-                App unit and types: .github/workflows/app-tests.yml (npm ci --prefix app + typecheck + test:unit,
+                App unit and types: .github/workflows/app-tests.yml (pnpm install --frozen-lockfile + typecheck + test:unit,
                 needs neither the Electron binary nor a display);
                 L1/L2 need mitmdump, curl and local ports, so they run locally only;
                 documentation checks are handled separately by .github/workflows/docs-check.yml
 ```
 
-Documentation-check workflow: [docs-check.yml](../../.github/workflows/docs-check.yml) (runs `npm run docs:check` and `npm run typecheck` on pull requests and pushes to `main`).
+Documentation-check workflow: [docs-check.yml](../../.github/workflows/docs-check.yml) (runs `pnpm run docs:check` and `pnpm run typecheck` on pull requests and pushes to `main`).
 
 ## 6. Test data and environments
 

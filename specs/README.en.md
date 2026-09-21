@@ -77,5 +77,5 @@ Entry conditions: [verification-strategy.md](../docs/verification/verification-s
 ## Checks
 
 ```bash
-npm run spec:check   # structure + required sections
+pnpm run spec:check   # structure + required sections
 ```

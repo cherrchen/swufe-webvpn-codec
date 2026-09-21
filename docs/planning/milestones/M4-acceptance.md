@@ -47,7 +47,7 @@
 
 **范围**：`KI-011`（网关客户端 shim 与透明桥不兼容）的修复与 macOS 实机复验；修复方案见 [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)（网关自有命名空间直通 + bootstrap 文档升级到网关原生 URL 空间）。
 
-**结果**：TC-G01 通过（入口 `http://jwxt.swufe.edu.cn/` → 桥日志 `detail=promoted` → 网关原生空间首页完整渲染）、TC-G02 通过（站内「学生成绩查询」可交互、链接不跳飞）；非 jwxt 主机（`www.swufe.edu.cn`）仍留在普通 URL 空间；`/wengine-vpn/js/main.js` 经桥 200 / 376 922 B（修复前经桥 404）；`lib.swufe.edu.cn` 因同样是 bootstrap 页而同样升级（预期）。回归：`uv run pytest -q` = 198 passed、App 单测 71 passed、`docs:check` 0 error / 0 warning、关桥后系统代理与进程均无残留。
+**结果**：TC-G01 通过（入口 `http://jwxt.swufe.edu.cn/` → 桥日志 `detail=promoted` → 网关原生空间首页完整渲染）、TC-G02 通过（站内「学生成绩查询」可交互、链接不跳飞）；非 jwxt 主机（`www.swufe.edu.cn`）仍留在普通 URL 空间；`/wengine-vpn/js/main.js` 经桥 200 / 376 922 B（修复前经桥 404）；`lib.swufe.edu.cn` 因同样是 bootstrap 页而同样升级（预期）。回归：`uv run --directory bridges/python pytest -q` = 198 passed、App 单测 71 passed、`docs:check` 0 error / 0 warning、关桥后系统代理与进程均无残留。
 
 **证据**：[specs/001-phase1-local-bridge/verification.md](../../../specs/001-phase1-local-bridge/verification.md) 的「M5（`KI-011` 修复）执行记录」；脱敏快照 `specs/001-phase1-local-bridge/evidence/acceptance-macos/acceptance-darwin-20260921-154657.md`。
 
@@ -59,14 +59,14 @@
 
 **执行时间**：2026-09-21（macOS 本机，`darwin 24.6.0`，应用 `--user-data-dir=/tmp/m4-acceptance`，`SWUFE_PROBE_INTERVAL_MS=8000`）。
 
-**执行方式**：真实应用 + CDP（`--remote-debugging-port=9222`）驱动界面，浏览器步骤关键观察由 cherrchen 手工完成（自动化导航在本环境反复卡死）；两侧平台共用的脱敏证据采集脚本为 `npm run acceptance:check`（T044）。
+**执行方式**：真实应用 + CDP（`--remote-debugging-port=9222`）驱动界面，浏览器步骤关键观察由 cherrchen 手工完成（自动化导航在本环境反复卡死）；两侧平台共用的脱敏证据采集脚本为 `pnpm run acceptance:check`（T044）。
 
 **证据**：
 - [specs/001-phase1-local-bridge/verification.md](../../../specs/001-phase1-local-bridge/verification.md) 的「M4 双平台验收执行手册」+「M4 结果表」+「M4 教务浏览器验收记录」+「执行的命令与结果」M4 段；
 - 脱敏快照：`specs/001-phase1-local-bridge/evidence/acceptance-macos/`（7 份）与 `evidence/kit-selfcheck/`（5 份，T044 自检）；
 - 缺陷台账：[known-issues.md](../../../specs/001-phase1-local-bridge/known-issues.md)（`KI-001`..`KI-013`）。
 
-**通过项**：TC-D01/D02/D03/D04、TC-C01/C02/C03/C04、TC-E01（经应用自带手动命令）/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05；`uv run pytest -q` = 190 passed、`npm --prefix app run test:unit` = 71 passed、`npm --prefix app run typecheck` / `npm run typecheck` 无 error、`npm run docs:check` = 0 error/0 warning。
+**通过项**：TC-D01/D02/D03/D04、TC-C01/C02/C03/C04、TC-E01（经应用自带手动命令）/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05；`uv run --directory bridges/python pytest -q` = 190 passed、`pnpm --filter swufe-webvpn-bridge run test:unit` = 71 passed、`pnpm --filter swufe-webvpn-bridge run typecheck` / `pnpm run typecheck` 无 error、`pnpm run docs:check` = 0 error/0 warning。
 
 **失败项**：TC-G01、TC-G02（教务浏览器验收）。根因（`KI-011`）：本部署网关对每个 HTML 响应注入客户端 shim（`__vpn_*` + `<script src="/wengine-vpn/js/main.js">`），该 shim 期望浏览器工作在 WebVPN URL 空间；透明桥把该相对路径加 token 前缀 → 经桥 404（网关根为 200/376 922B）→ 首页白屏、真实页渲染但不可交互。三条候选解除路径（网关自有路径不经 token / HTML 中剥离 shim / 接受教务以门户形态使用）均改公共契约，需 cherrchen 决策并补 ADR。
 

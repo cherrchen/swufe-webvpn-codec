@@ -23,13 +23,13 @@ Make the bridge work end to end without a desktop shell first, so the rewrite lo
 
 ## Exit criteria
 
-- [x] `curl` through the local bridge + a real or simulated WebVPN reaches an allowlist host successfully (TC-F01, P0) — fake upstream: `tests/l2/test_proxy_end_to_end.py`; real `webvpn.swufe.edu.cn`: see the manual smoke in "Completion record" (returns the portal login 302, no real session)
+- [x] `curl` through the local bridge + a real or simulated WebVPN reaches an allowlist host successfully (TC-F01, P0) — fake upstream: `bridges/python/tests/l2/test_proxy_end_to_end.py`; real `webvpn.swufe.edu.cn`: see the manual smoke in "Completion record" (returns the portal login 302, no real session)
 - [x] A non-allowlist host is not rewritten and keeps direct-connection semantics (TC-F02, P0) — L2 asserts both the body and the upstream cookie are empty
 - [x] L0 passes: codec vectors (TC-A01..TC-A05) and allowlist matching functions (TC-B01..TC-B04) — 74 passed
 - [x] L1 passes: the addon rewrites requests and reverse-rewrites responses against recorded traffic / a fake upstream (including `Location` reverse rewrite, TC-F03) — 74 passed
-- [x] Response rewrite precedence implemented: `Location` → `Set-Cookie` Domain/Path → absolute URLs in HTML/JS/JSON → other content types untouched (REQ-007) — `swufe_bridge/addon.py` runs them in order and reports through `swufe-debug.detail`
+- [x] Response rewrite precedence implemented: `Location` → `Set-Cookie` Domain/Path → absolute URLs in HTML/JS/JSON → other content types untouched (REQ-007) — `bridges/python/swufe_bridge/addon.py` runs them in order and reports through `swufe-debug.detail`
 - [x] Loop prevention holds: `webvpn.swufe.edu.cn` / `authserver.swufe.edu.cn` and requests already in WebVPN form pass through (REQ-008) — L1 `test_ec_004_*`
-- [x] Affected documents are synced (including bilingual pairs); no blocking defects — `npm run docs:check` 0 error / 0 warning
+- [x] Affected documents are synced (including bilingual pairs); no blocking defects — `pnpm run docs:check` 0 error / 0 warning
 
 ## Risks
 
@@ -47,24 +47,24 @@ Make the bridge work end to end without a desktop shell first, so the rewrite lo
 
 | Category | Contents |
 | ---- | ---- |
-| Tooling | `pyproject.toml` + `uv.lock` + `.python-version` (runtime `mitmproxy==12.2.3`, `cryptography==48.0.1`; dev `pytest==9.1.1`) |
-| Implementation | `swufe_bridge/wrd_codec.py` (T003), `swufe_bridge/allowlist.py` (T005), `swufe_bridge/config.py` (T006/T012 data layer), `swufe_bridge/rewrite.py` (T009–T011 logic layer), `swufe_bridge/addon.py` (T008–T012), `swufe_bridge/sidecar.py` (T007) |
+| Tooling | `bridges/python/pyproject.toml` + `bridges/python/uv.lock` + `bridges/python/.python-version` (runtime `mitmproxy==12.2.3`, `cryptography==48.0.1`; dev `pytest==9.1.1`) |
+| Implementation | `bridges/python/swufe_bridge/wrd_codec.py` (T003), `bridges/python/swufe_bridge/allowlist.py` (T005), `bridges/python/swufe_bridge/config.py` (T006/T012 data layer), `bridges/python/swufe_bridge/rewrite.py` (T009–T011 logic layer), `bridges/python/swufe_bridge/addon.py` (T008–T012), `bridges/python/swufe_bridge/sidecar.py` (T007) |
 | Control plane | Option A finalized: config-file hot reload + `swufe-ready` / `swufe-error` / `swufe-debug` stderr lines + exit codes ([bridge-control-protocol.md](../../api/bridge-control-protocol.md)); `--listen-host 127.0.0.1` hard-coded by the sidecar (no switch) |
-| Tests | `tests/l0/` (codec/allowlist/config), `tests/l1/` (request rewrite, response reverse rewrite, log minimization, config hot reload), `tests/l2/` (real mitmdump + curl + fake upstream) |
-| CI | [.github/workflows/python-tests.yml](../../../.github/workflows/python-tests.yml): every PR / main push runs `uv sync --frozen` + `uv run pytest tests/l0 -q` (T034) |
+| Tests | `bridges/python/tests/l0/` (codec/allowlist/config), `bridges/python/tests/l1/` (request rewrite, response reverse rewrite, log minimization, config hot reload), `bridges/python/tests/l2/` (real mitmdump + curl + fake upstream) |
+| CI | [.github/workflows/python-tests.yml](../../../.github/workflows/python-tests.yml): every PR / main push runs `uv sync --frozen --directory bridges/python` + `uv run --directory bridges/python pytest tests/l0 -q` (T034) |
 
 ### Verification commands and results (2026-09-21)
 
 | Command | Result |
 | ---- | ---- |
-| `uv sync --frozen` | passed (lock matches pyproject; 48 packages checked) |
-| `uv run pytest tests/l0 -q` | **74 passed** |
-| `uv run pytest tests/l1 -q` | **74 passed** |
-| `uv run pytest tests/l2 -q` | **6 passed** |
-| `uv run pytest -q` | **154 passed** |
-| `uv run python -m swufe_bridge.wrd_codec decode '<authserver sample URL>'` | `https://authserver.swufe.edu.cn/authserver/login?service=http%3A%2F%2Fjwxt.swufe.edu.cn%2Fsso%2Fjziotlogin` (exit code 0) |
-| `npm run docs:check` | 0 error / 0 warning (links + bilingual pairs + spec structure) |
-| `npm run typecheck` | no error |
+| `uv sync --frozen --directory bridges/python` | passed (lock matches pyproject; 48 packages checked) |
+| `uv run --directory bridges/python pytest tests/l0 -q` | **74 passed** |
+| `uv run --directory bridges/python pytest tests/l1 -q` | **74 passed** |
+| `uv run --directory bridges/python pytest tests/l2 -q` | **6 passed** |
+| `uv run --directory bridges/python pytest -q` | **154 passed** |
+| `uv run --directory bridges/python python -m swufe_bridge.wrd_codec decode '<authserver sample URL>'` | `https://authserver.swufe.edu.cn/authserver/login?service=http%3A%2F%2Fjwxt.swufe.edu.cn%2Fsso%2Fjziotlogin` (exit code 0) |
+| `pnpm run docs:check` | 0 error / 0 warning (links + bilingual pairs + spec structure) |
+| `pnpm run typecheck` | no error |
 
 ### Manual dev smoke (real and fake upstream)
 

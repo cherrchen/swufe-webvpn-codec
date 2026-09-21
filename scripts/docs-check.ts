@@ -8,7 +8,7 @@ import { summarize, type CheckResult } from './lib/util.ts';
  * on any error. Warnings are reported but do not fail the run.
  *
  * Individual checks remain runnable on their own:
- *   npm run docs:links | docs:i18n | spec:check
+ *   pnpm run docs:links | docs:i18n | spec:check
  */
 
 const checks: ReadonlyArray<() => CheckResult> = [checkLinks, checkI18n, checkSpecs];

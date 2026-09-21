@@ -39,19 +39,21 @@ async function start(): Promise<void> {
   const appRoot = app.getAppPath()
   const userDataDir = app.getPath('userData')
   const repoRoot = resolveRepoRoot(appRoot)
+  /** Python bridge project: source, venv and tests live under `<repo>/bridges/python` (ADR-0009). */
+  const bridgeRoot = join(repoRoot, 'bridges', 'python')
 
   const store = new AppStore(userDataDir)
   store.load()
   const session = new SessionBroker(store.getSettings().webvpnBase)
   await session.prepare()
-  const certManager = createCertManager(join(userDataDir, CONFDIR_NAME), repoRoot)
+  const certManager = createCertManager(join(userDataDir, CONFDIR_NAME), bridgeRoot)
 
   orchestrator = new ProxyOrchestrator({
     store,
     session,
     systemProxy: createSystemProxy(),
     certManager,
-    sidecarFactory: (options) => new SidecarProcess({ repoRoot, userDataDir, port: options.port }),
+    sidecarFactory: (options) => new SidecarProcess({ bridgeRoot, userDataDir, port: options.port }),
     userDataDir,
   })
   await orchestrator.recoverOnLaunch()

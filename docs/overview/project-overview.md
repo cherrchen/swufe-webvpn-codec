@@ -47,8 +47,8 @@ Out of scope: NG-001..NG-008，详见 goals-and-non-goals.md
 ## 交付形态
 
 ```text
-Repository type:  Documentation-first（docs/ + specs/）+ M1 桥实现（swufe_bridge/、tests/）
-Primary language: Python 3（bridge sidecar / Addon、WRD codec 权威实现，见 swufe_bridge/）
+Repository type:  Documentation-first（docs/ + specs/）+ M1 桥实现（bridges/python/swufe_bridge/、bridges/python/tests/）
+Primary language: Python 3（bridge sidecar / Addon、WRD codec 权威实现，见 bridges/python/swufe_bridge/）
                   + TypeScript（Electron 应用，IPC 以 TS 声明；M2 起）
                   文档为 Markdown + Node 文档检查脚本
 License:          MIT

@@ -29,7 +29,7 @@
 
 | 能力 | 实现 |
 | ---- | ---- |
-| 启动 | `uv run python -m swufe_bridge.sidecar --config <file> --port <port> --confdir <dir>`（M2 以 Electron 子进程方式 spawn 同一入口）；mitmdump 侧以 `--mode regular@<port>` 启动，**不传 `--listen-port`**（M3，见下） |
+| 启动 | `uv run --directory bridges/python python -m swufe_bridge.sidecar --config <file> --port <port> --confdir <dir>`（M2 以 Electron 子进程方式 spawn 同一入口）；mitmdump 侧以 `--mode regular@<port>` 启动，**不传 `--listen-port`**（M3，见下） |
 | 就绪探测 | stderr 出现 `swufe-ready` 行 **且** TCP 可连 `127.0.0.1:<port>` |
 | 配置下发 | 写入配置文件（整体覆盖）；sidecar 以 mtime + size 轮询热加载，无需信号、无需重启 |
 | 配置失败回退 | 解析失败时保留上一次可用配置继续服务，并输出 `swufe-error CONFIG_INVALID <message>`（同一消息不重复打印） |
@@ -102,7 +102,7 @@ swufe-error LISTEN_NOT_LOOPBACK <message>
 ### 开发运行
 
 ```bash
-uv run python -m swufe_bridge.sidecar --config <bridge-config.json> --port 18080 --confdir <confdir>
+uv run --directory bridges/python python -m swufe_bridge.sidecar --config <bridge-config.json> --port 18080 --confdir <confdir>
 # 就绪后（stderr 出现 swufe-ready）：
 curl -sS -i -x http://127.0.0.1:18080 --cacert <confdir>/mitmproxy-ca-cert.pem https://jwxt.swufe.edu.cn/sso/jziotlogin
 ```

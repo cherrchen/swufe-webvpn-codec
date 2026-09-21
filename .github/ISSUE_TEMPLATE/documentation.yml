@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         文档规则见 [documentation-rules.md](../blob/main/docs/development/documentation-rules.md)。
-        本地可用 `npm run docs:check` 复现链接与配对问题。
+        本地可用 `pnpm run docs:check` 复现链接与配对问题。
 
   - type: dropdown
     id: kind
@@ -54,7 +54,7 @@ body:
     attributes:
       label: 复现命令
       description: 若由检查脚本发现，请给出命令与输出摘要。
-      placeholder: npm run docs:check
+      placeholder: pnpm run docs:check
     validations:
       required: false
 

@@ -49,9 +49,9 @@ export function createSystemProxy(): SystemProxy {
   return new UnsupportedPlatform(process.platform)
 }
 
-export function createCertManager(confdir: string, repoRoot: string): CertManager {
-  if (process.platform === 'darwin') return new DarwinCertManager(confdir, repoRoot)
-  if (process.platform === 'win32') return new Win32CertManager(confdir, repoRoot)
+export function createCertManager(confdir: string, bridgeRoot: string): CertManager {
+  if (process.platform === 'darwin') return new DarwinCertManager(confdir, bridgeRoot)
+  if (process.platform === 'win32') return new Win32CertManager(confdir, bridgeRoot)
   return new UnsupportedPlatform(process.platform)
 }
 

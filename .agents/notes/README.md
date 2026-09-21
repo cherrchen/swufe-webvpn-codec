@@ -62,4 +62,4 @@
 
 ## 检查
 
-本目录不强制中英双语、不参与 Spec 结构校验；但其中的 Markdown 链接仍会被 `npm run docs:links` 检查。
+本目录不强制中英双语、不参与 Spec 结构校验；但其中的 Markdown 链接仍会被 `pnpm run docs:links` 检查。

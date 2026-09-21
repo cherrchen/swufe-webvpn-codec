@@ -24,10 +24,13 @@ Status:           Phase 1 delivered (M1 bridge core / M2 desktop orchestration /
                   deferred (KI-001) and KI-013 (TUN interference) / KI-014 (CAS theme assets truncated
                   by the server) are unresolved, so it is not `Verified` yet (KI-007, the automatic CA
                   install, is fixed — see ADR-0008)
-Primary language: Python 3 (bridge sidecar/Addon, WRD codec, see `swufe_bridge/`) + TypeScript (Electron app, from M2);
+Primary language: Python 3 (bridge sidecar/Addon, WRD codec, see `bridges/python/swufe_bridge/`) + TypeScript (Electron app, from M2);
                   Markdown docs (`docs/` + `specs/`) plus Node documentation-check scripts form the bulk
-Repository type:  Documentation-first (docs/ + specs/) + implementation (Python bridge `swufe_bridge/`,
-                  Electron app `app/`, `tests/`) + Node documentation-check scripts
+Repository type:  Documentation-first (docs/ + specs/) + implementation (Python bridge `bridges/python/`,
+                  Electron app `apps/desktop/`) + Node documentation-check scripts
+Layout:           Monorepo: `apps/` holds one directory per application (currently `desktop/`), `bridges/` one
+                  directory per bridge implementation (currently `python/`); the layout decision is ADR-0009
+                  (docs/architecture/adr/ADR-0009-monorepo-layout.md)
 Owner:            cherrchen
 ```
 
@@ -47,6 +50,7 @@ Owner:            cherrchen
 | Documentation rules and language policy | [docs/development/documentation-rules.md](docs/development/documentation-rules.md) |
 | Agent rules and workflow | this file + [docs/agent/](docs/agent/README.en.md) |
 | Verification and definition of done | [docs/verification/](docs/verification/README.en.md) |
+| Repository directory layout (`apps/` + `bridges/`) | [ADR-0009](docs/architecture/adr/ADR-0009-monorepo-layout.en.md) |
 | Long-term plans | [docs/planning/roadmap.md](docs/planning/roadmap.md) |
 
 **If a fact is not in the table above, it is not a source of truth.** Do not treat it as a project fact without evidence.

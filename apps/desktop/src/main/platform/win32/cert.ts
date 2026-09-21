@@ -13,7 +13,7 @@ const STORE = ['-user', '-store', 'Root', CA_BASENAME]
 export class Win32CertManager implements CertManager {
   constructor(
     private readonly confdir: string,
-    private readonly repoRoot: string,
+    private readonly bridgeRoot: string,
   ) {}
 
   async getStatus(): Promise<{ installed: boolean; trusted: boolean }> {
@@ -28,7 +28,7 @@ export class Win32CertManager implements CertManager {
   async install(): Promise<{ ok: boolean; message?: string }> {
     let caCert: string
     try {
-      caCert = await ensureCaFiles(this.confdir, this.repoRoot)
+      caCert = await ensureCaFiles(this.confdir, this.bridgeRoot)
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }

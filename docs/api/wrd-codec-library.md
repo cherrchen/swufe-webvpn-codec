@@ -99,7 +99,7 @@ decodeUrl(webvpnUrl: string): string
 
 ## Python 实现映射
 
-权威实现：`swufe_bridge/wrd_codec.py`（M1 落地）。
+权威实现：`bridges/python/swufe_bridge/wrd_codec.py`（M1 落地）。
 
 ```python
 class WrdCodec:
@@ -115,8 +115,8 @@ class WrdCodec:
 - `key` / `iv` 接受 `str`（按 UTF-8 编码）或 `bytes`，长度必须为 16 字节；默认值来自模块常量 `DEFAULT_KEY` / `DEFAULT_IV` / `DEFAULT_WEBVPN_HOST`。
 - AES 实现：`cryptography` 的 `Cipher(algorithms.AES(key), CFB(iv))`（即 CFB128，与原型 `segment_size=128` 等价；TC-A02 为门禁向量）；不引入 pycryptodome（见 [dependency-policy.md](../development/dependency-policy.md)）。
 - 错误统一抛 `WrdCodecError`（`ValueError` 子类），消息沿用原型：`WRD AES-128 key must be 16 bytes`、`WRD AES-128 IV must be 16 bytes`、`unsupported scheme: ...`、`missing hostname`、`host token too short or not hex`、`invalid WebVPN path`、`WebVPN path missing scheme or host token`、`bad scheme token: ...`；此外 token 解出的字节不是合法 UTF-8 时同样抛 `WrdCodecError`（错误 key 的常见结果）。
-- CLI：`uv run python -m swufe_bridge.wrd_codec encode <ordinary-url>` / `decode <webvpn-url>`（可选 `--key` / `--iv` / `--webvpn-host`；失败打印 `error: <message>` 并返回 `2`）。
-- 测试：`tests/l0/test_wrd_codec.py`（TC-A01..TC-A05 与错误分支）。
+- CLI：`uv run --directory bridges/python python -m swufe_bridge.wrd_codec encode <ordinary-url>` / `decode <webvpn-url>`（可选 `--key` / `--iv` / `--webvpn-host`；失败打印 `error: <message>` 并返回 `2`）。
+- 测试：`bridges/python/tests/l0/test_wrd_codec.py`（TC-A01..TC-A05 与错误分支）。
 
 ## 错误与边界
 

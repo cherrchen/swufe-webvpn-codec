@@ -35,7 +35,7 @@
 8. 填写 `tasks.md`：把 Phase 拆成 `T00x` 原子任务（动作 / 输入 / 输出 / 依赖 / 验证 / 关联 ID）。
 9. 填写 `verification.md`：Requirement → Verification 映射，状态初始 `Pending`。
 10. 在 [roadmap.md](../../../docs/planning/roadmap.md) 注册一行。
-11. 运行 `npm run spec:check`。
+11. 运行 `pnpm run spec:check`。
 12. 在交付说明中列出：新 Spec 路径、未解决项、需要谁决策。
 
 ## Output

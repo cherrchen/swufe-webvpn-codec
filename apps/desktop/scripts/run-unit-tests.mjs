@@ -1,5 +1,5 @@
-// Runs every app/test/**/*.test.ts with the Node test runner + tsx loader.
-// A Node-only replacement for shell globs so `npm run test:unit` works on every platform.
+// Runs every apps/desktop/test/**/*.test.ts with the Node test runner + tsx loader.
+// A Node-only replacement for shell globs so `pnpm run test:unit` works on every platform.
 import { spawnSync } from 'node:child_process'
 import { readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'

@@ -44,7 +44,7 @@ Conclusion: **the root cause is not "the elevation is not strong enough" but "th
 
 ## Decision
 
-1. On macOS, `install()` in `app/src/main/platform/darwin/cert.ts` performs the CA install in two sequential steps that must use different authorization paths:
+1. On macOS, `install()` in `apps/desktop/src/main/platform/darwin/cert.ts` performs the CA install in two sequential steps that must use different authorization paths:
    - **Step 1 (keychain, needs root)**: `runPrivilegedDarwin()` runs `security add-certificates -k /Library/Keychains/System.keychain "<caCert>"`. It writes the keychain only and **never touches trust settings**; a stdout line of `already in <keychain>` counts as success (idempotent).
    - **Step 2 (trust settings, admin domain)**: the **app process itself** runs `security add-trusted-cert -d -r trustRoot "<caCert>"` (**without `-k`**), so macOS handles the authorization for this app's own session. It uses `PRIVILEGE_PROMPT_TIMEOUT_MS` (120s) rather than the 10s default command timeout.
 2. Scope and prohibitions:
@@ -95,7 +95,7 @@ Conclusion: **the root cause is not "the elevation is not strong enough" but "th
 - Spec: `specs/001-phase1-local-bridge/` (TC-E01 / TC-E02 / TC-E03)
 - Related ADR: [ADR-0003](ADR-0003-electron-gui-for-phase-1.en.md) (Electron for phase 1)
 - Related known issues: `KI-007` (resolved by this ADR), `KI-010` (trust residue after uninstall)
-- Implementation: `app/src/main/platform/darwin/cert.ts`, `app/src/main/exec.ts`, `app/src/main/constants.ts`
+- Implementation: `apps/desktop/src/main/platform/darwin/cert.ts`, `apps/desktop/src/main/exec.ts`, `apps/desktop/src/main/constants.ts`
 - External material:
   - <https://developer.apple.com/documentation/security/sectrustsettingssettrustsettings(_:_:_:)>
   - <https://developer.apple.com/documentation/security/security-framework-result-codes>

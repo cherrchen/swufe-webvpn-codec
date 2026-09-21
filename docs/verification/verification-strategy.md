@@ -15,7 +15,7 @@
 | 自动化测试 | 单元 / 集成 / 端到端 | 命令 + 输出摘要 |
 | 手工验证 | 可复现步骤 | 步骤 + 实际结果 |
 | 静态检查 | 构建、类型、lint、格式 | 命令 + 结果 |
-| 文档一致性 | `npm run docs:check`、Documentation Update Matrix | 命令 + 结果 |
+| 文档一致性 | `pnpm run docs:check`、Documentation Update Matrix | 命令 + 结果 |
 | 兼容性 | 接口/数据/行为兼容性检查 | 结论 + 风险说明 |
 | 安全 | 输入、权限、密钥、依赖风险 | 结论 + 缓解措施 |
 | 评审 | PR Checklist | PR 记录 |
@@ -84,7 +84,7 @@ Feature 至少需要考虑：
 Additional checks:     每次 PR：L0（codec 向量 TC-A01..TC-A05 + allowlist 单测 TC-B01..TC-B03）
                        每次 PR：L1 组件与 L2 本地集成（addon 对假上游 / mitmdump + curl）
                        发版前：L3 真机教务验收（TC-G01..TC-G04，需测试者自有账号）
-Exemptions:            当前 CI 仅做文档检查（npm run docs:check），不运行代码测试；
+Exemptions:            当前 CI 仅做文档检查（pnpm run docs:check），不运行代码测试；
                        代码测试在实现仓库建立后接入 CI
 Required reviewers:    cherrchen
 Release gate:          所有 P0 用例通过；
