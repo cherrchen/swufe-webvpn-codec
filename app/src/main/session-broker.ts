@@ -13,6 +13,11 @@ import { LOGIN_PARTITION, SESSION_PROBE_INTERVAL_MS, SESSION_PROBE_TIMEOUT_MS } 
 import { classifyProbe } from './session-probe'
 import type { ProbeResult, SessionCookie } from './session-types'
 
+/** Chromium's "navigation was superseded/cancelled" error (`net::ERR_ABORTED`). */
+function isAbortError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ERR_ABORTED'
+}
+
 export class SessionBroker {
   private readonly webvpnHost: string
   private partition: Session | null = null
@@ -96,8 +101,12 @@ export class SessionBroker {
       await win.loadURL(this.webvpnBase)
     } catch (error) {
       // A successful login closes the window while the initial load is still
-      // pending, which rejects that load; any other failure is real.
-      if (!this.closedAfterLogin) throw error
+      // pending, and the portal's cross-origin redirect to CAS aborts that
+      // pending `loadURL` (ERR_ABORTED) even though the window did navigate.
+      // Login detection rides on the window's own navigation handlers, so both
+      // are non-fatal; anything else is a real failure.
+      if (!this.closedAfterLogin && !isAbortError(error)) throw error
+      console.log(`swufe-session 登录窗口初始加载被中断（非致命）：${String(error)}`)
     }
   }
 
@@ -131,7 +140,15 @@ export class SessionBroker {
       if (result !== 'valid') console.log(`swufe-session 会话探测：${reason} → ${result}`)
       resolve(result)
     }
-    const request = net.request({ url: this.webvpnBase, session: partition, redirect: 'manual' })
+    // `useSessionCookies` is off by default in Electron: without it the probe
+    // carries none of the login partition's cookies, every request looks
+    // anonymous, and a live session is misreported as expired (EC-007).
+    const request = net.request({
+      url: this.webvpnBase,
+      session: partition,
+      redirect: 'manual',
+      useSessionCookies: true,
+    })
     const timer = setTimeout(() => {
       request.abort()
       finish('unknown', '超时')

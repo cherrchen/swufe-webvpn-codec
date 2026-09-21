@@ -11,17 +11,32 @@ test('find-certificate with no match prints nothing and must not be read as inst
 })
 
 test('find-certificate output yields the SHA-1 fingerprint', () => {
-  const stdout = `keychain: "/Library/Keychains/System.keychain"
+  // Measured on macOS 15.6 with `-Z`: the hash lines precede the attributes dump.
+  const stdout = `SHA-256 hash: B85643D1C7F3328FBA9BE128A19C68A8B334045CD156427FC2ADD3B142BE858A
+SHA-1 hash: 09C58DE3212EC3B26CC1CA355B66D813044A447B
+keychain: "/Library/Keychains/System.keychain"
+version: 256
 class: 0x80001000
 attributes:
     "labl"<blob>="mitmproxy"
-SHA-1 hash: 1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d
 `
 
   assert.deepEqual(parseFindCertificate(stdout), {
     found: true,
-    sha1: '1A2B3C4D5E6F708192A3B4C5D6E7F8091A2B3C4D',
+    sha1: '09C58DE3212EC3B26CC1CA355B66D813044A447B',
   })
+})
+
+test('find-certificate without -Z prints no hash line, so no fingerprint is available', () => {
+  // Measured on macOS 15.6: the same command without `-Z` prints only the dump.
+  const stdout = `keychain: "/Library/Keychains/System.keychain"
+version: 256
+class: 0x80001000
+attributes:
+    "labl"<blob>="mitmproxy"
+`
+
+  assert.deepEqual(parseFindCertificate(stdout), { found: true, sha1: null })
 })
 
 test('certutil store listing decides presence on Windows', () => {

@@ -8,7 +8,9 @@ import { parseFindCertificate } from '../parse'
 import type { CertManager } from '../types'
 import { caPaths, ensureCaFiles } from '../ca-files'
 
-const CERT_SELECTOR = ['find-certificate', '-a', '-c', CA_BASENAME, SYSTEM_KEYCHAIN]
+// `-Z` is required: without it macOS prints only the attributes dump and no
+// `SHA-1 hash:` line, so the fingerprint for `delete-certificate` is unobtainable.
+const CERT_SELECTOR = ['find-certificate', '-a', '-c', CA_BASENAME, '-Z', SYSTEM_KEYCHAIN]
 
 function manualHint(command: string, result: RunResult): string {
   const reason = result.stderr.trim().split('\n').filter(Boolean).at(-1) ?? `退出码 ${result.code}`
