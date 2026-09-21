@@ -42,26 +42,26 @@ flowchart LR
 - 提供方：App Shell（Electron Main）。
 - 消费方：Telemetry UI、Login WebView（Renderer）。
 - 稳定性：Internal（仅 App 内使用；破坏性变更仍需评估）。
-- 输入：方法调用 `login` / `logout` / `getSession`、`startBridge` / `stopBridge` / `getStatus`、`getAllowlist` / `setAllowlist` / `getSettings`、`installCa` / `uninstallCa` / `getCaStatus`、`listCaptureCandidates` / `setCapturePids`、`setDebugLogging`；事件订阅 `onDebugLog` / `onStatus` / `onSessionExpired`（后两者为 M2 新增，`getSettings` 亦为 M2 新增且不返回 WRD key/IV）。
-- 输出：`BridgeStatus`、`AllowlistConfig`、CA 状态、会话状态、`DebugLogEvent`。字段级定义见 [api/electron-ipc.md](../api/electron-ipc.md)。
-- 错误模型：`BridgeStatus.error.code` 取固定错误码 `PROXY_CONFLICT` / `CA_MISSING` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `BRIDGE_CRASH` / `ALLOWLIST_EMPTY`；CA 操作用 `{ok, message}`。
-- 幂等性：`getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` 为幂等读；`setAllowlist` 幂等；`startBridge` / `stopBridge` / `installCa` / `uninstallCa` 非幂等（重复调用按状态机处置）。
+- 输入：方法调用 `login` / `logout` / `getSession`、`startBridge` / `stopBridge` / `getStatus`、`getAllowlist` / `setAllowlist` / `getSettings`、`installCa` / `uninstallCa` / `getCaStatus`、`listCaptureCandidates` / `setCaptureMode` / `setCaptureProcesses`、`setDebugLogging`；事件订阅 `onDebugLog` / `onStatus` / `onSessionExpired`（后两者为 M2 新增，`getSettings` 亦为 M2 新增且不返回 WRD key/IV）。M3 以 `setCaptureMode`（`'system-proxy' | 'selected-apps'`）取代 M2 的 `setCapturePids`，并新增 `setCaptureProcesses`（intercept pattern 字符串数组，整体覆盖写入）。
+- 输出：`BridgeStatus`（含 `localCaptureEnabled` 与 `captureError`）、`AllowlistConfig`、CA 状态、会话状态、`DebugLogEvent`。字段级定义见 [api/electron-ipc.md](../api/electron-ipc.md)。
+- 错误模型：`BridgeStatus.error.code` 取固定错误码 `PROXY_CONFLICT` / `CA_MISSING` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `BRIDGE_CRASH` / `ALLOWLIST_EMPTY`（切到「指定应用」捕获方式而系统代理被其它软件占用时同样返回 `PROXY_CONFLICT`）；CA 操作用 `{ok, message}`。进程捕获失败不进入 `error`，只出现在 `BridgeStatus.captureError`。Electron 的 `invoke` rejection 只保留 `message` / `stack`，因此 `setCaptureMode` / `setCaptureProcesses` 的拒绝消息形如 `<CODE>：<message>`（如 `PROXY_CONFLICT：…`），Renderer 解析前缀决定是否弹出代理冲突模态。
+- 幂等性：`getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` 为幂等读；`setAllowlist`、`setCaptureMode`、`setCaptureProcesses`（整体覆盖写入）幂等；`startBridge` / `stopBridge` / `installCa` / `uninstallCa` 非幂等（重复调用按状态机处置）。
 - 版本策略：preload 与 Main 同构建同版本，不跨版本混用。
 - 兼容性承诺：新增方法/字段向后兼容；删除或改签名属破坏性变更（允许的例外见「兼容性策略」）。
-- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)。
+- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)。
 
 ### IF-002 Main ↔ mitm sidecar 控制
 
 - 提供方：Bridge Addon（mitmproxy sidecar）。
 - 消费方：Proxy Orchestrator（Main）。
 - 稳定性：Internal / Evolving（仅供本 App 内部消费；第一期已采用方案 A「子进程生命周期 + 配置文件热加载」，不再承诺其它控制面形态）。
-- 输入：子进程生命周期（spawn / 结束）；配置文件整体覆盖写入（`allowlist` / `cookies` / `debug` / `webvpnBase` / `wrdKey` / `wrdIv`，路径与字段见 [api/bridge-control-protocol.md](../api/bridge-control-protocol.md)）。
-- 输出：stderr 上的就绪与诊断行（`swufe-ready` / `swufe-error <CODE> <message>`）、进程退出码（正常 `0`，启动校验失败 `2`）；配置生效结果（热加载，失败保留上次可用配置）。
-- 错误模型：sidecar 级诊断 `swufe-error <CODE> <message>` + 退出码 `2`（`CONFIG_INVALID`、`ALLOWLIST_EMPTY`、`LISTEN_NOT_LOOPBACK`）；运行期配置重载失败不退出，保留上次可用配置并重复上报同一消息前只打印一次；M2 将 sidecar 非预期退出映射为 `BRIDGE_CRASH`。
+- 输入：子进程生命周期（spawn / 结束）；启动参数 `--mode regular@<port>`（**不传** `--listen-port`：全局 `listen_port` 会让运行时新增的 `local:<spec>` 与 `regular` 被判为同一监听地址而报错）；配置文件整体覆盖写入（`allowlist` / `cookies` / `debug` / `webvpnBase` / `wrdKey` / `wrdIv` / `capture`，路径与字段见 [api/bridge-control-protocol.md](../api/bridge-control-protocol.md)）。`capture` 为 `{"processes": string[]}`，缺省即空数组；`system-proxy` 捕获方式下恒为 `[]`，非法（非列表 / 空串 / 含逗号 / 非字符串）⇒ `CONFIG_INVALID`。
+- 输出：stderr 上的就绪与诊断行（`swufe-ready` / `swufe-error <CODE> <message>` / `swufe-capture {"enabled":bool,"processes":string[],"error":string|null}`）、进程退出码（正常 `0`，启动校验失败 `2`）；配置生效结果（热加载，失败保留上次可用配置）。
+- 错误模型：sidecar 级诊断 `swufe-error <CODE> <message>` + 退出码 `2`（`CONFIG_INVALID`、`ALLOWLIST_EMPTY`、`LISTEN_NOT_LOOPBACK`）；运行期配置重载失败不退出，保留上次可用配置并重复上报同一消息前只打印一次；M2 将 sidecar 非预期退出映射为 `BRIDGE_CRASH`。`swufe-capture` 只报告进程捕获状态（键固定 `enabled` / `processes` / `error`），不参与就绪判定，捕获失败不改变桥状态，也不自动重试（直到运行时配置被重写才重新尝试）。
 - 幂等性：配置文件为整体覆盖式写入，以「最后一次生效」为幂等语义；结束进程重复调用收敛到已停止状态。
 - 版本策略：sidecar 与 App 同发布；控制面能力变更（如启用方案 B）视为实现变更而非契约变更。
-- 兼容性承诺：Cookie 禁止进日志与诊断行（INV-001）；`swufe-ready` / `swufe-error` 行格式与退出码语义稳定；监听地址恒为 `127.0.0.1`。
-- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
+- 兼容性承诺：Cookie 禁止进日志与诊断行（INV-001）；`swufe-ready` / `swufe-error` / `swufe-capture` 行格式与退出码语义稳定；`swufe-capture` 的键集合固定为 `enabled` / `processes` / `error`；监听地址恒为 `127.0.0.1`。
+- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
 
 ### IF-003 Bridge Addon ↔ WRD Codec 库
 
@@ -81,13 +81,13 @@ flowchart LR
 - 提供方：OS（系统 API）。
 - 消费方：Proxy Orchestrator。
 - 稳定性：Evolving（跟随 OS 版本）。
-- 输入：读取当前系统 HTTP/HTTPS 代理；设置代理为 `127.0.0.1:<bridge_port>`；清除本 App 设置的代理。
+- 输入：读取当前系统 HTTP/HTTPS 代理；设置代理为 `127.0.0.1:<bridge_port>`；清除本 App 设置的代理。捕获方式为 `selected-apps` 时不设置系统代理，并撤销此前由本 App 设置过的（ADR-0006）。
 - 输出：代理状态（是否启用、指向何处）。
-- 错误模型：读取失败或设置被占用 → `PROXY_CONFLICT`。
+- 错误模型：读取失败或设置被占用 → `PROXY_CONFLICT`（切到「指定应用」捕获方式前检查系统代理被其它软件占用时同样如此）。
 - 幂等性：读取幂等；设置/清除重复调用收敛到同一目标状态。
 - 版本策略：由 Proxy Orchestrator 内的 OS 适配层吸收差异，不向其它组件暴露。
-- 兼容性承诺：仅清除本 App 设置过的代理（INV-002）；macOS / Windows 行为差异在适配层内。
-- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0004](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md)。
+- 兼容性承诺：仅清除本 App 设置过的代理（INV-002）；`selected-apps` 捕获方式下不设置系统代理（ADR-0006）；macOS / Windows 行为差异在适配层内。
+- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0004](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)。
 
 ### IF-005 App ↔ OS 信任库
 
@@ -131,7 +131,7 @@ flowchart LR
 | 接口 | 测试位置 | 覆盖内容 |
 | ---- | -------- | -------- |
 | IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-D01、TC-D02、TC-C01–C04、TC-E01–E03、TC-B05、TC-H01） | 会话/桥控/allowlist/CA/进程捕获 IPC 的行为与错误码 |
-| IF-002 | L1 `tests/l1/test_addon_reload.py`（配置热更新与失败回退）+ L2 `tests/l2/test_proxy_end_to_end.py`（`swufe-ready` 行、退出码 `2`、回环监听） | 配置文件热加载语义、就绪/诊断行格式与启动失败退出码 |
+| IF-002 | L1 `tests/l1/test_addon_reload.py`（配置热更新与失败回退）、L1 `tests/l1/test_addon_capture.py`（local 模式叠加与 `swufe-capture` 上报）+ L2 `tests/l2/test_proxy_end_to_end.py`（`swufe-ready` 行含 `listen_port`、退出码 `2`、回环监听） | 配置文件热加载语义、就绪/诊断行格式与启动失败退出码、进程捕获模式叠加与回报 |
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-A01–A05） | codec 向量与 URL 互转一致 |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-C01–C04） | 冲突拒绝、设置与清除代理 |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-E01–E03） | 安装、卸载与未安装提示 |

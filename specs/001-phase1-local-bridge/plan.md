@@ -3,7 +3,7 @@
 > Spec ID: 001
 > Status: Draft
 > Owner: cherrchen
-> Last Updated: 2026-09-20
+> Last Updated: 2026-09-21
 
 ## Strategy
 
@@ -40,8 +40,8 @@
 
 ### MS3 体验打磨
 
-- 目标：Allowlist/开关/状态 UI、进程捕获 UI、调试日志面板与文案完成，浏览器教务验收通过（至少一侧平台）。
-- 交付物：主窗口各分区、进程捕获进程选择、调试日志面板（域名 + 结果，默认关）、状态与错误文案。
+- 目标：Allowlist（可增删）/开关/状态 UI、一级「捕获方式」（系统代理 / 指定应用）与进程捕获、调试日志面板与文案完成，浏览器教务验收通过（至少一侧平台）。
+- 交付物：主窗口各分区（含一级捕获方式区与可编辑 allowlist）、候选应用列表与进程捕获（运行时配置 `capture.processes` + sidecar `swufe-capture` 回报）、调试日志面板（时间 | 域名 | 结果，默认关，最近 200 条）、状态与错误文案（含捕获态与 macOS 网络扩展授权引导）。
 - 退出条件：TC-H01、TC-H02、TC-F04、TC-G04 通过；TC-G01、TC-G02 在至少一侧桌面 OS 通过。
 
 ### MS4 验收
@@ -57,6 +57,7 @@
 | 已验证 codec（`wrd_codec.py`、MS0） | 内部 | T003、T004 的实现基准 | M0 已完成（2026-09-20） |
 | codec 固化（T003）→ 请求改写 addon（T008）→ 响应反向改写（T009..T011）→ L3 教务验收（T037/T038） | 内部 | 主路径串行链 | 上游任务验证通过；对应 TC 通过 |
 | mitm 工程骨架（T007）、登录会话（T016/T017）、Proxy Orchestrator（T020）、Cert Manager（T022） | 内部 | Allowlist/开关/状态 UI（T025）与 MS3 | 上述任务完成且桥可开、系统代理可设、CA 可装 |
+| 捕获方式切换依赖 sidecar 运行时模式切换（T026） | 内部 | MS3 的进程捕获 UI 与 TC-G04（`setCaptureMode` / `setCaptureProcesses` 需把 `capture.processes` 下发并让 sidecar 从 `regular@<port>` 切到含 `local:<spec>` 的模式） | sidecar 能在运行中增删 local 模式实例并回报 `swufe-capture`（[design.md](design.md) 关键步骤 2、6；[ADR-0006](../../docs/architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)） |
 | macOS 系统适配（T029..T031）与 Windows 系统适配（T032、T033） | 内部 | 双平台验收（T037/T038） | 与 Proxy Orchestrator / Cert Manager 并行完成后各自 TC 通过 |
 | macOS、Windows 各一台测试机 + Chrome/Edge + mitmproxy/curl | 外部 | L1/L2/L3 执行（T035..T039） | 环境就绪（测试计划 §7） |
 | 测试者自有西财账号（不写入仓库）与授权设备 | 外部 | L3 真实 WebVPN 与教务验收（T019、T037、T038） | 账号与授权设备就绪 |
@@ -85,7 +86,7 @@
 | [docs/requirements/](../../docs/requirements/README.md) | 无影响：REQ-001..REQ-011 / NFR-001..NFR-007 的规范定义在 requirements，本 Spec 只引用；若实现中产生新需求，先在 requirements 登记再回写 [spec.md](spec.md) | 出现需求变更时 | cherrchen |
 | [docs/architecture/](../../docs/architecture/README.md) | 无影响：组件、数据流、接口、数据模型均为首次实现，内容由 architecture 文档定义；实现若偏离（组件边界或数据流变化）需先更新 architecture 或新建 ADR | 实现偏离设计时 | cherrchen |
 | [docs/api/](../../docs/api/README.md) | 已同步：本批次建立 [electron-ipc.md](../../docs/api/electron-ipc.md)、[bridge-control-protocol.md](../../docs/api/bridge-control-protocol.md)、[wrd-codec-library.md](../../docs/api/wrd-codec-library.md)；实现若变更签名需同步 | 接口签名变更时 | cherrchen |
-| ADR（如需） | 无新增：[ADR-0001](../../docs/architecture/adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)..[ADR-0005](../../docs/architecture/adr/ADR-0005-builtin-wrd-key-with-override.md) 已 Accepted；决策语义变化须新建 ADR 并 Supersede | 决策变化时 | cherrchen |
+| ADR（如需） | M3 新增 [ADR-0006](../../docs/architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)（mitmproxy local 模式做进程捕获，且与系统代理互斥，2026-09-21）；[ADR-0001](../../docs/architecture/adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)..[ADR-0005](../../docs/architecture/adr/ADR-0005-builtin-wrd-key-with-override.md) 已 Accepted；决策语义变化须新建 ADR 并 Supersede | 决策变化时 | cherrchen |
 | [docs/planning/roadmap.md](../../docs/planning/roadmap.md) | 状态更新（Spec 001 状态随 Spec 推进；M1..M4 行状态） | 里程碑达成/Spec 状态变化时 | cherrchen |
 | [docs/ui-ux/main-window.md](../../docs/ui-ux/main-window.md) | 已同步：主窗口信息架构与状态集合；实现若调整交互需同步 | 交互变化时 | cherrchen |
 | [docs/planning/milestones/](../../docs/planning/milestones/README.md) | 状态更新：M0 Done；M1..M4 由 Planned 推进，完成记录写在各里程碑文件 | 里程碑达成时 | cherrchen |
@@ -99,12 +100,12 @@
 | AC-001 | TC-G01 / TC-G03（L3 手工：双平台启动应用）+ 开发版启动 smoke | MS2 起（macOS）、MS4（Windows） | 启动记录/截图 + 应用可交互 |
 | AC-002 | TC-D01（L1/L3：完成 CAS 后 `loggedIn=true`）+ TC-F04（日志检查无 Cookie/密码） | MS2 | UI 状态截图 + 日志文件节选（无 Cookie 与密码） |
 | AC-003 | TC-C01（L1/L2：OS 代理已开时 `startBridge`） | MS2 | 错误码 `PROXY_CONFLICT` + OS 代理前后未变 |
-| AC-004 | TC-C02 / TC-C03 / TC-C04（L1/L2：开桥设代理、关桥清代理、退出清代理） | MS2 | OS 代理读取命令输出（开桥前/中/后三态） |
+| AC-004 | TC-C02 / TC-C03 / TC-C04（L1/L2：开桥设代理、关桥清代理、退出清代理）+ TC-G04（L3 手工：切到「指定应用」后本 App 不设系统代理，切回后恢复） | MS2（系统代理）、MS3（捕获方式互斥） | OS 代理读取命令输出（开桥前/中/后三态）+ 两种捕获方式下的 `networksetup -getwebproxy` 输出 |
 | AC-005 | TC-E01 / TC-E02（L3 手工，需管理员权限） | MS2 | 系统信任库中 CA 的存在/移除 + UI `getCaStatus` |
 | AC-006 | TC-B01 / TC-B02 / TC-B05（L0/L1：默认值、精确命中、重启持久化）+ TC-H02（L3 手工：通配勾选） | MS1（匹配与默认值）、MS3（UI） | L0 测试输出 + 重启后配置文件内容 |
 | AC-007 | TC-G01 / TC-G02 / TC-G03（L3 手工：教务首页与页面内导航） | MS3（至少一侧）、MS4（双平台） | 验收记录（含已知问题），不绑定 DOM |
 | AC-008 | TC-D03（L1/L3：模拟失效信号） | MS2 | 状态机日志（停桥→清代理→停捕获）+ UI 弹窗截图 |
-| AC-009 | TC-F04（L2 + L3：调试日志内容检查） | MS3 | 日志节选（仅 `host`/`rewritten`/`ts`，无正文） |
+| AC-009 | TC-F04（L2 + L3：调试日志内容与面板行为检查） | MS3 | 日志节选（仅 `host`/`rewritten`/`ts`，无正文/Cookie）+ 日志面板观察（时间、域名、结果三列，关开关后隐藏且清空） |
 | AC-010 | TC-D04（L2 抓包/日志：登录期间访问 webvpn/authserver 主机） | MS2 | 抓包或日志显示登录流量无 WRD 二次包装 |
 
 结果登记到 [verification.md](verification.md)。

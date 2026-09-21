@@ -37,7 +37,8 @@
 | `installCa` / `uninstallCa` | 是 |
 | `getCaStatus` | 是（只读） |
 | `listCaptureCandidates` | 是（只读） |
-| `setCapturePids` | 是（整体覆盖写入） |
+| `setCaptureMode` | 是（整体覆盖写入） |
+| `setCaptureProcesses` | 是（整体覆盖写入） |
 | `setDebugLogging` | 是 |
 | `onDebugLog` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
 | `onStatus` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
@@ -57,6 +58,7 @@ interface BridgeStatus {
   localCaptureEnabled: boolean
   bridgePort?: number
   error?: { code: string; message: string }
+  captureError?: string   // M3 补充：进程捕获失败原因（不影响桥状态）
 }
 ```
 
@@ -85,10 +87,31 @@ interface DebugLogEvent {
 ```
 
 ```ts
+type CaptureMode = 'system-proxy' | 'selected-apps'   // M3 补充：捕获方式，二者互斥
+```
+
+```ts
+interface CaptureCandidate {          // M3 补充：候选应用（一行一个应用）
+  pid: number
+  name: string
+  pattern: string                     // mitmproxy intercept pattern：.app 包路径或可执行文件全路径
+}
+```
+
+```ts
+interface CaptureReport {             // M3 补充：对应 sidecar 的 swufe-capture 诊断行
+  enabled: boolean
+  processes: string[]
+  error: string | null
+}
+```
+
+```ts
 interface AppSettingsView {
   bridgePort: number
   debugLogging: boolean
-  capturePids: number[]
+  captureMode: CaptureMode            // M3：取代 capturePids
+  captureProcesses: string[]          // M3：intercept pattern 列表（最多 32 个）
   webvpnBase: string
 }
 ```
@@ -206,7 +229,7 @@ setAllowlist(cfg: AllowlistConfig): Promise<void>
 getSettings(): Promise<AppSettingsView>   // M2 补充：只读，供界面显示设置初值
 ```
 
-- 用途：读取当前设置的界面可见子集（`bridgePort` / `debugLogging` / `capturePids` / `webvpnBase`），供界面显示开关与端口的初值。
+- 用途：读取当前设置的界面可见子集（`bridgePort` / `debugLogging` / `captureMode` / `captureProcesses` / `webvpnBase`），供界面显示开关、捕获方式与端口的初值。
 - 输入：无。
 - 输出：`AppSettingsView`；**不含** `wrdKey` / `wrdIv`（敏感值不跨 IPC）。
 - 错误：见 [错误模型](#错误模型)。
@@ -244,32 +267,49 @@ getCaStatus(): Promise<{ installed: boolean; trusted: boolean }>
 - 输出：`CaStatus`（见「类型定义」）。
 - 错误：见 [错误模型](#错误模型)。
 
-### `listCaptureCandidates(): Promise<Array<{ pid: number; name: string }>>`
+### `listCaptureCandidates(): Promise<CaptureCandidate[]>`
 
 ```ts
-listCaptureCandidates(): Promise<Array<{ pid: number; name: string }>>
+listCaptureCandidates(): Promise<CaptureCandidate[]>   // M3：每项含 pattern
 ```
 
-- 用途：列出可供「进程捕获」（mitmproxy local mode）选择的进程（如 Chrome）。
+- 用途：列出可供「进程捕获」（mitmproxy local mode）选择的应用（如 Chrome）。
 - 输入：无。
-- 输出：进程数组，每项含 `pid` 与 `name`。
+- 输出：`CaptureCandidate[]`；**一行一个应用**——应用主进程与其 Helper 归并为同一条 `pattern`（`.app` 包路径），非应用用可执行文件全路径。
 - 错误：见 [错误模型](#错误模型)。
 
-### `setCapturePids(pids: number[]): Promise<void>`
+### `setCaptureMode(mode: CaptureMode): Promise<void>`
 
 ```ts
-setCapturePids(pids: number[]): Promise<void>
+setCaptureMode(mode: CaptureMode): Promise<void>   // M3 新增
 ```
 
-- 用途：设置要捕获的进程集合（与系统代理可同时启用）。
+- 用途：切换捕获方式（`system-proxy` = 系统代理接管全部流量；`selected-apps` = 仅捕获所选应用）。
 - 输入：
 
   | 字段 | 类型 | 必填 | 约束 | 说明 |
   | ---- | ---- | ---- | ---- | ---- |
-  | `pids` | `number[]` | 是 | 取值须来自 `listCaptureCandidates()`；空数组表示不启用进程捕获 | 整体覆盖写入 |
+  | `mode` | `'system-proxy' \| 'selected-apps'` | 是 | 必须是两个字面量之一 | 整体覆盖写入 |
 
 - 输出：`Promise<void>`。
-- 错误：见 [错误模型](#错误模型)。
+- 行为：两种方式**互斥**——切到 `selected-apps` 会撤销本 App 设置过的系统代理（而非设置新代理）；切回 `system-proxy` 会移除进程捕获并重新设置系统代理。桥未运行时只落盘与下发配置，不动 OS 代理。
+- 错误：见 [错误模型](#错误模型)；系统代理被其它软件占用时切到 `selected-apps` 以 `PROXY_CONFLICT` 拒绝，且配置不落盘。
+
+### `setCaptureProcesses(patterns: string[]): Promise<void>`
+
+```ts
+setCaptureProcesses(patterns: string[]): Promise<void>   // M3 新增，取代 setCapturePids
+```
+
+- 用途：设置要捕获的应用集合（仅在捕获方式为 `selected-apps` 时生效）。
+- 输入：
+
+  | 字段 | 类型 | 必填 | 约束 | 说明 |
+  | ---- | ---- | ---- | ---- | ---- |
+  | `patterns` | `string[]` | 是 | 取值须来自 `listCaptureCandidates()` 的 `pattern`；非空、不含逗号、去重；最多 32 个；空数组表示不捕获任何应用 | 整体覆盖写入 |
+
+- 输出：`Promise<void>`。
+- 错误：见 [错误模型](#错误模型)；参数非法时 reject（不写入配置）。
 
 ### `setDebugLogging(enabled: boolean): Promise<void>`
 
@@ -336,12 +376,18 @@ onSessionExpired(cb: () => void): () => void
 
 | 错误码 | 含义 | 用户动作 |
 | ------ | ---- | -------- |
-| `PROXY_CONFLICT` | 系统代理已占用 | 关闭其它代理 |
+| `PROXY_CONFLICT` | 系统代理已占用（开桥前，或启用「指定应用」前检测到） | 关闭其它代理 |
 | `CA_MISSING` | 未安装/未信任 CA | 去安装 |
 | `NOT_LOGGED_IN` | 无会话 | 去登录 |
 | `SESSION_EXPIRED` | 会话失效 | 重登 |
 | `BRIDGE_CRASH` | mitm 进程退出 | 查看日志/重启桥 |
 | `ALLOWLIST_EMPTY` | 无主机 | 添加主机 |
+
+错误码的传递方式：`BridgeStatus.error` / `BridgeStatus.captureError` 走状态对象；方法 reject 时错误码随 `Error` 一起抛给 Renderer。
+但 Electron 的 `invoke` rejection 只保留 `message` 与 `stack`（自定义属性会被丢弃），因此 `setCaptureMode` / `setCaptureProcesses` 的拒绝消息形如
+`<CODE>：<message>`（例如 `PROXY_CONFLICT：检测到系统代理已启用。…`），Renderer 侧解析该前缀决定是否弹出代理冲突模态。
+
+进程捕获失败**不使用**错误码：它不改变桥状态，只写入 `BridgeStatus.captureError`（REQ-003 边界 / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)）。
 
 会话失效处理后（停桥 → 清系统代理 → 停进程捕获 → 提示重登）的完整流程见 [../ui-ux/main-window.md](../ui-ux/main-window.md)。
 
@@ -357,3 +403,4 @@ onSessionExpired(cb: () => void): () => void
 | ---- | ---- | ------ | --------------- |
 | 2026-09-20 | 首版：会话、桥控制、allowlist、证书、进程捕获、调试日志共 15 个方法/事件 | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | M2 落地补充三项（不改变上述 15 个方法的语义）：`getSettings`（只读，供界面显示设置初值；WRD key/IV 不跨 IPC）、`onStatus`（Main → Renderer 状态推送）、`onSessionExpired`（会话过期事件，驱动重登模态） | 兼容（新增方法/事件） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [M2 完成记录](../planning/milestones/M2-desktop-orchestration.md) |
+| 2026-09-21 | M3 捕获方式：`setCapturePids` → **`setCaptureProcesses`**（按 intercept pattern 而非 PID，整体覆盖写入）；新增 `setCaptureMode`（`system-proxy` / `selected-apps` 互斥）；`BridgeStatus.captureError`；`CaptureCandidate.pattern`；`AppSettingsView.captureMode` / `.captureProcesses`；`getStatus` 的 `localCaptureEnabled` 语义收紧为「桥 running + 指定应用 + sidecar 已报告 enabled」 | **破坏性**：`setCapturePids` 已删除 | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md) |

@@ -48,6 +48,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0003](ADR-0003-electron-gui-for-phase-1.md) | Phase 1 采用 Electron 而非纯 CLI | Accepted | 2026-09-20 | — |
 | [ADR-0004](ADR-0004-refuse-start-when-system-proxy-in-use.md) | 系统代理被占用时拒绝启动 | Accepted | 2026-09-20 | — |
 | [ADR-0005](ADR-0005-builtin-wrd-key-with-override.md) | WRD 默认密钥内置并保留配置覆盖 | Accepted | 2026-09-20 | — |
+| [ADR-0006](ADR-0006-local-capture-mode-and-mutual-exclusion.md) | mitmproxy local 模式做进程捕获，且与系统代理互斥 | Accepted | 2026-09-21 | — |
 
 ## 规则
 

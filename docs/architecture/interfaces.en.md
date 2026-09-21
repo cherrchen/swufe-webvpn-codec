@@ -44,26 +44,26 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 - Provider: App Shell (Electron Main).
 - Consumer: Telemetry UI, Login WebView (Renderer).
 - Stability: Internal (app-internal only; breaking changes still need assessment).
-- Input: method calls `login` / `logout` / `getSession`, `startBridge` / `stopBridge` / `getStatus`, `getAllowlist` / `setAllowlist` / `getSettings`, `installCa` / `uninstallCa` / `getCaStatus`, `listCaptureCandidates` / `setCapturePids`, `setDebugLogging`; event subscriptions `onDebugLog` / `onStatus` / `onSessionExpired` (the last two, and `getSettings`, were added in M2; `getSettings` never returns the WRD key/IV).
-- Output: `BridgeStatus`, `AllowlistConfig`, CA status, session state, `DebugLogEvent`. Field-level definitions in [api/electron-ipc.md](../api/electron-ipc.md).
-- Error model: `BridgeStatus.error.code` takes the fixed codes `PROXY_CONFLICT` / `CA_MISSING` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `BRIDGE_CRASH` / `ALLOWLIST_EMPTY`; CA operations use `{ok, message}`.
-- Idempotency: `getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` are idempotent reads; `setAllowlist` is idempotent; `startBridge` / `stopBridge` / `installCa` / `uninstallCa` are not (repeated calls are handled by the state machine).
+- Input: method calls `login` / `logout` / `getSession`, `startBridge` / `stopBridge` / `getStatus`, `getAllowlist` / `setAllowlist` / `getSettings`, `installCa` / `uninstallCa` / `getCaStatus`, `listCaptureCandidates` / `setCaptureMode` / `setCaptureProcesses`, `setDebugLogging`; event subscriptions `onDebugLog` / `onStatus` / `onSessionExpired` (the last two, and `getSettings`, were added in M2; `getSettings` never returns the WRD key/IV). M3 replaces M2's `setCapturePids` with `setCaptureMode` (`'system-proxy' | 'selected-apps'`) and adds `setCaptureProcesses` (an array of intercept-pattern strings, written as a whole-set overwrite).
+- Output: `BridgeStatus` (including `localCaptureEnabled` and `captureError`), `AllowlistConfig`, CA status, session state, `DebugLogEvent`. Field-level definitions in [api/electron-ipc.md](../api/electron-ipc.md).
+- Error model: `BridgeStatus.error.code` takes the fixed codes `PROXY_CONFLICT` / `CA_MISSING` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `BRIDGE_CRASH` / `ALLOWLIST_EMPTY` (switching to the "selected apps" capture mode while another application occupies the system proxy also returns `PROXY_CONFLICT`); CA operations use `{ok, message}`. A process-capture failure never enters `error`; it only shows up in `BridgeStatus.captureError`. Electron's `invoke` rejection keeps only `message` / `stack`, so rejections from `setCaptureMode` / `setCaptureProcesses` look like `<CODE>：<message>` (e.g. `PROXY_CONFLICT：…`) and the Renderer parses that prefix to decide whether to open the proxy-conflict modal.
+- Idempotency: `getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` are idempotent reads; `setAllowlist`, `setCaptureMode` and `setCaptureProcesses` (whole-set overwrite) are idempotent; `startBridge` / `stopBridge` / `installCa` / `uninstallCa` are not (repeated calls are handled by the state machine).
 - Versioning: preload and Main are built and versioned together; no cross-version mixing.
 - Compatibility commitment: added methods/fields are backward compatible; removals or signature changes are breaking (allowed exceptions in "Compatibility strategy").
-- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md).
+- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md), [ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md).
 
 ### IF-002 Main ↔ mitm sidecar control
 
 - Provider: Bridge Addon (mitmproxy sidecar).
 - Consumer: Proxy Orchestrator (Main).
 - Stability: Internal / Evolving (consumed only inside this app; Phase 1 has adopted option A — "child-process lifecycle + config-file hot reload" — and no other control-plane shape is promised).
-- Input: child-process lifecycle (spawn / terminate); whole-file overwrite of the config file (`allowlist` / `cookies` / `debug` / `webvpnBase` / `wrdKey` / `wrdIv`; path and fields in [api/bridge-control-protocol.md](../api/bridge-control-protocol.md)).
-- Output: readiness and diagnostic lines on stderr (`swufe-ready` / `swufe-error <CODE> <message>`), the process exit code (normal `0`, startup validation failure `2`); and the config-application result (hot reload; on failure the last usable config is kept).
-- Error model: sidecar-level diagnostics `swufe-error <CODE> <message>` + exit code `2` (`CONFIG_INVALID`, `ALLOWLIST_EMPTY`, `LISTEN_NOT_LOOPBACK`); a runtime config-reload failure does not exit — it keeps the last usable config and prints the same message only once; M2 maps an unexpected sidecar exit to `BRIDGE_CRASH`.
+- Input: child-process lifecycle (spawn / terminate); the launch argument `--mode regular@<port>` (**never** `--listen-port`: a global `listen_port` would make the `local:<spec>` added at runtime collide with `regular` on the same listen address); whole-file overwrite of the config file (`allowlist` / `cookies` / `debug` / `webvpnBase` / `wrdKey` / `wrdIv` / `capture`; path and fields in [api/bridge-control-protocol.md](../api/bridge-control-protocol.md)). `capture` is `{"processes": string[]}` and defaults to an empty array; it is always `[]` in the `system-proxy` capture mode, and an invalid value (not a list / empty string / comma inside / non-string) ⇒ `CONFIG_INVALID`.
+- Output: readiness and diagnostic lines on stderr (`swufe-ready` / `swufe-error <CODE> <message>` / `swufe-capture {"enabled":bool,"processes":string[],"error":string|null}`), the process exit code (normal `0`, startup validation failure `2`); and the config-application result (hot reload; on failure the last usable config is kept).
+- Error model: sidecar-level diagnostics `swufe-error <CODE> <message>` + exit code `2` (`CONFIG_INVALID`, `ALLOWLIST_EMPTY`, `LISTEN_NOT_LOOPBACK`); a runtime config-reload failure does not exit — it keeps the last usable config and prints the same message only once; M2 maps an unexpected sidecar exit to `BRIDGE_CRASH`. `swufe-capture` only reports the process-capture state (keys fixed to `enabled` / `processes` / `error`); it never takes part in the readiness decision, a capture failure does not change the bridge state, and there is no automatic retry (it retries only once the runtime config is rewritten).
 - Idempotency: the config file is written as a whole-file overwrite, with "last one wins" as the idempotency semantics; repeated terminate calls converge to the stopped state.
 - Versioning: the sidecar ships with the App; control-plane capability changes (e.g. enabling option B) count as implementation changes rather than contract changes.
-- Compatibility commitment: Cookies never enter logs or diagnostic lines (INV-001); the `swufe-ready` / `swufe-error` line formats and the exit-code semantics are stable; the listen address is always `127.0.0.1`.
-- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md).
+- Compatibility commitment: Cookies never enter logs or diagnostic lines (INV-001); the `swufe-ready` / `swufe-error` / `swufe-capture` line formats and the exit-code semantics are stable; the `swufe-capture` key set is fixed to `enabled` / `processes` / `error`; the listen address is always `127.0.0.1`.
+- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md), [ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md).
 
 ### IF-003 Bridge Addon ↔ WRD Codec library
 
@@ -83,13 +83,13 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 - Provider: OS (system API).
 - Consumer: Proxy Orchestrator.
 - Stability: Evolving (follows OS versions).
-- Input: read the current HTTP/HTTPS system proxy; set the proxy to `127.0.0.1:<bridge_port>`; clear the proxy set by this app.
+- Input: read the current HTTP/HTTPS system proxy; set the proxy to `127.0.0.1:<bridge_port>`; clear the proxy set by this app. In the `selected-apps` capture mode the system proxy is not set and one previously set by this app is revoked (ADR-0006).
 - Output: proxy state (enabled or not, and where it points).
-- Error model: read failure or a proxy already in use → `PROXY_CONFLICT`.
+- Error model: read failure or a proxy already in use → `PROXY_CONFLICT` (the same applies when checking the system proxy before switching to the "selected apps" capture mode and another application occupies it).
 - Idempotency: reads are idempotent; repeated set/clear calls converge to the same target state.
 - Versioning: an OS adaptation layer inside Proxy Orchestrator absorbs differences; nothing else is exposed.
-- Compatibility commitment: only the proxy set by this app is cleared (INV-002); macOS / Windows behaviour differences stay inside the adaptation layer.
-- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0004](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md).
+- Compatibility commitment: only the proxy set by this app is cleared (INV-002); no system proxy is set in the `selected-apps` capture mode (ADR-0006); macOS / Windows behaviour differences stay inside the adaptation layer.
+- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0004](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md), [ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md).
 
 ### IF-005 App ↔ OS trust store
 
@@ -133,7 +133,7 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 | Interface | Test location | Coverage |
 | --------- | ------------- | -------- |
 | IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-D01, TC-D02, TC-C01–C04, TC-E01–E03, TC-B05, TC-H01) | Session / bridge-control / allowlist / CA / process-capture IPC behaviour and error codes |
-| IF-002 | L1 `tests/l1/test_addon_reload.py` (config hot reload and failure fallback) + L2 `tests/l2/test_proxy_end_to_end.py` (`swufe-ready` line, exit code `2`, loopback listener) | config-file hot-reload semantics, readiness/diagnostic line formats and startup-failure exit code |
+| IF-002 | L1 `tests/l1/test_addon_reload.py` (config hot reload and failure fallback), L1 `tests/l1/test_addon_capture.py` (local-mode overlay and `swufe-capture` reporting) + L2 `tests/l2/test_proxy_end_to_end.py` (`swufe-ready` line with `listen_port`, exit code `2`, loopback listener) | config-file hot-reload semantics, readiness/diagnostic line formats and startup-failure exit code, process-capture mode overlay and reporting |
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-A01–A05) | codec vectors and URL conversion consistency |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-C01–C04) | conflict refusal, proxy set and clear |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-E01–E03) | install, uninstall and missing-CA prompt |

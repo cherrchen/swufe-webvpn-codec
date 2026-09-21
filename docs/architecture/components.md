@@ -11,19 +11,19 @@
 
 > 「代码位置」为已落地实现的真实路径；尚未实现的组件仍为 `TBD（实现首个任务确定）`。
 > M1（桥核心）已实现 WRD Codec、Bridge Addon（含配置面与 sidecar 入口）与 Allowlist Store 的库层；M2 已落地 Electron 侧全部组件
-> （`app/src/`），Windows 平台适配已实现、真机验证待 M4。
+> （`app/src/`），Windows 平台适配已实现、真机验证待 M4；M3 补齐捕获方式（进程捕获）、allowlist 增删界面与调试日志面板。
 
 | 组件 | 类型 | 职责（一句话） | 代码位置 | 状态 |
 | ---- | ---- | -------------- | -------- | ---- |
 | App Shell | 进程内模块（Electron Main） | 窗口/托盘（可选）、配置持久化，并作为 Main 侧编排入口暴露 preload IPC | `app/src/main/index.ts`（组合根、单实例锁、退出清理 `shutdown.ts`）、`app/src/main/ipc.ts`（IF-001）、`app/src/main/windows.ts`、`app/src/main/store.ts` | Implemented (M2；托盘未实现) |
 | Login WebView | 进程内模块（Electron Renderer / BrowserWindow） | 承载官方 WebVPN / CAS 登录并保证防环 | `app/src/main/session-broker.ts`（`openLogin`，`persist:swufe-login` 分区 + `setProxy({mode:'direct'})`） | Implemented (M2) |
 | Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与失效检测 | `app/src/main/session-broker.ts`（采集/清除/监视）、`app/src/main/session-probe.ts`（失效信号分类，纯函数） | Implemented (M2；Q-001 的另两个信号留 M3/M4) |
-| Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、管理进程捕获、代理冲突检测 | `app/src/main/orchestrator.ts`、`app/src/main/state-machine.ts`、`app/src/main/sidecar.ts`、`app/src/main/platform/`（`exec.ts`、`parse.ts` 与 darwin/win32 适配） | Implemented (M2；Windows 真机验证待 M4) |
+| Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、在「系统代理 / 指定应用」两种捕获方式间切换、代理冲突检测 | `app/src/main/orchestrator.ts`、`app/src/main/state-machine.ts`、`app/src/main/sidecar.ts`、`app/src/main/platform/`（`exec.ts`、`parse.ts` 与 darwin/win32 适配） | Implemented (M2；Windows 真机验证待 M4) |
 | WRD Codec | 进程内库（App 与 sidecar 共享） | hostname 加解密与 URL 互转（纯函数，无 IO） | `swufe_bridge/wrd_codec.py` | Implemented (M1) |
 | Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入 | `swufe_bridge/addon.py`（响应反向改写纯函数 `swufe_bridge/rewrite.py`；配置面 `swufe_bridge/config.py`；进程入口 `swufe_bridge/sidecar.py`） | Implemented (M1) |
 | Cert Manager | 进程内模块（Electron Main） | 本机 MITM CA 的安装/卸载与状态查询 | `app/src/main/platform/darwin/cert.ts`、`app/src/main/platform/win32/cert.ts`、`app/src/main/platform/ca-files.ts`；CA 生成入口 `swufe_bridge/ca.py` | Implemented (M2；系统信任库写入的真机验证待人工，见 [M2 完成记录](../planning/milestones/M2-desktop-orchestration.md)) |
-| Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | `app/src/main/store.ts`（`<userData>/config.json` 读写与校验）+ `swufe_bridge/allowlist.py`（匹配语义与校验）+ `swufe_bridge/config.py`（`AllowlistStore`） | Implemented (M2；编辑界面属 M3) |
-| Telemetry UI | 进程内模块（Electron Renderer） | 状态展示与调试日志面板 | `app/src/renderer/renderer.ts`、`app/static/{index.html,styles.css}`、`app/src/preload/index.ts` | Partial (M2：状态条/桥开关/证书/代理状态/调试开关；allowlist 编辑与日志面板属 M3) |
+| Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | `app/src/main/store.ts`（`<userData>/config.json` 读写与校验）+ `swufe_bridge/allowlist.py`（匹配语义与校验）+ `swufe_bridge/config.py`（`AllowlistStore`） | Implemented (M2；编辑界面已在 M3 落地) |
+| Telemetry UI | 进程内模块（Electron Renderer） | 捕获方式选择、allowlist 增删、状态展示与调试日志面板 | `app/src/renderer/renderer.ts`、`app/static/{index.html,styles.css}`、`app/src/preload/index.ts` | Implemented (M3：状态条/桥开关/证书/代理状态/调试开关 + 捕获方式区、allowlist 编辑与日志面板) |
 
 ## 组件关系
 
@@ -46,7 +46,7 @@ flowchart TD
     Addon -->|"IF-003"| Codec
 ```
 
-说明：Telemetry UI 是叶子（只经 preload IPC 调用 App Shell），App Shell 是 Main 侧的组合根；Session Broker 读取 Login WebView 的 session，是 Cookie 的唯一读取点；Proxy Orchestrator 依赖 Allowlist Store 作为路由数据源，并经本地控制口驱动 sidecar 内的 Bridge Addon；WrdCodec 无 IO、不被任何组件反向依赖，由 Bridge Addon 与 App Shell 共同使用。
+说明：Telemetry UI 是叶子（只经 preload IPC 调用 App Shell），App Shell 是 Main 侧的组合根；Session Broker 读取 Login WebView 的 session，是 Cookie 的唯一读取点；Proxy Orchestrator 依赖 Allowlist Store 作为路由数据源，并经本地控制口驱动 sidecar 内的 Bridge Addon（含运行时叠加 / 移除 local 捕获模式）；WrdCodec 无 IO、不被任何组件反向依赖，由 Bridge Addon 与 App Shell 共同使用。
 
 ## 组件详情
 
@@ -88,15 +88,19 @@ flowchart TD
 
 ### Proxy Orchestrator
 
-- 职责：启停 mitm sidecar、设置/清除系统代理、管理进程捕获（local capture）、代理冲突检测。
+- 职责：启停 mitm sidecar、设置/清除系统代理、管理进程捕获（local capture）与捕获方式（`captureMode`）、代理冲突检测。
 - 不负责：不做流量改写；不管理 CA（Cert Manager）；不直接读取 Cookie（经 Session Broker）。
-- 输入：`startBridge` / `stopBridge` IPC；OS 当前代理设置；`capturePids`。
-- 输出：`BridgeStatus`；系统代理指向；推送给 sidecar 的 `{allowlist, cookies, debug}` 配置。
+- 输入：`startBridge` / `stopBridge` / `setCaptureMode` / `setCaptureProcesses` IPC；OS 当前代理设置；`captureMode` 与 `captureProcesses`。
+- 输出：`BridgeStatus`（含 `localCaptureEnabled` 与 `captureError`）；系统代理指向；推送给 sidecar 的 `{allowlist, cookies, debug, capture}` 配置。
 - 依赖：Allowlist Store、OS 代理 API（IF-004）、mitm sidecar 控制口（IF-002）。
 - 被谁依赖：App Shell。
 - 关键不变式：仅在「由本 App 设置」标记存在时清除系统代理（INV-002）；桥状态机固定为 `idle → starting → running`，`running → stopping → idle`，`starting → error → idle`。
-- 相关测试：TC-C01、TC-C02、TC-C03、TC-C04、TC-D03。
-- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0004](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
+- 捕获方式互斥（ADR-0006）：`system-proxy` 与 `selected-apps` 不同时生效——`selected-apps` 时本 App 不设置系统代理，并撤销此前由自己设置过的（清 `systemProxyManagedByApp` 标记），改由 local 模式接管所选应用的流量；`system-proxy` 时不启用 local 捕获（运行时配置里 `capture.processes` 恒为空），由系统代理覆盖全部流量。切换方式按目标方式撤销 / 恢复；桥端口（regular 监听）在两种方式下始终可用。
+- 切换前检查：切到 `selected-apps` 之前先检查系统代理，被其它软件占用（非指向本桥）则拒绝并返回 `PROXY_CONFLICT`，设置不落盘（与 ADR-0004 的「拒绝而不是半工作」一致）。
+- 候选应用枚举：macOS 用 `ps -Ao pid=,comm=`、Windows 用 `tasklist /fo csv /nh`；应用按 `.app` 包路径归并为一行（主进程与 Helper 合并为同一 pattern），非应用用可执行文件全路径，作为 mitmproxy intercept pattern。
+- 进程捕获失败不进入桥的 `error` 状态：桥继续 `running`，原因只写入 `BridgeStatus.captureError`；`localCaptureEnabled` 仅在「桥 `running` + `captureMode = 'selected-apps'` + sidecar 上报 `enabled: true`」时为真。
+- 相关测试：TC-C01、TC-C02、TC-C03、TC-C04、TC-D03、TC-G04。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)、[ADR-0004](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
 
 ### WRD Codec
 
@@ -112,15 +116,17 @@ flowchart TD
 
 ### Bridge Addon
 
-- 职责：对命中 allowlist 的请求做 WRD 改写与 Cookie 注入；对响应做反向改写；产出调试日志事件。
+- 职责：对命中 allowlist 的请求做 WRD 改写与 Cookie 注入；对响应做反向改写；产出调试日志事件；按运行时配置叠加 / 移除 local 捕获模式并回报捕获状态。
 - 不负责：不做 UI；不直接读写用户配置（只接受下发的配置）；不依赖 Renderer/UI；不做会话采集。
-- 输入：经本机桥的 HTTP/HTTPS 请求与响应；下发的 `{allowlist, cookies, debug}`。
-- 输出：改写到 WebVPN 形态的上行请求；反向改写后的响应；调试日志事件（域名 + 是否改写成功）。
+- 输入：经本机桥的 HTTP/HTTPS 请求与响应；下发的 `{allowlist, cookies, debug, capture}` 配置。
+- 输出：改写到 WebVPN 形态的上行请求；反向改写后的响应；调试日志事件（域名 + 是否改写成功）；`swufe-capture` 诊断行。
 - 依赖：WrdCodec。
 - 被谁依赖：Proxy Orchestrator（经控制口）。
 - 关键不变式：非 allowlist 流量直连不改写（C-004）；`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 硬编码排除（INV-004）；日志不含 Cookie 与正文（INV-001）。
+- 捕获机制（ADR-0006）：sidecar 以 `--mode regular@<port>` 启动并**不传** `--listen-port`（全局 `listen_port` 会让运行时新增的 `local:<spec>` 与 `regular` 被判为同一监听地址而报错）；运行时把 `local:<spec>` 叠加到同一个 mitmproxy 实例，regular 监听保留、桥端口始终可用，`swufe-ready` 的 `listen_port` 由 regular 模式推导。
+- 捕获回报：`swufe-capture {"enabled":bool,"processes":string[],"error":string|null}` 诊断行（键固定为 `enabled` / `processes` / `error` 三个），首次应用与配置变更时上报；失败后不自动重试，直到运行时配置被重写（界面「重试」按钮即再次下发配置）。进程捕获是可选能力，该行不参与就绪判定，失败也不改变桥状态。
 - 相关测试：TC-F01、TC-F02、TC-F03、TC-F04、TC-D04。
-- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)、[ADR-0005](adr/ADR-0005-builtin-wrd-key-with-override.md)。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)、[ADR-0001](adr/ADR-0001-wrd-rewrite-in-mitm-layer.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)、[ADR-0005](adr/ADR-0005-builtin-wrd-key-with-override.md)。
 
 ### Cert Manager
 
@@ -148,14 +154,14 @@ flowchart TD
 
 ### Telemetry UI
 
-- 职责：状态条、日志面板、allowlist / CA / 进程捕获 / 调试日志开关等界面（Renderer）。
+- 职责：一级「捕获方式」选择（系统代理 / 指定应用，含进程捕获状态、macOS 授权引导与重试）、可编辑 allowlist（增删主机 + `*.swufe.edu.cn` 勾选）、状态条与日志面板，以及 CA / 调试日志开关等界面（Renderer）。
 - 不负责：不直接调用 OS API；不做改写；不持有 Cookie 明文。
-- 输入：`BridgeStatus`、`DebugLogEvent`、`AllowlistConfig`、CA 状态。
+- 输入：`BridgeStatus`（含 `localCaptureEnabled` / `captureError`）、`DebugLogEvent`、`AllowlistConfig`、`AppSettingsView`（`captureMode` / `captureProcesses`）、`CaptureCandidate[]`、CA 状态。
 - 输出：用户操作对应的 IPC 调用。
 - 依赖：App Shell（经 preload IPC）。
 - 被谁依赖：无（叶子）。
-- 关键不变式：错误不得仅靠颜色表达（无障碍）；日志面板默认不展示正文与 Cookie。
-- 相关测试：TC-H01、TC-H02、TC-F04。
+- 关键不变式：错误不得仅靠颜色表达（无障碍）；日志面板默认随「调试日志」开关隐藏、最多保留最近 200 条、只有时间 / 域名 / 结果三列，不含正文与 Cookie；allowlist 修改与捕获方式切换立即生效（无需重启）。
+- 相关测试：TC-H01、TC-H02、TC-F04、TC-B05。
 - 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)。
 
 ## 依赖规则
@@ -176,7 +182,7 @@ flowchart TD
 | App Shell | cherrchen | IPC 边界与 [interfaces.md](interfaces.md)、[api/electron-ipc.md](../api/electron-ipc.md) 是否同步 |
 | Login WebView | cherrchen | 防环策略（INV-004）是否仍成立 |
 | Session Broker | cherrchen | Cookie 策略与「唯一读取点」约束是否保持 |
-| Proxy Orchestrator | cherrchen | 代理冲突与清除策略（ADR-0004、INV-002）是否改变 |
+| Proxy Orchestrator | cherrchen | 代理冲突与清除策略、捕获方式互斥（ADR-0004、ADR-0006、INV-002）是否改变 |
 | WRD Codec | cherrchen | codec 向量（NFR-002）与默认 key/iv 语义（ADR-0005）是否受影响 |
 | Bridge Addon | cherrchen | 改写策略、allowlist 语义与日志最小化（C-004、INV-001、INV-004）是否受影响 |
 | Cert Manager | cherrchen | CA / 信任模型（ADR-0002、REQ-010）是否改变 |

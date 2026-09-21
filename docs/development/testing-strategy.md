@@ -23,7 +23,7 @@
 ## 2. 覆盖要求
 
 ```text
-Coverage target: TBD（M1 未设定数值目标；当前基线为 L0/L1/L2 的 154 个用例全绿）
+Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 190 个用例与 70 个 App 单测用例全绿）
 Coverage tool:   TBD（M1 未引入；层与用例即当前的可回归证据）
 Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 ```
@@ -35,7 +35,8 @@ Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 - 代理冲突与系统代理清除（TC-C01..TC-C04）；
 - 会话过期时的停桥、清代理、停捕获（TC-D03）；
 - 防环：登录流量不经 WRD 二次包装（TC-D04）；
-- 响应反向改写的关键跳转（`Location` 与教务内导航，TC-F03 / TC-G02）。
+- 响应反向改写的关键跳转（`Location` 与教务内导航，TC-F03 / TC-G02）；
+- 进程捕获（REQ-003）：`swufe_bridge.capture` 的模式集推导 / 失败回滚 / 不重试语义用 L0 单测（`tests/l0/test_capture.py`），addon 的捕获循环用 L1 注入式单测（`tests/l1/test_addon_capture.py`，注入 fake，**不得真实启用 local 模式**）；真实范围与「切回系统代理即停」属 L3 手工验证（需测试者本人在系统授权提示内确认）。
 
 此外必须覆盖需求验收标准、已修复 Bug 的复现路径、边界与错误路径。
 

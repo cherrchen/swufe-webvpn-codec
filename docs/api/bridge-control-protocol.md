@@ -29,7 +29,7 @@
 
 | 能力 | 实现 |
 | ---- | ---- |
-| 启动 | `uv run python -m swufe_bridge.sidecar --config <file> --port <port> --confdir <dir>`（M2 以 Electron 子进程方式 spawn 同一入口） |
+| 启动 | `uv run python -m swufe_bridge.sidecar --config <file> --port <port> --confdir <dir>`（M2 以 Electron 子进程方式 spawn 同一入口）；mitmdump 侧以 `--mode regular@<port>` 启动，**不传 `--listen-port`**（M3，见下） |
 | 就绪探测 | stderr 出现 `swufe-ready` 行 **且** TCP 可连 `127.0.0.1:<port>` |
 | 配置下发 | 写入配置文件（整体覆盖）；sidecar 以 mtime + size 轮询热加载，无需信号、无需重启 |
 | 配置失败回退 | 解析失败时保留上一次可用配置继续服务，并输出 `swufe-error CONFIG_INVALID <message>`（同一消息不重复打印） |
@@ -49,7 +49,8 @@
     "debug": false,
     "webvpnBase": "https://webvpn.swufe.edu.cn",
     "wrdKey": "wrdvpnisthebest!",
-    "wrdIv": "wrdvpnisthebest!"
+    "wrdIv": "wrdvpnisthebest!",
+    "capture": { "processes": [] }
   }
   ```
 
@@ -60,7 +61,9 @@
 | `debug` | `false` | 抛 `CONFIG_INVALID` |
 | `webvpnBase` | `https://webvpn.swufe.edu.cn` | 抛 `CONFIG_INVALID` |
 | `wrdKey` / `wrdIv` | `wrdvpnisthebest!` | 长度 ≠ 16 字节 ⇒ 抛 `CONFIG_INVALID` |
+| `capture` | `{"processes": []}` | 非对象、`processes` 非列表、元素非字符串 / 空串 / 含逗号 ⇒ 抛 `CONFIG_INVALID` |
 
+- `capture.processes` 项为 mitmproxy intercept pattern：应用取 `.app` 包路径，非应用取可执行文件全路径；逗号是 intercept spec 的分隔符，故不允许出现在单个 pattern 内。空列表表示不启用进程捕获；`system-proxy` 捕获方式下 App 恒写入空列表（两种方式互斥，见 [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)）。
 - 缺键取默认值；未知顶层键忽略；文件缺失或 JSON 解析失败 ⇒ `CONFIG_INVALID`。
 - **sidecar 不写入、不修改该文件**：唯一写入方是 App（M2）；M1 开发期由人工写入。
 
@@ -85,13 +88,15 @@ python -m swufe_bridge.ca --confdir <confdir>
 ```text
 swufe-debug {"ts":"2026-09-21T10:00:00+00:00","host":"jwxt.swufe.edu.cn","rewritten":true,"direction":"request","detail":null}
 swufe-ready {"listen_host":"127.0.0.1","listen_port":8080,"config":"/abs/path.json","allowlist":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false,"cookies":1,"debug":false}
+swufe-capture {"enabled":true,"processes":["/Applications/Google Chrome.app/"],"error":null}
 swufe-error CONFIG_INVALID <message>
 swufe-error ALLOWLIST_EMPTY allowlist 为空：请添加主机或启用 *.swufe.edu.cn
 swufe-error LISTEN_NOT_LOOPBACK <message>
 ```
 
 - `swufe-debug` 键固定为 `ts` / `host` / `rewritten` / `direction` / `detail`；`detail` 仅取短标记（`not-allowlisted`、`encode-failed`、`location`、`set-cookie`、`body`、`body-skipped`、`no-wrd-match`），**禁止**出现 Cookie 值与请求/响应正文（INV-001）。
-- `swufe-ready` 在 addon `running()` 打印一次，报告生效的 `listen_host` / `listen_port`；`cookies` 只输出条数。
+- `swufe-ready` 在 addon `running()` 打印一次，报告生效的 `listen_host` / `listen_port`；`cookies` 只输出条数。`listen_port` 由 `--mode regular@<port>` 推导（sidecar 不传 `--listen-port`）。
+- `swufe-capture`（M3）键固定为 `enabled` / `processes` / `error` 三个：首次应用捕获配置与配置变更后各上报一次。它**不参与就绪判定**（进程捕获是可选能力），失败后不自动重试，直到运行时配置被重写（界面「重试」即再次下发配置）。失败只影响 `BridgeStatus.captureError`，桥保持 `running`。
 - 退出码：正常停止 `0`；启动校验失败（`CONFIG_INVALID`、`ALLOWLIST_EMPTY`）`2`。
 
 ### 开发运行
@@ -101,6 +106,10 @@ uv run python -m swufe_bridge.sidecar --config <bridge-config.json> --port 18080
 # 就绪后（stderr 出现 swufe-ready）：
 curl -sS -i -x http://127.0.0.1:18080 --cacert <confdir>/mitmproxy-ca-cert.pem https://jwxt.swufe.edu.cn/sso/jziotlogin
 ```
+
+### 为什么用 `--mode regular@<port>`（M3 变更）
+
+sidecar 不再向 mitmdump 传 `--listen-port`：全局 `listen_port` 会作用于**每个**模式，而进程捕获要求运行时把 `local:<spec>` 追加到同一个 mitmproxy 实例上，mitmproxy 的重复监听地址检查会把 `local` 判为与 `regular` 争用同一地址并抛 `OptionsError`。改用 `--mode regular@<port>` 后端口只属于 regular 模式，`local` 模式不占端口（`listen_addrs` 为空），两种模式共存且切换时桥端口始终可用。`swufe-ready` 的 `listen_port` 因此由 regular 模式推导，而不是读取 `ctx.options.listen_port`。
 
 ## 硬约束
 
@@ -120,3 +129,4 @@ curl -sS -i -x http://127.0.0.1:18080 --cacert <confdir>/mitmproxy-ca-cert.pem h
 | 2026-09-20 | 首版：记录方案 A / 方案 B 两种候选实现与硬约束，实现方式标 `TBD` | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | 定稿方案 A：配置文件路径与字段表、mtime + size 轮询热加载与失败回退、`swufe-ready` / `swufe-error` 行与退出码、开发运行命令、回环由 sidecar 硬编码强制 | 兼容（首版未定稿，无既有消费方） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md) |
 | 2026-09-21 | M2 落地：新增 CA 生成入口 `python -m swufe_bridge.ca --confdir <dir>`（stdout JSON / `swufe-error CA_FAILED` / 退出码 2 / 幂等）；明确 M2 的 `--config` 与 `--confdir` 落点分别为 `<userData>/bridge-config.json` 与 `<userData>/mitmproxy/` | 兼容（新增入口，控制面未变） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
+| 2026-09-21 | M3 捕获：配置新增 `capture.processes`；新增 `swufe-capture {"enabled","processes","error"}` 诊断行；启动改为 `--mode regular@<port>`（不再传 `--listen-port`），`swufe-ready.listen_port` 由 regular 模式推导 | 兼容（新增键与行；启动参数变化对 Main 透明） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md) |

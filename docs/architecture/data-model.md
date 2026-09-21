@@ -13,7 +13,7 @@
 | ---- | ---- | -------- | ---- |
 | AllowlistConfig | 主机列表与通配选项，决定哪些主机经 WebVPN 改写 | 随配置写入创建/更新，长期保留 | 本文件 |
 | SessionState | WebVPN 会话所需的 Cookie 及最小附属状态 | 登录后创建，过期/登出即失效 | 本文件 |
-| AppSettings | 应用设置（端口、调试、捕获进程、WebVPN 基址、WRD key/iv、代理标记） | 首次启动创建，用户修改时更新 | 本文件 |
+| AppSettings | 应用设置（端口、调试、捕获方式与捕获应用、WebVPN 基址、WRD key/iv、代理标记） | 首次启动创建，用户修改时更新 | 本文件 |
 | BridgeRuntimeStatus | 桥的运行时状态（不持久化） | 进程内产生与消亡 | 本文件、[api/electron-ipc.md](../api/electron-ipc.md) |
 | DebugLogRecord | 调试日志记录（域名 + 是否改写成功） | 内存环缓，可选落盘 | 本文件 |
 
@@ -80,13 +80,15 @@
   | ---- | ---- | ---- | ---- | ---- |
   | bridgePort | number | 是 | 默认 8080 或自动 | 本机桥监听端口 |
   | debugLogging | boolean | 是 | 默认 `false` | 调试日志开关 |
-  | capturePids | number[] | 是 | 默认 `[]` | 进程捕获目标 |
+  | captureMode | `'system-proxy'` \| `'selected-apps'` | 是 | 默认 `'system-proxy'` | 捕获方式（M3）：两种方式互斥（ADR-0006） |
+  | captureProcesses | string[] | 是 | 默认 `[]`；元素为 mitmproxy intercept pattern（非空、不含逗号、去重，最多 32 个） | 捕获方式为 `selected-apps` 时下发给 sidecar 的应用集合（M3） |
   | webvpnBase | string | 是 | 默认 `https://webvpn.swufe.edu.cn` | WebVPN 入口 |
   | wrdKey | string | 是 | 默认 `wrdvpnisthebest!`，可覆盖 | WRD 默认密钥（ADR-0005） |
   | wrdIv | string | 是 | 默认 `wrdvpnisthebest!`，可覆盖 | WRD 默认 IV（ADR-0005） |
   | systemProxyManagedByApp | boolean | 是 | 默认 `false`；运行时 | 「系统代理由本 App 设置」标记 |
 
 - 不变式：`systemProxyManagedByApp` 与实际代理状态强一致；仅在标记为真时清除系统代理（INV-002）。
+- 不变式（M3）：`captureMode` 与「本 App 是否设置系统代理」互斥——`selected-apps` 时 `systemProxyManagedByApp` 必须为 `false`；`captureProcesses` 仅在 `selected-apps` 时写入 `bridge-config.json` 的 `capture.processes`（`system-proxy` 下恒为空数组）。
 - 生命周期：创建于首次启动；更新于用户修改设置或桥启停；删除为重置设置。
 - 所有者：cherrchen。
 - 关联需求：REQ-001、REQ-003、REQ-004。

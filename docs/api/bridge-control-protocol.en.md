@@ -31,7 +31,7 @@ Phase 1 adopts option A (finalised 2026-09-21): Main only launches/terminates th
 
 | Capability | Implementation |
 | ---- | ---- |
-| Start | `uv run python -m swufe_bridge.sidecar --config <file> --port <port> --confdir <dir>` (M2 spawns the same entry point as an Electron child process) |
+| Start | `uv run python -m swufe_bridge.sidecar --config <file> --port <port> --confdir <dir>` (M2 spawns the same entry point as an Electron child process); mitmdump itself is started with `--mode regular@<port>` and **never** `--listen-port` (M3, see below) |
 | Readiness probe | a `swufe-ready` line on stderr **and** TCP reachable at `127.0.0.1:<port>` |
 | Configuration delivery | write the configuration file (full overwrite); the sidecar hot-reloads it by polling mtime + size, with no signal and no restart |
 | Configuration failure fallback | on a parse failure the last usable configuration is kept and the bridge keeps serving, emitting `swufe-error CONFIG_INVALID <message>` (the same message is not printed twice) |
@@ -51,7 +51,8 @@ Phase 1 adopts option A (finalised 2026-09-21): Main only launches/terminates th
     "debug": false,
     "webvpnBase": "https://webvpn.swufe.edu.cn",
     "wrdKey": "wrdvpnisthebest!",
-    "wrdIv": "wrdvpnisthebest!"
+    "wrdIv": "wrdvpnisthebest!",
+    "capture": { "processes": [] }
   }
   ```
 
@@ -62,7 +63,9 @@ Phase 1 adopts option A (finalised 2026-09-21): Main only launches/terminates th
 | `debug` | `false` | raises `CONFIG_INVALID` |
 | `webvpnBase` | `https://webvpn.swufe.edu.cn` | raises `CONFIG_INVALID` |
 | `wrdKey` / `wrdIv` | `wrdvpnisthebest!` | length ≠ 16 bytes ⇒ raises `CONFIG_INVALID` |
+| `capture` | `{"processes": []}` | not an object, `processes` not a list, or an item that is not a string / is empty / contains a comma ⇒ raises `CONFIG_INVALID` |
 
+- A `capture.processes` item is a mitmproxy intercept pattern: applications use their `.app` bundle path, anything else uses the executable's full path. A comma separates entries in an intercept spec, so it may not appear inside one pattern. An empty list disables process capture; in `system-proxy` capture mode the app always writes an empty list (the two modes exclude each other, see [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.en.md)).
 - Missing keys take their default value; unknown top-level keys are ignored; a missing file or a JSON parse failure ⇒ `CONFIG_INVALID`.
 - **The sidecar neither writes nor modifies this file**: the only writer is the app (M2); during M1 development it is written by hand.
 
@@ -87,13 +90,15 @@ python -m swufe_bridge.ca --confdir <confdir>
 ```text
 swufe-debug {"ts":"2026-09-21T10:00:00+00:00","host":"jwxt.swufe.edu.cn","rewritten":true,"direction":"request","detail":null}
 swufe-ready {"listen_host":"127.0.0.1","listen_port":8080,"config":"/abs/path.json","allowlist":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false,"cookies":1,"debug":false}
+swufe-capture {"enabled":true,"processes":["/Applications/Google Chrome.app/"],"error":null}
 swufe-error CONFIG_INVALID <message>
 swufe-error ALLOWLIST_EMPTY allowlist 为空：请添加主机或启用 *.swufe.edu.cn
 swufe-error LISTEN_NOT_LOOPBACK <message>
 ```
 
 - `swufe-debug` keys are fixed to `ts` / `host` / `rewritten` / `direction` / `detail`; `detail` only takes short markers (`not-allowlisted`, `encode-failed`, `location`, `set-cookie`, `body`, `body-skipped`, `no-wrd-match`), and cookie values and request/response bodies **must never** appear (INV-001).
-- `swufe-ready` is printed once from the addon's `running()` and reports the effective `listen_host` / `listen_port`; `cookies` reports the count only.
+- `swufe-ready` is printed once from the addon's `running()` and reports the effective `listen_host` / `listen_port`; `cookies` reports the count only. `listen_port` is derived from `--mode regular@<port>` (the sidecar never passes `--listen-port`).
+- `swufe-capture` (M3) has exactly three keys — `enabled` / `processes` / `error` — and is printed once on first apply of the capture configuration and again after every change. It does **not** gate readiness (process capture is optional) and a failure is not retried until the runtime configuration is rewritten (the UI's retry button re-pushes it). A failure only fills `BridgeStatus.captureError`; the bridge stays `running`.
 - Exit codes: normal stop `0`; startup validation failure (`CONFIG_INVALID`, `ALLOWLIST_EMPTY`) `2`.
 
 ### Development run
@@ -103,6 +108,10 @@ uv run python -m swufe_bridge.sidecar --config <bridge-config.json> --port 18080
 # once ready (a swufe-ready line appears on stderr):
 curl -sS -i -x http://127.0.0.1:18080 --cacert <confdir>/mitmproxy-ca-cert.pem https://jwxt.swufe.edu.cn/sso/jziotlogin
 ```
+
+### Why `--mode regular@<port>` (changed in M3)
+
+The sidecar no longer passes `--listen-port` to mitmdump: a global `listen_port` applies to **every** mode, while process capture requires appending `local:<spec>` to the same mitmproxy instance at runtime — mitmproxy's duplicate-listen-address check would flag `local` as competing with `regular` for the same address and raise `OptionsError`. With `--mode regular@<port>` the port belongs to the regular mode alone, `local` mode binds nothing (`listen_addrs` is empty), the two coexist and the bridge port stays usable across switches. `swufe-ready`'s `listen_port` is therefore derived from the regular mode instead of reading `ctx.options.listen_port`.
 
 ## Hard constraints
 
@@ -122,3 +131,4 @@ curl -sS -i -x http://127.0.0.1:18080 --cacert <confdir>/mitmproxy-ca-cert.pem h
 | 2026-09-20 | First version: options A / B recorded as candidates with hard constraints; implementation marked `TBD` | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | Option A finalised: configuration file path and field table, mtime + size polling hot reload with failure fallback, `swufe-ready` / `swufe-error` lines and exit codes, development run commands, loopback enforced by the sidecar in code | Compatible (the first version was not final and had no existing consumer) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md) |
 | 2026-09-21 | M2 landed: new CA generation entry `python -m swufe_bridge.ca --confdir <dir>` (stdout JSON / `swufe-error CA_FAILED` / exit code 2 / idempotent); M2 `--config` and `--confdir` locations pinned to `<userData>/bridge-config.json` and `<userData>/mitmproxy/` | Compatible (new entry point, control plane unchanged) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
+| 2026-09-21 | M3 capture: configuration gains `capture.processes`; new `swufe-capture {"enabled","processes","error"}` diagnostic line; mitmdump is started as `--mode regular@<port>` (no `--listen-port`) and `swufe-ready.listen_port` is derived from the regular mode | Compatible (new key and line; the start-argument change is invisible to Main) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.en.md) |

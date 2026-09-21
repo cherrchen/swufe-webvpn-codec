@@ -25,7 +25,7 @@
 ## 2. Coverage expectations
 
 ```text
-Coverage target: TBD (M1 sets no numeric target; the current baseline is the 154 green L0/L1/L2 cases)
+Coverage target: TBD (no numeric target; the current baseline is 190 green L0/L1/L2 cases plus 70 app unit cases)
 Coverage tool:   TBD (not adopted in M1; the layers and cases are the current regression evidence)
 Exceptions:      the L3 and manual layers are excluded from coverage and
                  replaced by manual steps
@@ -38,7 +38,8 @@ Coverage is a reference metric, not the goal. **Must be covered**:
 - proxy conflict and system proxy clearing (TC-C01..TC-C04);
 - stopping the bridge, clearing the proxy and stopping capture on session expiry (TC-D03);
 - loop prevention: login traffic is never re-wrapped by WRD (TC-D04);
-- the critical redirects of response reverse rewriting (`Location` and in-registrar navigation, TC-F03 / TC-G02).
+- the critical redirects of response reverse rewriting (`Location` and in-registrar navigation, TC-F03 / TC-G02);
+- process capture (REQ-003): mode-set derivation, rollback on failure and the no-retry semantics of `swufe_bridge.capture` in L0 unit tests (`tests/l0/test_capture.py`), and the addon's capture loop in an L1 test with injected fakes (`tests/l1/test_addon_capture.py` — automated tests **must never** really enable local mode); the real scope and "switching back to the system proxy stops it" belong to L3 manual verification (the tester has to confirm the OS authorisation prompt in person).
 
 Requirement acceptance criteria, reproductions of fixed bugs, and boundaries and error paths must also be covered.
 

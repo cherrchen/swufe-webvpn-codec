@@ -18,13 +18,14 @@ The main window is the only Phase 1 screen; the tray icon is optional and undeci
 flowchart TD
     W["Main window"] --> S["Top status bar<br/>connection state / short error"]
     W --> M["Primary actions<br/>login · re-login / bridge toggle"]
+    W --> CM["Capture mode (first level)<br/>system proxy / selected apps + app list"]
     W --> A["Allowlist<br/>default jwxt / add·remove / *.swufe.edu.cn tick"]
     W --> C["Certificate<br/>install · uninstall local CA"]
-    W --> D["Advanced (collapsible)<br/>system proxy note / process capture / debug logging toggle"]
-    W --> L["Log panel (when debug is on)<br/>host | rewrite result | time"]
+    W --> D["Advanced (collapsible)<br/>system proxy note / debug logging toggle"]
+    W --> L["Log panel (when debug is on)<br/>time | host | result"]
 ```
 
-How to read the diagram: the window is ordered top-down as "state → primary action → configuration → diagnostics"; the status bar answers "can I use it now", the primary action is the only mandatory click target, the allowlist and certificate decide what the bridge is capable of, and the advanced area plus log panel are used only when troubleshooting.
+How to read the diagram: the window is ordered top-down as "state → primary action → configuration → diagnostics"; the status bar answers "can I use it now", the primary action is the only mandatory click target, the capture mode decides how traffic enters the bridge (the two modes exclude each other), the allowlist and certificate decide what the bridge is capable of, and the advanced area plus log panel are used only when troubleshooting.
 
 Information architecture (item by item from package §2):
 
@@ -34,6 +35,11 @@ Main window
 ├─ Primary actions
 │  ├─ [Log in to WebVPN] / [Re-login]
 │  └─ [Start bridge] toggle
+├─ Capture mode (first level)
+│  ├─ (•) system proxy (all traffic) / ( ) selected apps
+│  ├─ process capture: off / enabled (N apps) / enabling… / failed — reason
+│  ├─ app list (filter box + [Refresh list] + one checkbox row per app)
+│  └─ macOS authorisation guidance + [Retry] (only on failure)
 ├─ Allowlist
 │  ├─ default jwxt.swufe.edu.cn
 │  ├─ add / remove
@@ -43,9 +49,8 @@ Main window
 │  └─ [Uninstall local CA]
 ├─ Advanced (collapsible)
 │  ├─ system proxy state note
-│  ├─ process capture: pick browser and other processes (selectable list)
 │  └─ [ ] debug logging
-└─ Log panel (when debug is on): host | rewrite result | time
+└─ Log panel (when debug is on): time | host | result (at most 200 records, with [Clear])
 ```
 
 ## States
@@ -54,7 +59,9 @@ Main window
 | ----- | ---------- | ------ | ----- |
 | Not logged in | grey "Not logged in" | disabled | log in first |
 | Logged in, bridge off | blue "Logged in" | can start | |
-| Bridging | green "Bridging" | can stop | |
+| Bridging | green "Bridging" | can stop | system-proxy mode, or selected apps before capture took effect |
+| Bridging (process capture) | green "Bridging (process capture)" | can stop | selected-apps mode and the sidecar reported `enabled: true` |
+| Capture enabling / failed | status bar still "Bridging" | can stop | capture state has its own line: `process capture: enabling…` / `process capture: failed — <reason>` (with authorisation guidance and [Retry]); a failure never changes the bridge state |
 | Error | red + reason | as applicable | e.g. "system proxy in use" |
 | Handling expiry | orange | forced off | |
 
@@ -64,6 +71,9 @@ Main window
 | ------------- | ------ | ---------- |
 | First use | 1. On start an onboarding bar: "a local certificate is required to handle HTTPS" → 2. user accepts the risk and installs the CA (the OS may ask for a password/permission) → 3. click "Log in to WebVPN"; the WebView opens the portal/CAS → 4. auth completes, the app detects the session and the state becomes "Logged in" → 5. confirm the allowlist → 6. turn on "Start bridge" → 7. prompt the user to open the academic affairs site in a browser | At step 6, if a system proxy already exists, a modal blocks the start and explains that Clash must be closed (REQ-004 / ADR-0004); without the CA, starting returns `CA_MISSING` and points at installing it |
 | Daily use | 1. start the app; if cookies are still valid it shows "Logged in" (if silent validation is impossible, re-login is required) → 2. start the bridge → 3. use the browser → 4. stop the bridge or quit when done (quitting must clear the proxy) | Stopping the bridge or quitting must never leave a "half-open" system proxy (NFR-004) |
+| Switching capture mode | Selected apps: revoke the system proxy this app set and ask the sidecar to enable local mode for the chosen apps; system proxy: remove local mode and set the system proxy again | The two modes exclude each other (REQ-003); when another tool owns the system proxy, switching to selected apps is refused with `PROXY_CONFLICT` and the same modal is shown |
+| Selecting captured apps | Tick/untick rows in the app list (filter by app name, [Refresh list]); the selection is persisted and pushed to the sidecar without restarting the bridge | The first enable triggers the macOS network-extension prompt: without confirmation within 5 seconds the UI shows "failed" with guidance and [Retry] |
+| Viewing the debug log | Turn on [ ] debug logging in the advanced area ⇒ the log panel appears and lists "time \| host \| result"; [Clear] empties it | Only domains and rewrite results, never bodies or cookies; at most 200 records; turning the switch off hides and clears the panel (REQ-009) |
 | Session expiry | 1. the bridge detects 401 / a login-page redirect / cookie invalidation (probe signals are implementation-defined) → 2. automatically: stop bridge, clear system proxy, stop process capture → 3. modal: "The WebVPN session has expired. Please log in again." → [Go to login] | While handling expiry the toggle is forced off; after a successful re-login the state returns to "Logged in, bridge off" |
 | Uninstall CA / app | "Uninstall local CA" in settings; quit/uninstall instructions: stop the bridge, then uninstall the certificate | The CA is removable in one click (REQ-010); before uninstalling the app, stop the bridge and uninstall the CA |
 
@@ -82,8 +92,10 @@ Main window
 | CA install warning | 本证书用于在本机解密并改写 HTTPS，仅限个人设备；可随时卸载。 | NFR-005; must be shown before installing |
 | Proxy conflict prompt | 检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。 | REQ-004; modal blocks starting the bridge |
 | Session expiry prompt | WebVPN 会话已失效。桥接已停止并已清除系统代理。 | REQ-002; the modal offers [Go to login] |
+| Capture-mode hint | 系统代理：全部流量经本桥；指定应用：只有所选应用的流量经本桥，本 App 不设置系统代理（切换时会撤销本 App 设置过的系统代理）。 | REQ-003; permanent hint next to the first-level choice, explaining the exclusion and the proxy effect of switching |
+| Process-capture authorisation guidance | 首次启用时 macOS 会安装并激活 mitmproxy 的网络扩展：请在系统设置 → 通用 → 登录项与扩展（或弹出的授权提示）中允许。未在 5 秒内确认会导致启用失败，授权后点「重试」。 | NFR-005 / R4; shown only on failure, together with [Retry] |
 
-> The three strings above are Chinese UI copy and are kept verbatim from the package (the Chinese file is the source of truth).
+> The strings above are Chinese UI copy and are kept verbatim from the implementation (the Chinese file is the source of truth).
 
 ## Text wireframe
 
@@ -93,15 +105,25 @@ Main window
 ├─────────────────────────────────────────────┤
 │  [ 重新登录 ]           桥接  ( ●──── ) 开  │
 ├─────────────────────────────────────────────┤
+│ 捕获方式                                     │
+│  (•) 系统代理（全部流量）  ( ) 指定应用       │
+│  进程捕获：未启用                            │
+│  [筛选应用名…]  [刷新列表]                   │
+│  ☑ Google Chrome      ☐ curl                 │
+├─────────────────────────────────────────────┤
 │ Allowlist                                   │
-│  ✓ jwxt.swufe.edu.cn                    [删]│
-│  [+] 添加主机…                              │
+│  jwxt.swufe.edu.cn                      [删]│
+│  [ 添加主机… ]  [添加]                       │
 │  ☐ 启用 *.swufe.edu.cn                      │
 ├─────────────────────────────────────────────┤
 │ 证书  [安装本机 CA]  [卸载本机 CA]           │
 ├─────────────────────────────────────────────┤
-│ ▸ 高级 / 调试日志                           │
-│  12:01  jwxt.swufe.edu.cn   rewrite=ok      │
+│ ▸ 高级 / [ ] 调试日志                       │
+├─────────────────────────────────────────────┤
+│ 调试日志                                     │
+│  时间         域名                 结果       │
+│  12:01:03     jwxt.swufe.edu.cn    已改写     │
+│  [清空]                                      │
 └─────────────────────────────────────────────┘
 ```
 

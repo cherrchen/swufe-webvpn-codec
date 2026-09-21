@@ -23,7 +23,8 @@
 | ------ | ---- | -------- | ------ | ------ | -------- |
 | `bridgePort` | 本机桥监听的 HTTP/HTTPS 代理端口 | 可用端口（8080 或自动分配） | 8080 或自动 | 低 | 系统代理指向该端口；桥运行期间变更需重启桥 |
 | `debugLogging` | 调试日志开关 | `true` / `false` | `false` | 低 | 开启后记录「域名 + 是否改写成功 + 方向 + 时间」，仍不含正文与 Cookie |
-| `capturePids` | 进程捕获（mitmproxy local）的 PID 列表 | 本机进程 PID 数组 | `[]` | 低 | 捕获集合变化需重启捕获；macOS 可能触发权限授权 |
+| `captureMode` | 捕获方式：系统代理接管全部流量，或只捕获所选应用（M3，二者互斥） | `system-proxy` / `selected-apps` | `system-proxy` | 低 | 切到 `selected-apps` 会撤销本 App 设置的系统代理；切回会重新设置并移除进程捕获；系统代理被其它软件占用时切到 `selected-apps` 会被拒绝 |
+| `captureProcesses` | 进程捕获（mitmproxy local）的应用 pattern 列表（M3） | 非空、不含逗号、去重的字符串数组（最多 32 个；`.app` 包路径或可执行文件全路径） | `[]` | 低 | 仅在 `captureMode = selected-apps` 时下发到 `<userData>/bridge-config.json` 的 `capture.processes`；运行中修改无需重启桥，失败不自动重试（界面「重试」重新下发）；macOS 首次启用会请求系统扩展授权 |
 | `webvpnBase` | 上游 WebVPN 基址（改写目标） | URL | `https://webvpn.swufe.edu.cn` | 低 | 变更后教务验收结论失效，需重新验收 |
 | `wrdKey` / `wrdIv` | WRD hostname 加密的 key / iv | 字符串（首期使用默认值） | `wrdvpnisthebest!` | 高 | 值错误会导致编码不可用；需与上游规则一致（ADR-0005） |
 | `systemProxyManagedByApp` | 「系统代理由本 App 设置」标记（运行时） | `true` / `false` | `false` | 低 | 决定关桥 / 退出时是否清除系统代理；标记错误会导致代理残留或误清 |
@@ -33,7 +34,7 @@
 
 - **存储位置**：
   - `<userData>/config.json`：顶层为 allowlist（`hosts` / `includeSwufeWildcard` / `updatedAt`），同级 `settings` 键保存 `AppSettings`（缺键取默认值）；Python 侧读同一文件的 allowlist 部分。
-  - `<userData>/bridge-config.json`：下发给 sidecar 的运行时配置（`allowlist` + `cookies` + `debug` + `webvpnBase` + `wrdKey`/`wrdIv`），权限 `0600`（含会话 Cookie）；唯一写入方是 App。
+  - `<userData>/bridge-config.json`：下发给 sidecar 的运行时配置（`allowlist` + `cookies` + `debug` + `webvpnBase` + `wrdKey`/`wrdIv` + `capture.processes`），权限 `0600`（含会话 Cookie）；唯一写入方是 App。sidecar 以 `--mode regular@<bridgePort>` 起桥（不传 `--listen-port`，见 ADR-0006），捕获配置变化靠该文件的 mtime+size 热加载。
   - `<userData>/mitmproxy/`：MITM CA 的 confdir（私钥 `0600`），同时也是 sidecar 的 `--confdir`。
   - `<userData>/Partitions/swufe-login/`：登录会话（Electron 持久分区，不写 `session.bin`）；会话 Cookie 位置与加密见 [security/README.md](../security/README.md) 第 4 节。
 - **配置来源与优先级**：持久文件是唯一来源，构建期默认值只用于缺键/首次启动；`settings.bridgePort` 与 `settings.webvpnBase` 在开桥时读取并下发，运行期标记 `systemProxyManagedByApp` 由 Proxy Orchestrator 写入。配置如何下发到 sidecar 见 [bridge-control-protocol.md](../api/bridge-control-protocol.md)。

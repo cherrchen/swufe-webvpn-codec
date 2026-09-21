@@ -15,7 +15,7 @@
 | ------ | ----------- | --------- | ------ |
 | AllowlistConfig | Host list and wildcard option deciding which hosts are rewritten through WebVPN | Created/updated with config writes, kept long term | this file |
 | SessionState | Cookies and minimal ancillary state needed for the WebVPN session | Created after login, invalidated on expiry/logout | this file |
-| AppSettings | App settings (port, debug, capture PIDs, WebVPN base, WRD key/iv, proxy marker) | Created on first launch, updated on user changes | this file |
+| AppSettings | App settings (port, debug, capture mode and captured apps, WebVPN base, WRD key/iv, proxy marker) | Created on first launch, updated on user changes | this file |
 | BridgeRuntimeStatus | Bridge runtime status (not persisted) | Born and dies in-process | this file, [api/electron-ipc.md](../api/electron-ipc.md) |
 | DebugLogRecord | Debug log record (host + rewrite result) | In-memory ring buffer, optionally persisted | this file |
 
@@ -82,13 +82,15 @@ The entities are mutually independent and have no relationship diagram: `Allowli
   | --------- | ---- | -------- | ---------- | ----- |
   | bridgePort | number | yes | default 8080 or automatic | local bridge listening port |
   | debugLogging | boolean | yes | default `false` | debug logging toggle |
-  | capturePids | number[] | yes | default `[]` | process-capture targets |
+  | captureMode | `'system-proxy'` \| `'selected-apps'` | yes | default `'system-proxy'` | capture mode (M3): the two modes exclude each other (ADR-0006) |
+  | captureProcesses | string[] | yes | default `[]`; items are mitmproxy intercept patterns (non-empty, comma-free, deduplicated, at most 32) | the app set pushed to the sidecar while the capture mode is `selected-apps` (M3) |
   | webvpnBase | string | yes | default `https://webvpn.swufe.edu.cn` | WebVPN entry |
   | wrdKey | string | yes | default `wrdvpnisthebest!`, overridable | default WRD key (ADR-0005) |
   | wrdIv | string | yes | default `wrdvpnisthebest!`, overridable | default WRD IV (ADR-0005) |
   | systemProxyManagedByApp | boolean | yes | default `false`; runtime | "system proxy set by this app" marker |
 
 - Invariants: `systemProxyManagedByApp` stays strongly consistent with the actual proxy state; the system proxy is cleared only when the marker is true (INV-002).
+- Invariant (M3): `captureMode` and "this app set a system proxy" exclude each other — in `selected-apps` mode `systemProxyManagedByApp` must be `false`; `captureProcesses` is written into `bridge-config.json` as `capture.processes` only in `selected-apps` mode (always an empty array under `system-proxy`).
 - Lifecycle: created on first launch; updated on user setting changes or bridge start/stop; deleted by resetting settings.
 - Owner: cherrchen.
 - Related requirements: REQ-001, REQ-003, REQ-004.

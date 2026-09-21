@@ -64,14 +64,14 @@ The system shall …
 - Source: archived package / [requirements-onepager-v1.0.md](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/requirements-onepager-v1.0.md) FR-1
 
 **Description**
-The system shall provide a desktop window on macOS / Windows (a tray icon is optional) with these UI capabilities: login (an embedded BrowserWindow/WebView opening the official WebVPN/CAS, where the user completes authentication themselves, including MFA), a one-click connection switch, allowlist management (view/add/remove hosts, containing `jwxt.swufe.edu.cn` by default, with an optional one-click `*.swufe.edu.cn` toggle), a status area (connected / disconnected / error reason, plus a summary of the current allowlist), certificates (one-click install and one-click uninstall of the local MITM root CA), and a debug-log switch.
+The system shall provide a desktop window on macOS / Windows (a tray icon is optional) with these UI capabilities: login (an embedded BrowserWindow/WebView opening the official WebVPN/CAS, where the user completes authentication themselves, including MFA), a one-click connection switch, a first-level capture-mode choice (system proxy / selected apps), allowlist management (view/add/remove hosts, containing `jwxt.swufe.edu.cn` by default, with an optional one-click `*.swufe.edu.cn` toggle), a status area (connected / disconnected / error reason, plus a summary of the current allowlist), certificates (one-click install and one-click uninstall of the local MITM root CA), and a debug-log switch with a log panel.
 
 **Rationale**
 CAS/MFA and certificate-trust onboarding require a GUI (see ADR-0003); "state visible, dangerous operations reversible" is product goal G-003.
 
 **Acceptance criteria**
 1. The app builds and starts on both macOS and Windows and shows the main window.
-2. The status bar matches the bridge state machine: grey and switch disabled when not logged in; blue "logged in" and switch enabled when logged in but bridged off; green "bridging" and switch enabled when running; red with a reason on error; orange and force-off while handling expiry (TC-H01).
+2. The status bar matches the bridge state machine: grey and switch disabled when not logged in; blue "logged in" and switch enabled when logged in but bridged off; green "bridging" and switch enabled when running (shown as "bridging (process capture)" while selected-apps capture is active); red with a reason on error; orange and force-off while handling expiry (TC-H01).
 3. The allowlist can add and remove hosts, and the change survives an app restart (TC-B05).
 4. The `*.swufe.edu.cn` wildcard toggle can be saved (TC-H02).
 5. The certificate section offers both "install local CA" and "uninstall local CA", each with a clear label.
@@ -118,19 +118,21 @@ No password on disk is a security baseline (G-003); stopping the bridge explicit
 - Source: archived package / [requirements-onepager-v1.0.md](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/requirements-onepager-v1.0.md) FR-3
 
 **Description**
-The system shall support both takeover modes at the same time: the system HTTP/HTTPS proxy pointing at the local bridge port, and mitmproxy local (or equivalent) per-process capture so a browser process can be selected. Turning the switch off must stop the proxy service, restore/clear the system proxy, and stop process capture.
+The system shall offer two **mutually exclusive** takeover modes, chosen explicitly from the first-level "capture mode" control in the UI: `System proxy (all traffic)` — point the system HTTP/HTTPS proxy at the local bridge port; `Selected apps` — capture only the chosen applications with mitmproxy local mode. The two never hold at once: in selected-apps mode the app does not set a system proxy (and revokes one it set earlier), and in system-proxy mode process capture stays off. Turning the switch off must stop the proxy service, clear the system proxy, and stop process capture.
 
 **Rationale**
-Phase 1 does not implement TUN/transparent gateway; the system proxy covers ordinary browsers, and per-process capture complements it. Both may be enabled together.
+Phase 1 does not implement a TUN/transparent gateway. The system proxy covers ordinary browsers; per-process capture narrows the scope to the apps the user picks and leaves the system proxy to the user's own tools. The exclusion is required: a captured app's connection that also went through the system proxy would enter the proxy core as a transparent-layer stream and fail hard.
 
 **Acceptance criteria**
-1. With a logged-in session, no system proxy, and the CA ready, turning the bridge on points the system HTTP/HTTPS proxy at the local bridge port (TC-C02).
+1. With a logged-in session, no system proxy, and the CA ready, turning the bridge on in system-proxy mode points the system HTTP/HTTPS proxy at the local bridge port (TC-C02).
 2. After the switch is turned off, the system proxy no longer belongs to this app (TC-C03).
-3. Candidate processes can be listed and selected for capture (e.g. Chrome), and turning the switch off also stops process capture.
+3. Candidate apps can be listed (one row per app, a process merged with its helpers) and selected for capture (e.g. Chrome); in selected-apps mode only the chosen apps go through the bridge and the app sets no system proxy, and turning the switch off also stops process capture.
 4. Turning the switch on without an installed CA returns `CA_MISSING` or shows an explicit failure message (TC-E03).
 
 **Boundaries and exceptions**
-- On macOS, per-process capture may trigger accessibility/network-extension prompts; the UI must guide the user.
+- On macOS, per-process capture may trigger accessibility/network-extension prompts; the UI must guide the user. The first enable must be confirmed in the system prompt; otherwise the UI shows a failure with guidance and a retry button.
+- When another tool owns the system proxy, selecting apps is refused with `PROXY_CONFLICT` as well (consistent with REQ-004).
+- A capture failure does not change the bridge state (the bridge stays usable); only the reason is shown.
 - WebSocket is best-effort and not an acceptance blocker; HTTP/3 should be disabled or fall back to TCP.
 - TUN / sing-box transparent gateway is not part of this requirement (see [non-goals](../overview/goals-and-non-goals.md)).
 
@@ -185,6 +187,7 @@ Only allowlist hosts need and are allowed to go through WebVPN; sending everythi
 **Boundaries and exceptions**
 - The wildcard is off by default and must be enabled explicitly by the user.
 - Invalid hostnames (not lowercase valid hostnames) are not written into the allowlist.
+- Hosts added/removed and the wildcard toggle take effect immediately (no restart) and survive an app restart (TC-B05 / TC-H02).
 - Starting the bridge with an empty allowlist returns `ALLOWLIST_EMPTY`.
 
 **Related spec**
@@ -276,7 +279,7 @@ The login WebView itself talks to the WebVPN portal; rewriting those requests wo
 - Source: archived package / [requirements-onepager-v1.0.md](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/requirements-onepager-v1.0.md) FR-7
 
 **Description**
-The system shall show connection state, allowlist and error reasons by default, and shall offer a toggleable debug log whose content is only "domain + whether rewriting succeeded". The log is off by default and never records response bodies, request bodies or cookies.
+The system shall show connection state, allowlist and error reasons by default, and shall offer a toggleable debug log whose content is only "domain + whether rewriting succeeded". The log is off by default and never records response bodies, request bodies or cookies. The UI presents this as a status bar plus a log panel listing "time | domain | result", shown/hidden with the switch and capped at the 200 most recent records.
 
 **Rationale**
 Visible state is part of experience goal G-002 and a prerequisite for troubleshooting; log minimisation is part of security baseline G-003 (cookies are sensitive).
@@ -286,6 +289,7 @@ Visible state is part of experience goal G-002 and a prerequisite for troublesho
 2. With debug logging enabled and traffic flowing, log records contain only the host and the rewrite result (TC-F04).
 3. Non-allowlist requests show `rewritten=false` in the debug log (TC-F02).
 4. Log records have the fields `ts/host/rewritten/direction/detail` and never contain cookies or bodies.
+5. The log panel shows the columns "time | domain | result", keeps at most the 200 most recent records, and hides and clears them when the switch is turned off (TC-F04 / AC-009).
 
 **Boundaries and exceptions**
 - Debug logging is off by default and enabled explicitly by the user.

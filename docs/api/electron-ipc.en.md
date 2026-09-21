@@ -39,7 +39,8 @@ Not applicable. Both sides are two processes of the same application on the same
 | `installCa` / `uninstallCa` | yes |
 | `getCaStatus` | yes (read-only) |
 | `listCaptureCandidates` | yes (read-only) |
-| `setCapturePids` | yes (full overwrite) |
+| `setCaptureMode` | yes (full overwrite) |
+| `setCaptureProcesses` | yes (full overwrite) |
 | `setDebugLogging` | yes |
 | `onDebugLog` | yes (subscription; repeated subscriptions are independent and each returns its own unsubscribe function) |
 | `onStatus` | yes (subscription; independent per subscription, returns its own unsubscribe function) |
@@ -59,6 +60,7 @@ interface BridgeStatus {
   localCaptureEnabled: boolean
   bridgePort?: number
   error?: { code: string; message: string }
+  captureError?: string   // added in M3: why process capture failed (never changes the bridge state)
 }
 ```
 
@@ -87,10 +89,31 @@ interface DebugLogEvent {
 ```
 
 ```ts
+type CaptureMode = 'system-proxy' | 'selected-apps'   // added in M3: the two modes exclude each other
+```
+
+```ts
+interface CaptureCandidate {          // added in M3: one candidate row per application
+  pid: number
+  name: string
+  pattern: string                     // mitmproxy intercept pattern: an .app bundle path or a full executable path
+}
+```
+
+```ts
+interface CaptureReport {             // added in M3: mirrors the sidecar's swufe-capture diagnostic line
+  enabled: boolean
+  processes: string[]
+  error: string | null
+}
+```
+
+```ts
 interface AppSettingsView {
   bridgePort: number
   debugLogging: boolean
-  capturePids: number[]
+  captureMode: CaptureMode            // M3: replaces capturePids
+  captureProcesses: string[]          // M3: intercept patterns (at most 32)
   webvpnBase: string
 }
 ```
@@ -208,7 +231,7 @@ setAllowlist(cfg: AllowlistConfig): Promise<void>
 getSettings(): Promise<AppSettingsView>   // added in M2: read-only, for UI defaults
 ```
 
-- Purpose: read the UI-visible subset of the current settings (`bridgePort` / `debugLogging` / `capturePids` / `webvpnBase`) so the UI can show the initial switch and port values.
+- Purpose: read the UI-visible subset of the current settings (`bridgePort` / `debugLogging` / `captureMode` / `captureProcesses` / `webvpnBase`) so the UI can show the initial switch, capture mode and port values.
 - Input: none.
 - Output: `AppSettingsView`; it does **not** include `wrdKey` / `wrdIv` (sensitive values never cross IPC).
 - Errors: see the [error model](#error-model).
@@ -246,32 +269,49 @@ getCaStatus(): Promise<{ installed: boolean; trusted: boolean }>
 - Output: `CaStatus` (see "Type definitions").
 - Errors: see [Error model](#error-model).
 
-### `listCaptureCandidates(): Promise<Array<{ pid: number; name: string }>>`
+### `listCaptureCandidates(): Promise<CaptureCandidate[]>`
 
 ```ts
-listCaptureCandidates(): Promise<Array<{ pid: number; name: string }>>
+listCaptureCandidates(): Promise<CaptureCandidate[]>   // M3: each row carries a pattern
 ```
 
-- Purpose: list the processes selectable for "process capture" (mitmproxy local mode), e.g. Chrome.
+- Purpose: list the applications selectable for "process capture" (mitmproxy local mode), e.g. Chrome.
 - Input: none.
-- Output: an array of processes, each with `pid` and `name`.
+- Output: `CaptureCandidate[]`; **one row per application** — a main process and its helpers collapse onto one `pattern` (the `.app` bundle path), anything else uses its full executable path.
 - Errors: see [Error model](#error-model).
 
-### `setCapturePids(pids: number[]): Promise<void>`
+### `setCaptureMode(mode: CaptureMode): Promise<void>`
 
 ```ts
-setCapturePids(pids: number[]): Promise<void>
+setCaptureMode(mode: CaptureMode): Promise<void>   // added in M3
 ```
 
-- Purpose: set the captured process set (may be enabled together with the system proxy).
+- Purpose: switch the capture mode (`system-proxy` = the system proxy takes all traffic; `selected-apps` = capture only the chosen apps).
 - Input:
 
   | Field | Type | Required | Constraint | Notes |
   | ----- | ---- | -------- | ---------- | ----- |
-  | `pids` | `number[]` | yes | values must come from `listCaptureCandidates()`; an empty array disables process capture | full overwrite |
+  | `mode` | `'system-proxy' \| 'selected-apps'` | yes | must be one of the two literals | full overwrite |
 
 - Output: `Promise<void>`.
-- Errors: see [Error model](#error-model).
+- Behaviour: the two modes are **mutually exclusive** — switching to `selected-apps` revokes the system proxy this app set (instead of setting a new one), and switching back to `system-proxy` removes process capture and sets the system proxy again. While the bridge is not running only the config is written and pushed; no OS proxy is touched.
+- Errors: see [Error model](#error-model); when another tool owns the system proxy, switching to `selected-apps` is refused with `PROXY_CONFLICT` and nothing is persisted.
+
+### `setCaptureProcesses(patterns: string[]): Promise<void>`
+
+```ts
+setCaptureProcesses(patterns: string[]): Promise<void>   // added in M3, replaces setCapturePids
+```
+
+- Purpose: set the captured application set (effective only while the capture mode is `selected-apps`).
+- Input:
+
+  | Field | Type | Required | Constraint | Notes |
+  | ----- | ---- | -------- | ---------- | ----- |
+  | `patterns` | `string[]` | yes | values must come from `listCaptureCandidates()` `pattern` fields; non-empty, comma-free, deduplicated; at most 32; an empty array captures no application | full overwrite |
+
+- Output: `Promise<void>`.
+- Errors: see [Error model](#error-model); invalid input rejects without writing the config.
 
 ### `setDebugLogging(enabled: boolean): Promise<void>`
 
@@ -338,12 +378,18 @@ The full error code set (meaning and user action); `message` carries the user-fa
 
 | Code | Meaning | User action |
 | ---- | ------- | ----------- |
-| `PROXY_CONFLICT` | system proxy already in use | close the other proxy |
+| `PROXY_CONFLICT` | system proxy already in use (checked before starting, and before switching to selected apps) | close the other proxy |
 | `CA_MISSING` | CA not installed / not trusted | go install it |
 | `NOT_LOGGED_IN` | no session | go log in |
 | `SESSION_EXPIRED` | session expired | log in again |
 | `BRIDGE_CRASH` | mitm process exited | check logs / restart the bridge |
 | `ALLOWLIST_EMPTY` | no hosts | add a host |
+
+How error codes travel: `BridgeStatus.error` / `BridgeStatus.captureError` ride on the status object, while a rejecting method throws an `Error` carrying the code.
+Electron keeps only `message` and `stack` of an `invoke` rejection (custom properties are dropped), so `setCaptureMode` / `setCaptureProcesses` reject with
+`<CODE>：<message>` (for example `PROXY_CONFLICT：检测到系统代理已启用。…`); the renderer parses that prefix to decide whether to show the proxy-conflict modal.
+
+A capture failure **has no error code**: it never changes the bridge state and only fills `BridgeStatus.captureError` (REQ-003 boundary / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.en.md)).
 
 The full post-expiry handling (stop bridge → clear system proxy → stop process capture → prompt re-login) is in [../ui-ux/main-window.md](../ui-ux/main-window.md).
 
@@ -359,3 +405,4 @@ The full post-expiry handling (stop bridge → clear system proxy → stop proce
 | ---- | ------ | ------------- | ------------------ |
 | 2026-09-20 | First version: session, bridge control, allowlist, certificate, process capture and debug logging — 15 methods/events total | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | M2 added three items (the semantics of the 15 methods above are unchanged): `getSettings` (read-only, for UI defaults; the WRD key/IV never cross IPC), `onStatus` (Main → Renderer status pushes) and `onSessionExpired` (session-expiry event driving the re-login modal) | Compatible (added methods/events) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [M2 completion record](../planning/milestones/M2-desktop-orchestration.en.md) |
+| 2026-09-21 | M3 capture modes: `setCapturePids` → **`setCaptureProcesses`** (intercept patterns instead of PIDs, full overwrite); new `setCaptureMode` (`system-proxy` / `selected-apps`, mutually exclusive); `BridgeStatus.captureError`; `CaptureCandidate.pattern`; `AppSettingsView.captureMode` / `.captureProcesses`; `getStatus().localCaptureEnabled` now means "bridge running + selected apps + the sidecar reported enabled" | **Breaking**: `setCapturePids` is gone | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.en.md) |

@@ -14,7 +14,7 @@
 | [M0 预研](milestones/M0-pre-research.md) | WRD codec 验证、Phase 1 需求规格与文档包 | G-001 / G-002 / G-003 | TBD | Done |
 | [M1 桥核心](milestones/M1-mitm-bridge.md) | mitm WRD addon（请求改写）、Cookie 注入、响应反向改写、单测/集成测 | G-001 | TBD | Done |
 | [M2 桌面编排](milestones/M2-desktop-orchestration.md) | Electron 壳、系统代理、CA、代理冲突检测、过期停桥 | G-001 / G-002 / G-003 | TBD | Done（CA 信任库写入与 Windows 真机验证待人工/M4） |
-| [M3 体验打磨](milestones/M3-experience-polish.md) | Allowlist UI、调试日志、进程捕获、文案 | G-002 / G-003 | TBD | Planned |
+| [M3 体验打磨](milestones/M3-experience-polish.md) | Allowlist UI、调试日志、进程捕获、文案 | G-002 / G-003 | TBD | Done（真实进程捕获范围与日志面板的桥联动需人工授权系统扩展后复验，见完成记录「遗留问题」） |
 | [M4 验收](milestones/M4-acceptance.md) | macOS + Windows 教务浏览器验收、缺陷收敛 | G-001 / G-002 / G-003 | TBD | Planned |
 | M5 开源准备（可选） | 开源清理、README、后续 TUN 设计备忘 | G-004 | TBD | Candidate |
 

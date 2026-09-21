@@ -50,6 +50,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0003](ADR-0003-electron-gui-for-phase-1.en.md) | Use Electron for Phase 1 instead of a CLI-only tool | Accepted | 2026-09-20 | — |
 | [ADR-0004](ADR-0004-refuse-start-when-system-proxy-in-use.en.md) | Refuse to start when the system proxy is already in use | Accepted | 2026-09-20 | — |
 | [ADR-0005](ADR-0005-builtin-wrd-key-with-override.en.md) | Ship a built-in default WRD key with a configuration override | Accepted | 2026-09-20 | — |
+| [ADR-0006](ADR-0006-local-capture-mode-and-mutual-exclusion.en.md) | Process capture via mitmproxy local mode, mutually exclusive with the system proxy | Accepted | 2026-09-21 | — |
 
 ## Rules
 
