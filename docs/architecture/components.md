@@ -97,6 +97,7 @@ flowchart TD
 - 关键不变式：仅在「由本 App 设置」标记存在时清除系统代理（INV-002）；桥状态机固定为 `idle → starting → running`，`running → stopping → idle`，`starting → error → idle`。
 - 捕获方式互斥（ADR-0006）：`system-proxy` 与 `selected-apps` 不同时生效——`selected-apps` 时本 App 不设置系统代理，并撤销此前由自己设置过的（清 `systemProxyManagedByApp` 标记），改由 local 模式接管所选应用的流量；`system-proxy` 时不启用 local 捕获（运行时配置里 `capture.processes` 恒为空），由系统代理覆盖全部流量。切换方式按目标方式撤销 / 恢复；桥端口（regular 监听）在两种方式下始终可用。
 - 切换前检查：切到 `selected-apps` 之前先检查系统代理，被其它软件占用（非指向本桥）则拒绝并返回 `PROXY_CONFLICT`，设置不落盘（与 ADR-0004 的「拒绝而不是半工作」一致）。
+- 开桥前 fake-ip 预检：系统代理冲突检查之后、端口探测之前，解析当前配置的网关主机（`settings.webvpnBase`，默认 `webvpn.swufe.edu.cn`）；任一地址落在 `198.18.0.0/15`（Clash / mihomo / sing-box 的 fake-ip）时以 `PROXY_CONFLICT` 拒绝启动，避免开桥后上游静默挂起；解析失败或超时不阻断（fail open）——判据与后果见 [ADR-0011](adr/ADR-0011-refuse-start-on-fake-ip-dns.md)。
 - 候选应用枚举：macOS 用 `ps -Ao pid=,comm=`、Windows 用 `tasklist /fo csv /nh`；应用按 `.app` 包路径归并为一行（主进程与 Helper 合并为同一 pattern），非应用用可执行文件全路径，作为 mitmproxy intercept pattern。
 - 进程捕获失败不进入桥的 `error` 状态：桥继续 `running`，原因只写入 `BridgeStatus.captureError`；`localCaptureEnabled` 仅在「桥 `running` + `captureMode = 'selected-apps'` + sidecar 上报 `enabled: true`」时为真。
 - 相关测试：TC-C01、TC-C02、TC-C03、TC-C04、TC-D03、TC-G04。

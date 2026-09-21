@@ -78,7 +78,7 @@ Rollback:      Stop the bridge -> confirm the system proxy is restored ->
 | Logs | In-app debug log (off by default) | Host + rewritten yes/no + direction (request/response) + time; no bodies or cookies (`DebugLogRecord`) | In-memory ring buffer; on-disk storage and retention are `TBD` (not defined for phase 1) |
 | Metrics | Not applicable | No server-side metric collection (single-machine desktop tool) | Not applicable |
 | Tracing | Not applicable | No distributed tracing | Not applicable |
-| Alerts | Not applicable | No server-side alerting; the status area and error codes (`PROXY_CONFLICT`, `CA_MISSING`, `NOT_LOGGED_IN`, `SESSION_EXPIRED`, `BRIDGE_CRASH`, `ALLOWLIST_EMPTY`) are the user-visible signals | Not applicable |
+| Alerts | Not applicable | No server-side alerting; the status area and error codes (`PROXY_CONFLICT`, `CA_MISSING`, `NOT_LOGGED_IN`, `SESSION_EXPIRED`, `BRIDGE_CRASH`, `ALLOWLIST_EMPTY`) are the user-visible signals (`PROXY_CONFLICT` covers both "system proxy in use" and "the gateway host resolves into the fake-ip range", [ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md)) | Not applicable |
 
 ## 5. Backup and recovery
 

@@ -173,7 +173,7 @@ startBridge(): Promise<BridgeStatus>
 - Purpose: start the local bridge: launch the mitm sidecar, set the system proxy and process capture as needed.
 - Input: none (bridge port, allowlist and webvpnBase come from `AppSettings` and the Allowlist Store).
 - Output: `BridgeStatus` (see "Type definitions"); on success `state` goes `idle → starting → running`.
-- Errors: see [Error model](#error-model); if the system proxy is already in use, starting is refused with `PROXY_CONFLICT` (ADR-0004).
+- Errors: see [Error model](#error-model); if the system proxy is already in use, or the gateway host resolves into the fake-ip range (`198.18.0.0/15`, Clash / mihomo / sing-box TUN mode), starting is refused with `PROXY_CONFLICT` (ADR-0004, [ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md)).
 
 ### `stopBridge(): Promise<BridgeStatus>`
 
@@ -378,7 +378,7 @@ The full error code set (meaning and user action); `message` carries the user-fa
 
 | Code | Meaning | User action |
 | ---- | ------- | ----------- |
-| `PROXY_CONFLICT` | system proxy already in use (checked before starting, and before switching to selected apps) | close the other proxy |
+| `PROXY_CONFLICT` | Proxy-environment conflict: the system proxy is already in use (checked before starting, and before switching to selected apps), or the gateway host resolves into the fake-ip range (`198.18.0.0/15`, TUN mode, [ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md)) | Turn off the other tool's system proxy and TUN mode |
 | `CA_MISSING` | CA not installed / not trusted | go install it |
 | `NOT_LOGGED_IN` | no session | go log in |
 | `SESSION_EXPIRED` | session expired | log in again |
@@ -387,7 +387,7 @@ The full error code set (meaning and user action); `message` carries the user-fa
 
 How error codes travel: `BridgeStatus.error` / `BridgeStatus.captureError` ride on the status object, while a rejecting method throws an `Error` carrying the code.
 Electron keeps only `message` and `stack` of an `invoke` rejection (custom properties are dropped), so `setCaptureMode` / `setCaptureProcesses` reject with
-`<CODE>：<message>` (for example `PROXY_CONFLICT：检测到系统代理已启用。…`); the renderer parses that prefix to decide whether to show the proxy-conflict modal.
+`<CODE>：<message>` (for example `PROXY_CONFLICT：检测到代理环境冲突：…`); the renderer parses that prefix to decide whether to show the proxy-conflict modal.
 
 A capture failure **has no error code**: it never changes the bridge state and only fills `BridgeStatus.captureError` (REQ-003 boundary / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.en.md)).
 

@@ -18,7 +18,7 @@
 | Python environment | `uv sync --directory bridges/python` executed at the repository root (produces `bridges/python/.venv/`) | The app starts the bridge with `<repo>/bridges/python/.venv/bin/python -m swufe_bridge.sidecar` by default |
 | Platform | macOS or Windows | Linux is out of scope for Phase 1 |
 | Network | Reachable `https://webvpn.swufe.edu.cn` | The registrar host `jwxt.swufe.edu.cn` is not directly reachable off campus; WebVPN is required |
-| Proxy tooling | **TUN / virtual-interface mode of any other proxy tool must be off** (Clash, mihomo, sing-box, Stash, …) | Measured: TUN fake-ip DNS (`198.18.0.0/15`) makes upstream connections through the bridge hang; `PROXY_CONFLICT` only detects the system proxy, not TUN (see `KI-013`) |
+| Proxy tooling | **TUN / virtual-interface mode of any other proxy tool must be off** (Clash, mihomo, sing-box, Stash, …) | Measured: TUN fake-ip DNS (`198.18.0.0/15`) makes upstream connections through the bridge hang. Before starting, the gateway host is resolved and a fake-ip answer is refused with `PROXY_CONFLICT` ([ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md)); that preflight only covers the fake-ip shape, so a `redir-host`-mode TUN still has to be turned off by hand (see `KI-013`) |
 | Account | The tester's own SWUFE unified-identity account (with MFA) | Never written into the repository |
 
 ## 2. First-time setup
@@ -76,9 +76,10 @@ pnpm run acceptance:check --out <dir> --user-data-dir <profile>
 | Symptom | Cause | Action |
 | ------- | ----- | ------ |
 | Status bar shows "error" with `CA_MISSING` after switching the bridge on | Local CA not installed | Click "install local CA" and enter the administrator password; until then the bridge changes no system setting |
-| Bridge start refused with `PROXY_CONFLICT` | Another tool owns the system proxy (Clash / mihomo / sing-box, …) | Turn that tool's system proxy off first; the conflict modal says so, and this app never modifies settings it does not own |
+| Bridge start refused with `PROXY_CONFLICT` | Another tool owns the system proxy, or the gateway host resolves into the fake-ip range (`198.18.0.0/15`, TUN mode) | Turn that tool's system proxy **and TUN mode** off first; the conflict modal says so, and this app never modifies settings it does not own |
 | Bridge start refused with `NOT_LOGGED_IN` | WebVPN (CAS/MFA) login not completed | Click "log in to WebVPN" |
 | Bridge start refused with `ALLOWLIST_EMPTY` | Empty allowlist | Add at least one host, or tick `*.swufe.edu.cn` |
+| Login window styling broken / overlapping pop-ups | CAS theme assets are intermittently truncated by the server (`ERR_INCOMPLETE_CHUNKED_ENCODING`, `KI-014`, not an app defect) | Close the login window and click "log in to WebVPN" again to reload it; it cannot be fixed on the product side until the server stabilises |
 | Status bar shows "error" with `BRIDGE_CRASH` | The sidecar exited abnormally, or `bridgePort` is taken | Turn on "debug log" to read the bridge output; if the port is taken, change `settings.bridgePort` in `<userData>/config.json` and retry |
 | `swufe-error CONFIG_INVALID` | Invalid runtime config (e.g. a comma inside `capture.processes`) | Fix the corresponding setting in `<userData>/config.json` and switch the bridge on again |
 | The sidecar does not start / python not found | `bridges/python` was never synced, or `SWUFE_PYTHON` points at a missing interpreter | Run `uv sync --directory bridges/python` from the repository root, or fix `SWUFE_PYTHON` |

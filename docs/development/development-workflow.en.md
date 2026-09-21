@@ -84,7 +84,7 @@ Commit message: Conventional Commits: `feat|fix|docs|test|chore(scope): <descrip
                 (scope optional; consistent with the existing `chore: <description>` commits)
 ```
 
-CI currently has two workflows: documentation checks [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml) and Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml).
+CI currently has three workflows: documentation checks [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml), Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml) and app unit tests/types [.github/workflows/app-tests.yml](../../.github/workflows/app-tests.yml).
 
 ## 6. Relationship to agents
 

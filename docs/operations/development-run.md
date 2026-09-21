@@ -18,7 +18,7 @@
 | Python 环境 | 仓库根执行过 `uv sync --directory bridges/python`（生成 `bridges/python/.venv/`） | 应用默认用 `<repo>/bridges/python/.venv/bin/python -m swufe_bridge.sidecar` 拉起桥 |
 | 平台 | macOS 或 Windows | Linux 不在第一期范围 |
 | 网络 | 能访问 `https://webvpn.swufe.edu.cn` | 教务 `jwxt.swufe.edu.cn` 在校园网外不可直连，必须经 WebVPN |
-| 代理工具 | **必须先关闭其它代理工具的 TUN / 虚拟网卡模式**（Clash、mihomo、sing-box、Stash 等） | 实测：TUN 的 fake-ip DNS（`198.18.0.0/15`）会让经桥的上游连接挂起；`PROXY_CONFLICT` 只检测系统代理，检测不到 TUN（见 `KI-013`） |
+| 代理工具 | **必须先关闭其它代理工具的 TUN / 虚拟网卡模式**（Clash、mihomo、sing-box、Stash 等） | 实测：TUN 的 fake-ip DNS（`198.18.0.0/15`）会让经桥的上游连接挂起。开桥前会解析网关主机，命中 fake-ip 段即以 `PROXY_CONFLICT` 拒绝（[ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）；该预检只覆盖 fake-ip 形态，`redir-host` 模式的 TUN 仍需按本前置条件手动关闭（见 `KI-013`） |
 | 账号 | 测试者自有的西财统一身份认证账号（含 MFA） | 不写入仓库 |
 
 ## 2. 首次准备
@@ -77,9 +77,10 @@ pnpm run acceptance:check --out <dir> --user-data-dir <profile>
 | 现象 | 原因 | 处置 |
 | ---- | ---- | ---- |
 | 开桥后状态条「错误」+ `CA_MISSING` | 未安装本机 CA | 点「安装本机 CA」并输入管理员密码；未安装前桥不会改动任何系统设置 |
-| 开桥被拒 + `PROXY_CONFLICT` | 系统代理已被其它软件占用（Clash / mihomo / sing-box 等） | 先关闭该软件的系统代理；界面弹出的冲突模态会说明这一点，且本 App 不会改动已被占用的设置 |
+| 开桥被拒 + `PROXY_CONFLICT` | 系统代理已被其它软件占用，或网关主机解析到 fake-ip 段（`198.18.0.0/15`，TUN 模式） | 先关闭该软件的系统代理**与 TUN 模式**；界面弹出的冲突模态会说明这一点，且本 App 不会改动已被占用的设置 |
 | 开桥被拒 + `NOT_LOGGED_IN` | 未完成 WebVPN（CAS/MFA）登录 | 点「登录 WebVPN」完成登录 |
 | 开桥被拒 + `ALLOWLIST_EMPTY` | allowlist 为空 | 添加至少一个主机，或勾选 `*.swufe.edu.cn` |
+| 登录窗样式错乱 / 弹层文字重叠 | CAS 主题静态资源被服务端间歇截断（`ERR_INCOMPLETE_CHUNKED_ENCODING`，`KI-014`，非本 App 缺陷） | 关闭登录窗后重新点「登录 WebVPN」重载一次；服务端稳定前无法在产品侧根治 |
 | 状态条「错误」+ `BRIDGE_CRASH` | sidecar 异常退出，或 `bridgePort` 被占用 | 打开「调试日志」查看桥输出；若是端口占用，修改 `<userData>/config.json` 的 `settings.bridgePort` 后重试 |
 | `swufe-error CONFIG_INVALID` | 运行时配置非法（如 `capture.processes` 含逗号） | 修正 `<userData>/config.json` 的对应设置后重新开桥 |
 | sidecar 起不来 / 提示找不到 python | `bridges/python` 未执行过 `uv sync`，或 `SWUFE_PYTHON` 指向不存在的解释器 | 在仓库根执行 `uv sync --directory bridges/python`，或修正 `SWUFE_PYTHON` |

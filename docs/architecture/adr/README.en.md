@@ -55,6 +55,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0008](ADR-0008-ca-trust-authorization-in-app-session.en.md) | The app process writes CA trust settings (keychain writes keep the elevation) | Accepted | 2026-09-21 | — |
 | [ADR-0009](ADR-0009-monorepo-layout.en.md) | Adopt a path-based monorepo layout: applications in apps/<app>, bridges in bridges/<bridge> | Accepted | 2026-09-21 | — |
 | [ADR-0010](ADR-0010-pnpm-workspaces.en.md) | Switch the Node toolchain to pnpm 11 workspaces: one lockfile and workspace script delegation | Accepted | 2026-09-21 | Supersedes the "keep npm" conclusion of an ADR-0009 alternative row (ADR-0009's layout decision itself stands) |
+| [ADR-0011](ADR-0011-refuse-start-on-fake-ip-dns.en.md) | A fake-ip (TUN / virtual-interface) environment is refused at start with `PROXY_CONFLICT` too | Accepted | 2026-09-21 | Does not supersede ADR-0004: it only extends its pre-start conflict criterion (the system-proxy criterion and clearing semantics are unchanged) |
 
 ## Rules
 

@@ -145,7 +145,7 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 - Source: 归档原包 / [requirements-onepager-v1.0.md](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/requirements-onepager-v1.0.md) FR-4
 
 **描述**
-系统应当在启动前检测系统代理是否已被其它软件占用；若已设置（且非本 App 设置），则拒绝启动并提示用户先关闭 Clash / mihomo / sing-box 等对系统代理的占用。
+系统应当在启动前检测系统代理是否已被其它软件占用；若已设置（且非本 App 设置），则拒绝启动并提示用户先关闭 Clash / mihomo / sing-box 等对系统代理的占用。同一开桥路径还检测网关主机的解析结果是否落在 fake-ip 段（`198.18.0.0/15`，Clash / mihomo / sing-box 的 TUN 模式），命中同样拒绝启动（[ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）。
 
 **理由**
 与 Clash 等叠加难以测试且行为不可预期（ADR-0004）；第一期明确不做链式共存。
@@ -154,10 +154,12 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 1. 操作系统代理已启用时启动桥接，返回 `PROXY_CONFLICT` 且桥未启动（TC-C01）。
 2. 提示文案明确要求用户关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。
 3. 用户释放系统代理后再次启动可成功。
+4. 网关主机解析到 fake-ip 段（`198.18.0.0/15`）时启动被拒并返回 `PROXY_CONFLICT`，且桥未启动（[ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）。
 
 **边界与例外**
 - 仅检测系统代理占用，不做链式转发。
 - 由本 App 自身设置并标记的代理（`systemProxyManagedByApp`）不视为冲突。
+- fake-ip 判据只覆盖 TUN 的 fake-ip 形态；`redir-host` 形态检测不到，仍依赖运行前置条件（见 `KI-013`）。
 
 **关联 Spec**
 - [specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/)

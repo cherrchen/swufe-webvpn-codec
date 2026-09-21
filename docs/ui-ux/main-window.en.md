@@ -62,14 +62,14 @@ Main window
 | Bridging | green "Bridging" | can stop | system-proxy mode, or selected apps before capture took effect |
 | Bridging (process capture) | green "Bridging (process capture)" | can stop | selected-apps mode and the sidecar reported `enabled: true` |
 | Capture enabling / failed | status bar still "Bridging" | can stop | capture state has its own line: `process capture: enabling…` / `process capture: failed — <reason>` (with authorisation guidance and [Retry]); a failure never changes the bridge state |
-| Error | red + reason | as applicable | e.g. "system proxy in use" |
+| Error | red + reason | as applicable | e.g. "proxy-environment conflict (system proxy in use / TUN mode present)" |
 | Handling expiry | orange | forced off | |
 
 ## Interactions
 
 | Action / flow | Result | Edge cases |
 | ------------- | ------ | ---------- |
-| First use | 1. On start an onboarding bar: "a local certificate is required to handle HTTPS" → 2. user accepts the risk and installs the CA (the OS may ask for a password/permission) → 3. click "Log in to WebVPN"; the WebView opens the portal/CAS → 4. auth completes, the app detects the session and the state becomes "Logged in" → 5. confirm the allowlist → 6. turn on "Start bridge" → 7. prompt the user to open the academic affairs site in a browser | At step 6, if a system proxy already exists, a modal blocks the start and explains that Clash must be closed (REQ-004 / ADR-0004); without the CA, starting returns `CA_MISSING` and points at installing it |
+| First use | 1. On start an onboarding bar: "a local certificate is required to handle HTTPS" → 2. user accepts the risk and installs the CA (the OS may ask for a password/permission) → 3. click "Log in to WebVPN"; the WebView opens the portal/CAS → 4. auth completes, the app detects the session and the state becomes "Logged in" → 5. confirm the allowlist → 6. turn on "Start bridge" → 7. prompt the user to open the academic affairs site in a browser | At step 6, if a system proxy already exists, a modal blocks the start and explains that Clash must be closed (REQ-004 / ADR-0004); a gateway host that resolves into the fake-ip range (TUN mode) is blocked by the same modal (ADR-0011); without the CA, starting returns `CA_MISSING` and points at installing it |
 | Daily use | 1. start the app; if cookies are still valid it shows "Logged in" (if silent validation is impossible, re-login is required) → 2. start the bridge → 3. use the browser → 4. stop the bridge or quit when done (quitting must clear the proxy) | Stopping the bridge or quitting must never leave a "half-open" system proxy (NFR-004) |
 | Switching capture mode | Selected apps: revoke the system proxy this app set and ask the sidecar to enable local mode for the chosen apps; system proxy: remove local mode and set the system proxy again | The two modes exclude each other (REQ-003); when another tool owns the system proxy, switching to selected apps is refused with `PROXY_CONFLICT` and the same modal is shown |
 | Selecting captured apps | Tick/untick rows in the app list (filter by app name, [Refresh list]); the selection is persisted and pushed to the sidecar without restarting the bridge | The first enable triggers the macOS network-extension prompt: without confirmation within 5 seconds the UI shows "failed" with guidance and [Retry] |
@@ -90,7 +90,7 @@ Main window
 | Location | Copy | Notes |
 | -------- | ---- | ----- |
 | CA install warning | 本证书用于在本机解密并改写 HTTPS，仅限个人设备；可随时卸载。 | NFR-005; must be shown before installing |
-| Proxy conflict prompt | 检测到系统代理已启用。请先关闭 Clash / mihomo / 其它 VPN 的系统代理后再试。 | REQ-004; modal blocks starting the bridge |
+| Proxy conflict prompt | 检测到代理环境冲突：系统代理已启用，或存在 VPN / 代理工具的 TUN（虚拟网卡）模式。请先关闭 Clash / mihomo / 其它 VPN 的系统代理与 TUN 模式后再试。 | REQ-004 / [ADR-0004](../architecture/adr/ADR-0004-refuse-start-when-system-proxy-in-use.en.md) / [ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md); the modal blocks starting the bridge (title "检测到代理环境冲突", body = the same sentence without the colon prefix); also shown when switching to selected apps |
 | Session expiry prompt | WebVPN 会话已失效。桥接已停止并已清除系统代理。 | REQ-002; the modal offers [Go to login] |
 | Capture-mode hint | 系统代理：全部流量经本桥；指定应用：只有所选应用的流量经本桥，本 App 不设置系统代理（切换时会撤销本 App 设置过的系统代理）。 | REQ-003; permanent hint next to the first-level choice, explaining the exclusion and the proxy effect of switching |
 | Process-capture authorisation guidance | 首次启用时 macOS 会安装并激活 mitmproxy 的网络扩展：请在系统设置 → 通用 → 登录项与扩展（或弹出的授权提示）中允许。未在 5 秒内确认会导致启用失败，授权后点「重试」。 | NFR-005 / R4; shown only on failure, together with [Retry] |

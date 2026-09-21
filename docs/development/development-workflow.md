@@ -83,7 +83,7 @@ Commit message: Conventional Commits：`feat|fix|docs|test|chore(scope): 说明`
                 （范围可省略；与既有 `chore: <说明>` 提交一致）
 ```
 
-CI 现有两个工作流：文档检查 [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml) 与 Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml)。
+CI 现有三个工作流：文档检查 [.github/workflows/docs-check.yml](../../.github/workflows/docs-check.yml)、Python L0 [.github/workflows/python-tests.yml](../../.github/workflows/python-tests.yml) 与 App 单元/类型 [.github/workflows/app-tests.yml](../../.github/workflows/app-tests.yml)。
 
 ## 6. 与 Agent 的关系
 

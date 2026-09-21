@@ -20,12 +20,12 @@
 
 **回归策略**：L0 每次 PR 必跑；L1/L2 在对应模块变更时本地跑；L3 发版前跑。用例集（TC-A01..TC-H02）与优先级见 Phase 1 Spec 的 `verification.md`，发版门槛见 [docs/verification/verification-strategy.md](../verification/verification-strategy.md) 第 6 节。
 
-**L3 的执行方式（M4 起）**：按 [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 双平台验收执行手册」逐步执行（每步含执行者/命令/期望/证据落点），两侧平台共用 `pnpm run acceptance:check` 采集脱敏证据（OS/代理/信任库/CA 权限/桥存活/curl 对照 + `redaction-self-check`），手册的结果表逐行填写。前置条件：**先关闭其它代理工具的 TUN / 虚拟网卡模式**（`KI-013`）；需要人的动作（管理员密码、CAS/MFA 登录、系统扩展授权）由测试者本人完成。登录步骤可能遇到 `KI-014`（CAS 主题静态资源被服务端截断导致登录窗样式丢失）：重载登录窗即可继续，属外部服务行为。
+**L3 的执行方式（M4 起）**：按 [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 双平台验收执行手册」逐步执行（每步含执行者/命令/期望/证据落点），两侧平台共用 `pnpm run acceptance:check` 采集脱敏证据（OS/代理/信任库/CA 权限/桥存活/curl 对照 + `redaction-self-check`），手册的结果表逐行填写。前置条件：**先关闭其它代理工具的 TUN / 虚拟网卡模式**（`KI-013`；开桥前会解析网关主机，fake-ip 形态会以 `PROXY_CONFLICT` 拒绝，`redir-host` 形态仍需手动关闭）；需要人的动作（管理员密码、CAS/MFA 登录、系统扩展授权）由测试者本人完成。登录步骤可能遇到 `KI-014`（CAS 主题静态资源被服务端截断导致登录窗样式丢失）：重载登录窗即可继续，属外部服务行为。
 
 ## 2. 覆盖要求
 
 ```text
-Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 198 个用例（L0 97 + L1 93 + L2 8）与 71 个 App 单测用例全绿）
+Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 198 个用例（L0 97 + L1 93 + L2 8）与 76 个 App 单测用例全绿）
 Coverage tool:   TBD（M1 未引入；层与用例即当前的可回归证据）
 Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 ```
@@ -85,7 +85,7 @@ CI test job:    L0：.github/workflows/python-tests.yml（pull_request 与 main 
 | -- | ---- |
 | 测试数据 | 真实数据仅限于「测试者自有的西财账号」，**禁止写入仓库**；其余输入用构造的样本 URL 与配置 |
 | 外部依赖 | L0 无外部依赖；L1/L2 使用假上游 WebVPN（录制流量或桩）；L3 使用真实 `webvpn.swufe.edu.cn`（仅在授权设备） |
-| 环境隔离 | L3 需要独占系统代理（App 在系统代理被占用时拒绝启动），同一测试机不得同时运行 Clash / mihomo / sing-box 等代理工具；**其 TUN / 虚拟网卡模式也必须关闭**（fake-ip DNS 会让经桥的上游连接挂起，`KI-013`，`PROXY_CONFLICT` 检测不到 TUN） |
+| 环境隔离 | L3 需要独占系统代理（App 在系统代理被占用时拒绝启动），同一测试机不得同时运行 Clash / mihomo / sing-box 等代理工具；**其 TUN / 虚拟网卡模式也必须关闭**（fake-ip DNS 会让经桥的上游连接挂起，`KI-013`；fake-ip 形态在开桥前以 `PROXY_CONFLICT` 拒绝，`redir-host` 形态检测不到、仍需手动关闭） |
 | 敏感性 | 日志与测试输出不得含会话 Cookie 或响应正文；不得提交真实 Cookie、账号或个人信息 |
 
 ## 7. 与验证的关系

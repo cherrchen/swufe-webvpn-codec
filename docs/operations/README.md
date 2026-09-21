@@ -68,7 +68,7 @@
 | 日志 | 应用内调试日志（默认关闭） | 域名 + 是否改写成功 + 方向（request/response）+ 时间；不含正文与 Cookie（`DebugLogRecord`） | 内存环缓；落盘与保留期 `TBD`（第一期未定义） |
 | 指标 | 不适用 | 无服务端指标采集（单机桌面工具） | 不适用 |
 | 追踪 | 不适用 | 无分布式追踪 | 不适用 |
-| 告警 | 不适用 | 无服务端告警；界面状态区与错误码（`PROXY_CONFLICT`、`CA_MISSING`、`NOT_LOGGED_IN`、`SESSION_EXPIRED`、`BRIDGE_CRASH`、`ALLOWLIST_EMPTY`）即用户可见信号 | 不适用 |
+| 告警 | 不适用 | 无服务端告警；界面状态区与错误码（`PROXY_CONFLICT`、`CA_MISSING`、`NOT_LOGGED_IN`、`SESSION_EXPIRED`、`BRIDGE_CRASH`、`ALLOWLIST_EMPTY`）即用户可见信号（`PROXY_CONFLICT` 同时覆盖「系统代理被占用」与「网关主机解析到 fake-ip 段」，[ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)） | 不适用 |
 
 ## 5. 备份与恢复
 

@@ -27,7 +27,7 @@
 ## 2. Coverage expectations
 
 ```text
-Coverage target: TBD (no numeric target; the current baseline is 198 green L0/L1/L2 cases (L0 97 + L1 93 + L2 8) plus 71 app unit cases)
+Coverage target: TBD (no numeric target; the current baseline is 198 green L0/L1/L2 cases (L0 97 + L1 93 + L2 8) plus 76 app unit cases)
 Coverage tool:   TBD (not adopted in M1; the layers and cases are the current regression evidence)
 Exceptions:      the L3 and manual layers are excluded from coverage and
                  replaced by manual steps
@@ -96,7 +96,7 @@ Documentation-check workflow: [docs-check.yml](../../.github/workflows/docs-chec
 | ---- | ---------- |
 | Test data | Real data is limited to "the tester's own SWUFE account" and **must never be committed**; everything else uses constructed sample URLs and configurations |
 | External dependencies | L0 has none; L1/L2 use a fake WebVPN upstream (recorded traffic or a stub); L3 uses the real `webvpn.swufe.edu.cn` (authorised devices only) |
-| Environment isolation | L3 needs exclusive use of the system proxy (the app refuses to start when a system proxy is already in use); the same test machine must not run Clash / mihomo / sing-box at the same time, and **their TUN / virtual-interface mode must be off as well** (fake-ip DNS makes upstream connections through the bridge hang, `KI-013`; `PROXY_CONFLICT` cannot see TUN) |
+| Environment isolation | L3 needs exclusive use of the system proxy (the app refuses to start when a system proxy is already in use); the same test machine must not run Clash / mihomo / sing-box at the same time, and **their TUN / virtual-interface mode must be off as well** (fake-ip DNS makes upstream connections through the bridge hang, `KI-013`; the fake-ip shape is refused before starting with `PROXY_CONFLICT`, the `redir-host` shape is invisible to that check and still has to be turned off by hand) |
 | Sensitivity | Logs and test output must not contain session cookies or response bodies; never commit real cookies, accounts or personal data |
 
 ## 7. Relationship to verification

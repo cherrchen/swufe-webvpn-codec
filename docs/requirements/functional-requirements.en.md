@@ -147,7 +147,7 @@ Phase 1 does not implement a TUN/transparent gateway. The system proxy covers or
 - Source: archived package / [requirements-onepager-v1.0.md](../archive/2026-09-20-swufe-webvpn-bridge-docs-v1.0/99-appendix/requirements-onepager-v1.0.md) FR-4
 
 **Description**
-Before starting, the system shall detect whether the system proxy is already occupied by other software; if it is set (and was not set by this app), the system shall refuse to start and tell the user to first close Clash / mihomo / sing-box or whatever occupies the system proxy.
+- Before starting, the system shall detect whether the system proxy is already occupied by other software; if it is set (and was not set by this app), the system shall refuse to start and tell the user to first close Clash / mihomo / sing-box or whatever occupies the system proxy. The same start path also checks whether the gateway host resolves into the fake-ip range (`198.18.0.0/15`, Clash / mihomo / sing-box TUN mode) and refuses the start on a hit ([ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md)).
 
 **Rationale**
 Layering on top of Clash is hard to test and behaves unpredictably (ADR-0004); chained coexistence is explicitly out of scope for Phase 1.
@@ -156,10 +156,12 @@ Layering on top of Clash is hard to test and behaves unpredictably (ADR-0004); c
 1. Starting the bridge while the OS proxy is enabled returns `PROXY_CONFLICT` and the bridge is not started (TC-C01).
 2. The prompt explicitly asks the user to close Clash / mihomo / other VPN system proxies before retrying.
 3. Once the user releases the system proxy, starting again succeeds.
+4. When the gateway host resolves into the fake-ip range (`198.18.0.0/15`), starting is refused with `PROXY_CONFLICT` and the bridge is not started ([ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md)).
 
 **Boundaries and exceptions**
 - Only system-proxy occupancy is detected; no chained forwarding is performed.
 - A proxy set and marked by this app itself (`systemProxyManagedByApp`) is not treated as a conflict.
+- The fake-ip criterion only covers the fake-ip shape of a TUN; the `redir-host` shape is invisible to it and still relies on the runtime prerequisite (see `KI-013`).
 
 **Related spec**
 - [specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/)

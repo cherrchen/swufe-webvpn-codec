@@ -171,7 +171,7 @@ startBridge(): Promise<BridgeStatus>
 - 用途：开启本机桥：启动 mitm sidecar、按需设置系统代理与进程捕获。
 - 输入：无（桥端口、allowlist、webvpnBase 等来自 `AppSettings` 与 Allowlist Store）。
 - 输出：`BridgeStatus`（见「类型定义」）；成功路径 `state` 由 `idle → starting → running`。
-- 错误：见 [错误模型](#错误模型)；开桥前若系统代理已被占用则以 `PROXY_CONFLICT` 拒绝启动（ADR-0004）。
+- 错误：见 [错误模型](#错误模型)；开桥前若系统代理已被占用，或网关主机解析到 fake-ip 段（`198.18.0.0/15`，Clash / mihomo / sing-box 的 TUN 模式），则以 `PROXY_CONFLICT` 拒绝启动（ADR-0004、[ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）。
 
 ### `stopBridge(): Promise<BridgeStatus>`
 
@@ -376,7 +376,7 @@ onSessionExpired(cb: () => void): () => void
 
 | 错误码 | 含义 | 用户动作 |
 | ------ | ---- | -------- |
-| `PROXY_CONFLICT` | 系统代理已占用（开桥前，或启用「指定应用」前检测到） | 关闭其它代理 |
+| `PROXY_CONFLICT` | 代理环境冲突：系统代理已占用（开桥前，或启用「指定应用」前检测到），或网关主机解析到 fake-ip 段（`198.18.0.0/15`，TUN 模式，[ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)） | 关闭其它代理的系统代理与 TUN 模式 |
 | `CA_MISSING` | 未安装/未信任 CA | 去安装 |
 | `NOT_LOGGED_IN` | 无会话 | 去登录 |
 | `SESSION_EXPIRED` | 会话失效 | 重登 |
@@ -385,7 +385,7 @@ onSessionExpired(cb: () => void): () => void
 
 错误码的传递方式：`BridgeStatus.error` / `BridgeStatus.captureError` 走状态对象；方法 reject 时错误码随 `Error` 一起抛给 Renderer。
 但 Electron 的 `invoke` rejection 只保留 `message` 与 `stack`（自定义属性会被丢弃），因此 `setCaptureMode` / `setCaptureProcesses` 的拒绝消息形如
-`<CODE>：<message>`（例如 `PROXY_CONFLICT：检测到系统代理已启用。…`），Renderer 侧解析该前缀决定是否弹出代理冲突模态。
+`<CODE>：<message>`（例如 `PROXY_CONFLICT：检测到代理环境冲突：…`），Renderer 侧解析该前缀决定是否弹出代理冲突模态。
 
 进程捕获失败**不使用**错误码：它不改变桥状态，只写入 `BridgeStatus.captureError`（REQ-003 边界 / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)）。
 

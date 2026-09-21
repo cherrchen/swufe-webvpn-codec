@@ -98,7 +98,7 @@ flowchart LR
 | ---- | ---- | ------------------------------ |
 | 安装 MITM CA | 该设备上的本机 HTTPS 会被解密 | 只能由本机用户显式触发；安装前必须展示风险提示（仅限个人设备、可随时卸载，NFR-005）；授权由 macOS 在本应用会话内的系统弹窗完成——先提权把证书写入系统钥匙串，再由**应用进程自己**写入信任设置（[ADR-0008](../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)），不再经 osascript 提权子进程写信任设置 |
 | 卸载 MITM CA | 桥仍在运行时 TLS 解密失败 | 本机用户显式触发；建议先停桥再卸载 |
-| 设置系统代理 | 影响本机全部 HTTP/HTTPS 流量 | 仅当系统代理未被占用时设置；已被占用则拒绝启动（ADR-0004 / `PROXY_CONFLICT`） |
+| 设置系统代理 | 影响本机全部 HTTP/HTTPS 流量 | 仅当系统代理未被占用时设置；已被占用则拒绝启动（ADR-0004 / `PROXY_CONFLICT`）。开桥前另做 fake-ip（TUN）预检，命中同一错误码拒绝启动（[ADR-0011](../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)） |
 | 清除系统代理 | 误清用户自己设置的代理 | 仅在「由本 App 设置」标记存在时清除（NFR-004），关闭/过期/退出均走同一路径 |
 | 开启桥 | 命中 allowlist 的流量被解密与改写 | 需已登录、CA 已安装且受信任、allowlist 非空；否则返回 `NOT_LOGGED_IN` / `CA_MISSING` / `ALLOWLIST_EMPTY` |
 | 启用进程捕获 | 被捕获进程的全部流量被解密 | 仅限用户显式选择的 PID；关闭桥时一并停止；macOS 可能需辅助功能/网络扩展授权 |
