@@ -23,7 +23,7 @@ specs/001-phase1-local-bridge/     ← the first spec of this project (phase 1 l
 
 | Spec | Title | Related REQs | Status | Link |
 | ---- | ----- | ------------ | ------ | ---- |
-| 001-phase1-local-bridge | phase 1 local bridge and academic-system browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | Draft | [spec.md](001-phase1-local-bridge/spec.md) |
+| 001-phase1-local-bridge | phase 1 local bridge and academic-system browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | Implemented (2026-09-21: the macOS side fully passes; `Verified` awaits the Windows side, see `KI-001`) | [spec.md](001-phase1-local-bridge/spec.md) |
 
 > Register one row per spec here, and mirror it in [roadmap.md](../docs/planning/roadmap.md); long-lived facts never live in a spec.
 

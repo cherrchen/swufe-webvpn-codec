@@ -23,7 +23,7 @@ specs/001-phase1-local-bridge/     ← 本项目第一个 Spec（Phase 1 本机�
 
 | Spec | 标题 | 关联 REQ | Status | 链接 |
 | ---- | ---- | -------- | ------ | ---- |
-| 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | Draft | [spec.md](001-phase1-local-bridge/spec.md) |
+| 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | Implemented（2026-09-21：macOS 侧全部通过；`Verified` 待 Windows 侧，见 `KI-001`） | [spec.md](001-phase1-local-bridge/spec.md) |
 
 > 每个 Spec 在此登记一行，并在 [roadmap.md](../docs/planning/roadmap.md) 同步注册；长期事实不属于 Spec。
 

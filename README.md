@@ -8,7 +8,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 阶段 | Phase 1 进行中：文档已对齐（2026-09-20）；M1 桥核心已实现并通过 L0/L1/L2（2026-09-21）；M2 桌面编排（Electron 壳 / 系统代理 / CA / 会话过期）已实现并通过 App 单测与端到端验证（2026-09-21；系统信任库写入与 Windows 真机验证待人工/M4）；M3–M4 未开始 |
+| 阶段 | Phase 1：M1–M4 已交付，**macOS 侧验收全部通过（含教务浏览器验收）**——2026-09-21 `KI-011` 修复（[ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）后复验 TC-G01/TC-G02 通过；Spec 001 状态 `Implemented`。未完成：Windows 侧真机项延期（`KI-001`）、`KI-007`（CA 自动安装）/`KI-013`（TUN 干扰）/`KI-014`（CAS 主题资源被服务端截断）未决，故未到 `Verified`（见 [verification.md](specs/001-phase1-local-bridge/verification.md)） |
 | 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)；含桥实现（[swufe_bridge/](swufe_bridge/wrd_codec.py)、[tests/](tests/l0/test_wrd_codec.py)）与桌面应用（[app/](app/README.md)） |
 | 第一期 Feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |
@@ -16,7 +16,7 @@
 | 文档版本 | 1.0 |
 | 初始化日期 | 2026-09-20 |
 
-本仓库以**文档为主体**（`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程），并含 M1/M2 交付的实现：桌面应用 `npm --prefix app start`（先 `npm --prefix app install`）；无桌面壳时也可用 `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` 直接起桥（见 [桥控制协议](docs/api/bridge-control-protocol.md)）。
+本仓库以**文档为主体**（`docs/` 记录长期项目事实，`specs/` 记录单个 Feature 的完整过程），并含 M1–M4 交付的实现（桥核心、桌面编排、体验打磨、验收修复）：桌面应用 `npm --prefix app start`（先 `npm --prefix app install`）；无桌面壳时也可用 `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` 直接起桥（见 [桥控制协议](docs/api/bridge-control-protocol.md)）。
 
 ## 1. 它解决什么问题
 
@@ -24,14 +24,14 @@
 
 WebVPN 是**应用层反向代理**，不是 SSLVPN/TUN，因此用户无法让本机普通浏览器或应用以「真实内网主机名」透明访问校内 HTTP/HTTPS 服务。
 
-本机桥补上的就是这一段：用户先完成官方登录，之后本机浏览器对 allowlist 内主机的请求由本机桥改写为 WebVPN URL 并携带 WebVPN 会话（**WRD 请求改写**，由 WrdCodec 实现）；响应中的 `Location`、`Set-Cookie` 以及 HTML/JS/JSON 里的校内绝对 URL 再经**响应反向改写**还原。客户端侧始终使用真实主机名，只有上行流量改走 WebVPN。
+本机桥补上的就是这一段：用户先完成官方登录，之后本机浏览器对 allowlist 内主机的请求由本机桥改写为 WebVPN URL 并携带 WebVPN 会话（**WRD 请求改写**，由 WrdCodec 实现）；响应中的 `Location`、`Set-Cookie` 以及 HTML/JS/JSON 里的校内绝对 URL 再经**响应反向改写**还原。客户端侧始终使用真实主机名，只有上行流量改走 WebVPN；两条例外见 [ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)：网关自有根命名空间（`/wengine-vpn/`、`/authserver/`）不经 token、直接取自网关根；命中网关客户端 shim（`__vpn_*` + `/wengine-vpn/js/main.js`）引导页判据的 HTML 文档会被升级到网关原生 URL 形态（`https://webvpn.swufe.edu.cn/<scheme>/<token>/…`），此后该主机由网关自己的改写运行时接管（地址栏不再是原主机名），其它 allowlist 主机不受影响。
 
 相关事实见[项目概览](docs/overview/project-overview.md)、[目标与非目标](docs/overview/goals-and-non-goals.md)、[术语表](docs/overview/glossary.md)、[架构总览](docs/architecture/overview.md)。
 
 ## 2. 第一期范围与验收
 
 - **平台**：macOS 与 Windows 优先；Linux 不在第一期范围。
-- **验收**：本机浏览器能打开并操作教务 `jwxt.swufe.edu.cn` 页面。
+- **验收**：本机浏览器能打开并操作教务 `jwxt.swufe.edu.cn` 页面。首次进入该主机时浏览器会被升级到 WebVPN 原生 URL 形态（见 [ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）；macOS 侧已于 2026-09-21 通过（TC-G01/TC-G02），Windows 侧延期（`KI-001`）。
 - **体验目标**：从「已登录」到「浏览器打开教务」≤ 3 次点击（不含 CAS 本身）。
 - **安全目标**：不存密码；MITM CA 可一键卸载；关闭后不留残留系统代理。
 

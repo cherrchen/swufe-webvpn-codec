@@ -62,7 +62,8 @@ Distribution:  TBD - embedded Python runtime versus an external mitmproxy
 Release flow:  TBD - there is no release pipeline yet; the current CI runs
                documentation checks (npm run docs:check) and the Python L0
                tests (.github/workflows/python-tests.yml); packaging and
-               distribution belong to M4
+               distribution are not implemented yet (tasks T041/T042, phase 7
+               and unbound to any milestone)
 Rollback:      Stop the bridge -> confirm the system proxy is restored ->
                uninstall the local MITM CA; if needed, roll back to the
                previous installer

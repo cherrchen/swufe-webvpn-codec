@@ -54,7 +54,7 @@
 分发形态:    TBD —— 嵌入式 Python 运行时与外置 mitmproxy 可执行文件两种方案
              尚未选定（体积与签名取舍见 ADR-0002，实现阶段决定）
 发布流程:    TBD —— 尚无发布流水线；当前 CI 做文档检查（npm run docs:check）与
-             Python L0 测试（.github/workflows/python-tests.yml），打包与分发属 M4
+             Python L0 测试（.github/workflows/python-tests.yml）；打包与分发尚未实现（tasks.md 的 T041/T042，属 Phase 7 后置，未绑定里程碑）
 回滚方式:    关闭桥 → 确认系统代理已清除 → 卸载本机 MITM CA；
              必要时回退到上一版应用安装包
 ```

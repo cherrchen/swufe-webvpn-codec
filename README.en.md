@@ -8,7 +8,7 @@
 
 | Item | Value |
 | --- | --- |
-| Stage | Phase 1 in progress: documentation aligned (2026-09-20); the M1 bridge core is implemented and passing L0/L1/L2 (2026-09-21); M2 desktop orchestration (Electron shell / system proxy / CA / session expiry) is implemented and verified by app unit tests plus end-to-end runs (2026-09-21; the trust-store write and Windows real-machine checks still need a human/M4); M3–M4 not started |
+| Stage | Phase 1: M1–M4 delivered and **the macOS-side acceptance, including the academic-affairs browser acceptance, fully passes** — after the `KI-011` fix ([ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)) the 2026-09-21 re-verification passes TC-G01/TC-G02; spec 001 is `Implemented`. Not done: the Windows real-machine items are deferred (`KI-001`) and `KI-007` (automatic CA install), `KI-013` (TUN interference) and `KI-014` (CAS theme assets truncated by the server) are unresolved, so the spec is not `Verified` yet (see [verification.md](specs/001-phase1-local-bridge/verification.md)) |
 | Repository type | Documentation-first: [docs/](docs/README.en.md) + [specs/](specs/README.en.md); plus the bridge implementation ([swufe_bridge/](swufe_bridge/wrd_codec.py), [tests/](tests/l0/test_wrd_codec.py)) and the desktop app ([app/](app/README.md)) |
 | Phase 1 feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Owner | cherrchen |
@@ -16,7 +16,7 @@
 | Documentation version | 1.0 |
 | Initialised | 2026-09-20 |
 
-The repository is **documentation-first** (`docs/` holds long-lived project facts, `specs/` records individual features end to end) and already contains the M1 bridge core: without any desktop shell you can start the bridge with `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` (see the [bridge control protocol](docs/api/bridge-control-protocol.en.md)).
+The repository is **documentation-first** (`docs/` holds long-lived project facts, `specs/` records individual features end to end) and already contains the M1–M4 implementation (bridge core, desktop orchestration, experience polish and the acceptance fixes): without any desktop shell you can start the bridge with `uv run python -m swufe_bridge.sidecar --config <bridge-config.json>` (see the [bridge control protocol](docs/api/bridge-control-protocol.en.md)).
 
 ## 1. What problem it solves
 
@@ -24,14 +24,14 @@ Off-campus access to campus web resources depends on the Wengine WebVPN `webvpn.
 
 The WebVPN is an **application-layer reverse proxy**, not an SSLVPN/TUN, so a normal local browser or application cannot reach campus HTTP/HTTPS services transparently under their real internal hostnames.
 
-The local bridge fills exactly that gap: the user logs in officially first, then requests from the local browser to allowlisted hosts are rewritten into WebVPN URLs carrying the WebVPN session (**WRD request rewriting**, implemented by WrdCodec); campus absolute URLs inside `Location`, `Set-Cookie` and HTML/JS/JSON responses are mapped back by **response reverse rewriting**. The client side always uses the real hostname — only upstream traffic goes through the WebVPN.
+The local bridge fills exactly that gap: the user logs in officially first, then requests from the local browser to allowlisted hosts are rewritten into WebVPN URLs carrying the WebVPN session (**WRD request rewriting**, implemented by WrdCodec); campus absolute URLs inside `Location`, `Set-Cookie` and HTML/JS/JSON responses are mapped back by **response reverse rewriting**. The client side always uses the real hostname — only upstream traffic goes through the WebVPN; there are two exceptions ([ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)): gateway-owned root namespaces (`/wengine-vpn/`, `/authserver/`) take no token and come straight from the gateway root, and an HTML document matching the gateway client shim (`__vpn_*` + `/wengine-vpn/js/main.js`) bootstrap predicate is promoted to the gateway-native URL space (`https://webvpn.swufe.edu.cn/<scheme>/<token>/…`), where that host is then handled by the gateway's own rewriting runtime (the address bar is no longer the original hostname); other allowlisted hosts are unaffected.
 
 See [project overview](docs/overview/project-overview.md), [goals and non-goals](docs/overview/goals-and-non-goals.md), [glossary](docs/overview/glossary.md) and [architecture overview](docs/architecture/overview.md).
 
 ## 2. Phase 1 scope and acceptance
 
 - **Platforms**: macOS and Windows first; Linux is out of scope for Phase 1.
-- **Acceptance**: the local browser can open and operate the academic affairs site `jwxt.swufe.edu.cn`.
+- **Acceptance**: the local browser can open and operate the academic affairs site `jwxt.swufe.edu.cn`. On first entry to that host the browser is promoted to the WebVPN-native URL space (see [ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)); the macOS side passed on 2026-09-21 (TC-G01/TC-G02), the Windows side is deferred (`KI-001`).
 - **Experience goal**: at most 3 clicks from "already logged in" to "academic affairs site open in the browser" (excluding CAS itself).
 - **Security goals**: no passwords stored; the MITM CA can be uninstalled in one action; no leftover system proxy after shutdown.
 
