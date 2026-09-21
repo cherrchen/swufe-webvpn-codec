@@ -19,6 +19,15 @@ REWRITABLE_CONTENT_TYPES = frozenset(
     {"text/html", "application/javascript", "text/javascript", "application/json"}
 )
 
+# The gateway hands its client shim to the browser through a minimal bootstrap
+# document (KI-011). Its two markers are the shim globals and the vendor runtime
+# script the document loads from the gateway root.
+GATEWAY_BOOTSTRAP_MARKERS: tuple[str, str] = ("__vpn_", "/wengine-vpn/js/main.js")
+# Observed bootstrap page: 925 B (2026-09-21, records in
+# specs/001-phase1-local-bridge/verification.md). Real site pages carry the same
+# injection on top of tens of kilobytes, so size separates the two.
+GATEWAY_BOOTSTRAP_MAX_BYTES = 8192
+
 _SCHEME_TOKEN = r"https?(?:-\d+)?"
 _HOST_TOKEN = r"[0-9a-fA-F]{34,}"
 # ``\/`` is a valid in-string escape for ``/``: accept it wherever a URL literal
@@ -63,6 +72,24 @@ def is_rewritable_content_type(value: str | None) -> bool:
     if not value:
         return False
     return value.split(";", 1)[0].strip().lower() in REWRITABLE_CONTENT_TYPES
+
+
+def is_gateway_bootstrap_html(content_type: str | None, body: bytes | None) -> bool:
+    """Whether a response is the gateway's client-shim bootstrap document.
+
+    The gateway answers a proxied HTML request with a tiny document whose only
+    job is to define the ``__vpn_*`` globals and load the vendor client runtime
+    from the gateway root (KI-011). Real site pages carry the same injection on
+    top of far more bytes, so ``text/html`` + both markers + the size cap
+    separates the two. Never raises: an undecodable body is matched on its
+    replacement-decoded text.
+    """
+    if not content_type or content_type.split(";", 1)[0].strip().lower() != "text/html":
+        return False
+    if not body or len(body) > GATEWAY_BOOTSTRAP_MAX_BYTES:
+        return False
+    text = body.decode("utf-8", "replace")
+    return all(marker in text for marker in GATEWAY_BOOTSTRAP_MARKERS)
 
 
 def decode_wrd_reference(value: str, codec: WrdCodec, webvpn_host: str) -> str | None:

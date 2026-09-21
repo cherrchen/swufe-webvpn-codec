@@ -7,12 +7,18 @@ import gzip
 import pytest
 from mitmproxy import http
 
-from swufe_bridge.addon import METADATA_WRD_PREFIX, BridgeAddon
+from swufe_bridge.addon import METADATA_ORIGINAL_URL, METADATA_WRD_PREFIX, BridgeAddon
 from swufe_bridge.wrd_codec import WrdCodec
 from tests.conftest import runtime_config
 
 WEBVPN_HOST = "webvpn.swufe.edu.cn"
 CHINESE_TEXT = "教务"
+
+# The gateway's client-shim bootstrap document (KI-011): both markers, 925 B live.
+BOOTSTRAP_BODY = (
+    b'<html><head><script>var __vpn_protocol_host="https://webvpn.swufe.edu.cn";</script>'
+    b'<script src="/wengine-vpn/js/main.js?ver=20211207"></script></head><body></body></html>'
+)
 
 
 @pytest.fixture
@@ -230,3 +236,37 @@ def test_response_without_a_body_is_handled(rewritten_flow, addon) -> None:
     respond(flow, addon, http.Response.make(204, b"", {"Content-Type": "text/html; charset=utf-8"}))
 
     assert flow.response.status_code == 204
+
+
+def test_gateway_owned_response_is_not_reverse_rewritten(addon, rewritten_flow, token: str) -> None:
+    """The shim runtime must reach the browser byte-identical (KI-011)."""
+    flow = rewritten_flow("http://jwxt.swufe.edu.cn/wengine-vpn/js/main.js?ver=20211207")
+    body = f'var u = "\\/https\\/{token}\\/api";'.encode()
+
+    respond(flow, addon, http.Response.make(200, body, {"Content-Type": "application/javascript"}))
+
+    assert flow.response.raw_content == body
+    assert flow.response.headers.get("location") is None
+
+
+def test_bootstrap_document_is_promoted(addon, rewritten_flow) -> None:
+    flow = rewritten_flow()
+    respond(flow, addon, http.Response.make(200, BOOTSTRAP_BODY, {"Content-Type": "text/html"}))
+
+    assert flow.response.status_code == 302
+    assert flow.response.headers["location"] == WrdCodec().encode_url(
+        flow.metadata[METADATA_ORIGINAL_URL], webvpn_base="https://webvpn.swufe.edu.cn"
+    )
+    assert flow.response.headers["cache-control"] == "no-store"
+
+
+def test_site_page_with_injected_shim_is_not_promoted(addon, rewritten_flow) -> None:
+    """A real page carries the same injection on far more bytes: it stays ordinary."""
+    flow = rewritten_flow()
+    body = b"<html><body>" + b"x" * 20000 + BOOTSTRAP_BODY + b"</body></html>"
+
+    respond(flow, addon, http.Response.make(200, body, {"Content-Type": "text/html; charset=utf-8"}))
+
+    assert flow.response.status_code == 200
+    assert flow.response.headers.get("cache-control") is None
+    assert flow.response.raw_content == body

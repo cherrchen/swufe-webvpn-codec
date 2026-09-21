@@ -28,6 +28,7 @@ from swufe_bridge.allowlist import match as allowlist_match, now_iso
 from swufe_bridge.capture import POLL_INTERVAL_SECONDS, LocalCapture
 from swufe_bridge.config import BridgeRuntimeConfig, ConfigWatcher
 from swufe_bridge.rewrite import (
+    is_gateway_bootstrap_html,
     is_rewritable_content_type,
     rewrite_body_text,
     rewrite_location,
@@ -37,6 +38,13 @@ from swufe_bridge.wrd_codec import WrdCodec, WrdCodecError
 
 METADATA_ORIGINAL_URL = "swufe_original_url"
 METADATA_WRD_PREFIX = "swufe_wrd_prefix"
+METADATA_GATEWAY_ROOT = "swufe_gateway_root"
+METADATA_WRD_URL = "swufe_wrd_url"
+
+# Gateway-owned root namespaces (KI-011, ADR-0007): these paths belong to the
+# WebVPN gateway itself, not to any proxied site, so they are fetched from the
+# gateway root instead of being given a token prefix.
+GATEWAY_ROOT_PREFIXES: tuple[str, ...] = ("/wengine-vpn/", "/authserver/")
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
@@ -48,6 +56,8 @@ DETAIL_SET_COOKIE = "set-cookie"
 DETAIL_BODY = "body"
 DETAIL_BODY_SKIPPED = "body-skipped"
 DETAIL_NO_WRD_MATCH = "no-wrd-match"
+DETAIL_GATEWAY_ROOT = "gateway-root"
+DETAIL_PROMOTED = "promoted"
 
 
 def wrd_prefix_of(wrd_url: str) -> str:
@@ -234,6 +244,14 @@ class BridgeAddon:
             logger.request(host, False, DETAIL_NOT_ALLOWLISTED)
             return
 
+        if flow.request.path.startswith(GATEWAY_ROOT_PREFIXES):
+            # Gateway-owned namespace: take it from the gateway root, never token-wrap it.
+            flow.metadata[METADATA_GATEWAY_ROOT] = "1"
+            flow.request.url = f"{cfg.webvpn_base}{flow.request.path}"
+            self._inject_cookies(flow.request, cfg)
+            logger.request(host, True, DETAIL_GATEWAY_ROOT)
+            return
+
         original_url = flow.request.url
         try:
             wrd_url = codec.encode_url(original_url, webvpn_base=cfg.webvpn_base)
@@ -244,6 +262,7 @@ class BridgeAddon:
 
         flow.metadata[METADATA_ORIGINAL_URL] = original_url
         flow.metadata[METADATA_WRD_PREFIX] = wrd_prefix_of(wrd_url)
+        flow.metadata[METADATA_WRD_URL] = wrd_url
         flow.request.url = wrd_url
         self._inject_cookies(flow.request, cfg)
         self._rewrite_request_headers(flow.request, cfg, codec, host)
@@ -263,6 +282,11 @@ class BridgeAddon:
         codec = WrdCodec(cfg.wrd_key, cfg.wrd_iv, cfg.webvpn_host)
         original_host = (urlsplit(original_url).hostname or "").lower()
 
+        if flow.metadata.get(METADATA_GATEWAY_ROOT):
+            return  # gateway-owned resource: nothing to reverse-rewrite
+        if self._promote_to_gateway(flow, cfg, logger, original_host):
+            return
+
         # Priority order is the contract: Location → Set-Cookie → body (REQ-007).
         details: list[str] = []
         if self._rewrite_location_header(flow.response, codec, cfg):
@@ -281,6 +305,28 @@ class BridgeAddon:
             )
 
     # --- internals -----------------------------------------------------------
+
+    def _promote_to_gateway(
+        self, flow: http.HTTPFlow, cfg: BridgeRuntimeConfig, logger: DebugLogger, original_host: str
+    ) -> bool:
+        """Send a client-shim bootstrap document to the gateway's native URL space.
+
+        The injected shim only works where the gateway's own URLs resolve, which
+        the ordinary URL space this bridge maintains cannot provide (KI-011,
+        ADR-0007). Promoting the entry document keeps the entry address bar
+        ordinary for every other allowlist host.
+        """
+        wrd_url = flow.metadata.get(METADATA_WRD_URL)
+        if not wrd_url or flow.request.method not in ("GET", "HEAD") or flow.response is None:
+            return False
+        body = flow.response.get_content(strict=False)
+        if not is_gateway_bootstrap_html(flow.response.headers.get("content-type"), body):
+            return False
+        flow.response = http.Response.make(
+            302, b"", {"location": wrd_url, "cache-control": "no-store"}
+        )
+        logger.response(original_host, True, DETAIL_PROMOTED)
+        return True
 
     def _rewrite_location_header(
         self, response: http.Response, codec: WrdCodec, cfg: BridgeRuntimeConfig

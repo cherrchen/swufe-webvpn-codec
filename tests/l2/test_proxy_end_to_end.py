@@ -30,6 +30,12 @@ pytestmark = pytest.mark.skipif(shutil.which("curl") is None, reason="curl is re
 ALLOWLISTED_HOST = "jwxt.swufe.edu.cn"
 SESSION_VALUE = "SESSION-VALUE"
 DIRECT_BODY = "DIRECT-BODY-MARKER"
+SHIM_BODY = "SHIM-BODY"
+# The gateway's client-shim bootstrap document (KI-011): both markers, under the cap.
+BOOTSTRAP_BODY = (
+    b'<html><head><script>var __vpn_protocol_host="http://127.0.0.1";</script>'
+    b'<script src="/wengine-vpn/js/main.js?ver=20211207"></script></head><body></body></html>'
+)
 CURL_TIMEOUT = 30
 READY_TIMEOUT = 30
 
@@ -40,17 +46,45 @@ class _QuietHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args) -> None:  # silence test output
         pass
 
+    def send_body(self, status: int, content_type: str, body: bytes) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
 
 class WebVPNHandler(_QuietHandler):
     def do_GET(self) -> None:  # noqa: N802 - http.server API
         server = self.server
         server.requests.append((self.path, self.headers.get("Cookie")))
+        if self.path.startswith("/wengine-vpn/"):
+            # Gateway-owned namespace, served from the gateway root (KI-011).
+            self.send_body(200, "application/javascript", SHIM_BODY.encode())
+            return
+        if self._is_site_root():
+            # What the gateway returns for a proxied site root: the shim bootstrap page.
+            self.send_body(200, "text/html; charset=utf-8", BOOTSTRAP_BODY)
+            return
         prefix = "/" + "/".join(self.path.lstrip("/").split("/", 2)[:2])
         self.send_response(302)
         self.send_header("Location", f"{prefix}/next")
         self.send_header("Set-Cookie", "UPSTREAM=1; Domain=.swufe.edu.cn; Path=/")
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+    def _is_site_root(self) -> bool:
+        """``/https/<token>/`` of the allowlisted host, without a further path segment."""
+        parts = self.path.strip("/").split("/")
+        if len(parts) != 2:
+            return False
+        scheme_token, token = parts
+        if scheme_token not in ("http", "https"):
+            return False
+        try:
+            return WrdCodec().decrypt_host(token) == ALLOWLISTED_HOST
+        except Exception:  # not a WRD token at all
+            return False
 
 
 class DirectHandler(_QuietHandler):
@@ -259,6 +293,25 @@ def test_tc_f01_allowlisted_request_is_rewritten_end_to_end(bridge, webvpn) -> N
     # HTTP/2 against the client lowercases header names.
     assert "location: https://jwxt.swufe.edu.cn/next" in result.stdout.lower()
     assert "set-cookie: UPSTREAM=1; Domain=.swufe.edu.cn; Path=/" in result.stdout
+
+
+def test_gateway_owned_path_and_promotion_end_to_end(bridge, webvpn) -> None:
+    """`KI-011`: the shim comes from the gateway root, the site root gets promoted."""
+    proxy = f"http://127.0.0.1:{bridge['port']}"
+    token = WrdCodec().encrypt_host(ALLOWLISTED_HOST)
+
+    shim = curl("--proxy", proxy, f"http://{ALLOWLISTED_HOST}/wengine-vpn/js/main.js?ver=20211207")
+
+    assert shim.returncode == 0, shim.stderr
+    assert shim.stdout == SHIM_BODY
+    assert webvpn.requests[-1][0] == "/wengine-vpn/js/main.js?ver=20211207"
+
+    entry = curl("--include", "--proxy", proxy, f"http://{ALLOWLISTED_HOST}/")
+
+    assert entry.returncode == 0, entry.stderr
+    assert entry.stdout.splitlines()[0].startswith("HTTP/1.1 302"), entry.stdout
+    assert f"location: http://127.0.0.1:{webvpn.port}/http/{token}/" in entry.stdout.lower()
+    assert WrdCodec().decrypt_host(token) == ALLOWLISTED_HOST
 
 
 def test_tc_f02_non_allowlisted_request_is_passed_through(bridge, direct) -> None:

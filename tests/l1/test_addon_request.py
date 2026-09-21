@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import json
 
-from swufe_bridge.addon import METADATA_ORIGINAL_URL, METADATA_WRD_PREFIX, BridgeAddon
+from swufe_bridge.addon import (
+    METADATA_GATEWAY_ROOT,
+    METADATA_ORIGINAL_URL,
+    METADATA_WRD_PREFIX,
+    BridgeAddon,
+)
 from swufe_bridge.wrd_codec import WrdCodec
 
 WEBVPN_HOST = "webvpn.swufe.edu.cn"
@@ -190,6 +195,59 @@ def test_addon_reports_config_error_when_no_config_path_is_configured(flow_facto
 
     assert flow.request.url == before
     assert "swufe-error CONFIG_INVALID" in capsys.readouterr().err
+
+
+def test_gateway_owned_path_is_not_token_wrapped(addon_factory, flow_factory, capsys) -> None:
+    addon, _ = addon_factory(debug=True)
+    flow = flow_factory("http://jwxt.swufe.edu.cn/wengine-vpn/js/main.js?ver=20211207")
+
+    addon.request(flow)
+
+    assert flow.request.url == f"https://{WEBVPN_HOST}/wengine-vpn/js/main.js?ver=20211207"
+    assert flow.request.host == WEBVPN_HOST
+    assert flow.metadata[METADATA_GATEWAY_ROOT] == "1"
+    assert METADATA_WRD_PREFIX not in flow.metadata
+    records = debug_records(capsys)
+    assert records[-1]["host"] == "jwxt.swufe.edu.cn"
+    assert records[-1]["rewritten"] is True
+    assert records[-1]["detail"] == "gateway-root"
+
+
+def test_gateway_owned_authserver_path_is_not_token_wrapped(addon_factory, flow_factory) -> None:
+    addon, _ = addon_factory(cookies=[{"name": "sid", "value": "CFG-SID", "domain": ".swufe.edu.cn"}])
+    flow = flow_factory("http://jwxt.swufe.edu.cn/authserver/login?service=x")
+
+    addon.request(flow)
+
+    assert flow.request.url == f"https://{WEBVPN_HOST}/authserver/login?service=x"
+    assert flow.metadata == {METADATA_GATEWAY_ROOT: "1"}
+    assert flow.request.headers["cookie"] == "sid=CFG-SID"
+
+
+def test_site_path_containing_gateway_prefix_is_still_wrapped(addon_factory, flow_factory) -> None:
+    addon, _ = addon_factory()
+    flow = flow_factory("http://jwxt.swufe.edu.cn/xtgl/wengine-vpn/x")
+
+    addon.request(flow)
+
+    token = WrdCodec().encrypt_host("jwxt.swufe.edu.cn")
+    assert flow.request.host == WEBVPN_HOST
+    assert flow.request.path == f"/http/{token}/xtgl/wengine-vpn/x"
+    assert flow.metadata[METADATA_WRD_PREFIX] == f"/http/{token}"
+    assert METADATA_GATEWAY_ROOT not in flow.metadata
+
+
+def test_gateway_owned_path_on_non_allowlisted_host_is_untouched(
+    addon_factory, flow_factory, capsys
+) -> None:
+    addon, _ = addon_factory(debug=True)
+    flow = flow_factory("http://example.com/wengine-vpn/a")
+
+    addon.request(flow)
+
+    assert flow.request.url == "http://example.com/wengine-vpn/a"
+    assert flow.metadata == {}
+    assert debug_records(capsys)[-1]["detail"] == "not-allowlisted"
 
 
 def test_plain_http_allowlisted_request_uses_http_scheme_token(addon_factory, flow_factory) -> None:
