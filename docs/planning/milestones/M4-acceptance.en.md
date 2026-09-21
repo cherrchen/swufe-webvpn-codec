@@ -1,6 +1,6 @@
 # M4: Acceptance
 
-> Status: Planned
+> Status: In Progress
 > Owner: cherrchen
 > Target: TBD (the original package defines no date)
 >
@@ -22,16 +22,20 @@ Complete Phase 1 acceptance on real machines against the real WebVPN, reaching "
 
 ## Exit criteria
 
-- [ ] macOS: the browser opens the academic-affairs home page (TC-G01, P0)
-- [ ] macOS: in-site navigation works and does not jump to an unreachable address because of absolute URLs (TC-G02, P0)
-- [ ] Windows: TC-G01 repeated and passed (TC-G03, P0)
-- [ ] All P0 cases pass (TC-A01/A02/A03, TC-B01..TC-B03, TC-C01..TC-C04, TC-D01..TC-D04, TC-E01/E02, TC-F01/F02, TC-G01..TC-G03)
-- [ ] No unresolved blocking defects in the P1 cases
-- [ ] Browser acceptance on the academic-affairs site passes on at least one desktop OS (both targeted)
-- [ ] The known-issues list is recorded
-- [ ] Affected documents are synced (including bilingual pairs)
+- [x] macOS: the app starts and the full login / start / stop / quit chain works (TC-D01/D02/D03/D04, TC-C01..C04, TC-E01/E02/E03, TC-F01/F04, TC-G04, TC-H01/H02, TC-B05 pass)
+- [ ] macOS: the browser opens the academic-affairs home page (TC-G01, P0) - **failed**: the root URL returns the gateway's client-side shim page and stays blank; root cause in `KI-011` of [known-issues.md](../../../specs/001-phase1-local-bridge/known-issues.md)
+- [ ] macOS: in-site navigation works and does not jump to an unreachable address because of absolute URLs (TC-G02, P0) - **failed**: the real academic-affairs page renders but its scripts depend on the shim, so the page is not interactive (same `KI-011`)
+- [ ] Windows: TC-G01 repeated and passed (TC-G03, P0) - **deferred**: the machine is not reachable in this round (`KI-001`)
+- [ ] All P0 cases pass (TC-A01/A02/A03, TC-B01..TC-B03, TC-C01..TC-C04, TC-D01..TC-D04, TC-E01/E02, TC-F01/F02, TC-G01..TC-G03) - **not met**: everything except TC-G01/TC-G02 (failed) and TC-G03 (deferred) passes
+- [ ] No unresolved blocking defects in the P1 cases - **not met**: `KI-007` (automatic CA install), `KI-011` (browser acceptance; also P0) and `KI-013` (TUN interference) remain open
+- [ ] Browser acceptance on the academic-affairs site passes on at least one desktop OS (both targeted) - **not met**
+- [x] The known-issues list is recorded (`id/title/severity/status/linked_case/owner/note`, including the new `KI-007`..`KI-013`)
+- [x] Affected documents are synced (including bilingual pairs: `development-run.md`, milestone/roadmap/testing-strategy and the five spec files)
+
+> Exit floor: on macOS everything except the browser acceptance passes; Windows is explicitly deferred. **The "at least one desktop OS" floor was not reached**, so this milestone stays `In Progress` and spec 001 stays `In Progress` too.
 
 Acceptance environment: one macOS and one Windows test machine, Chrome/Edge, mitmproxy and curl; the test account is the tester's own SWUFE account (never committed to the repository) and is used only on authorized devices.
+Measured additions this round: **the TUN / virtual-interface mode of any other proxy tool must be off before acceptance** (Clash/mihomo fake-ip makes upstream connections through the bridge hang, see `KI-013`); the academic-affairs site is only proxyable through the gateway in its `http://jwxt.swufe.edu.cn/...` form (the `https` form returns `/wengine-vpn/failed`).
 
 ## Risks
 
@@ -43,4 +47,21 @@ Acceptance environment: one macOS and one Windows test machine, Chrome/Edge, mit
 
 ## Completion record
 
-Not started yet; the completion time, evidence (test report and execution-record summaries) and remaining issues are recorded here once it is done.
+**Run date**: 2026-09-21 (macOS local machine, `darwin 24.6.0`, app started with `--user-data-dir=/tmp/m4-acceptance` and `SWUFE_PROBE_INTERVAL_MS=8000`).
+
+**Method**: the real app driven over CDP (`--remote-debugging-port=9222`); the decisive browser observations were made by hand by cherrchen (automated navigation wedged repeatedly in this environment). Both platforms share the redacted evidence collector `npm run acceptance:check` (T044).
+
+**Evidence**:
+- "M4 双平台验收执行手册" + "M4 结果表" + "M4 教务浏览器验收记录" + the M4 rows of "执行的命令与结果" in [specs/001-phase1-local-bridge/verification.md](../../../specs/001-phase1-local-bridge/verification.md);
+- redacted snapshots: `specs/001-phase1-local-bridge/evidence/acceptance-macos/` (7) and `evidence/kit-selfcheck/` (5, T044 self-check);
+- defect ledger: [known-issues.md](../../../specs/001-phase1-local-bridge/known-issues.md) (`KI-001`..`KI-013`).
+
+**Passing**: TC-D01/D02/D03/D04, TC-C01/C02/C03/C04, TC-E01 (via the app's own manual command)/E02/E03, TC-F01/F04, TC-G04, TC-H01/H02, TC-B05; `uv run pytest -q` = 190 passed, `npm --prefix app run test:unit` = 71 passed, both typechecks clean, `npm run docs:check` = 0 error / 0 warning.
+
+**Failing**: TC-G01 and TC-G02 (browser acceptance). Root cause (`KI-011`): this deployment's gateway injects a client-side shim into every HTML response (`__vpn_*` plus `<script src="/wengine-vpn/js/main.js">`) that expects the browser to live in the WebVPN URL space; the transparent bridge token-prefixes that relative path, so it 404s through the bridge (the gateway root serves it: 200 / 376,922B) - the home page stays blank and the real page renders but is not interactive. The three candidate fixes (serve gateway-owned paths without a token / strip the shim from HTML / accept operating the site in portal form) all change public contracts and need a cherrchen decision plus an ADR.
+
+**Deferred**: every Windows real-machine item (`KI-001`).
+
+**Defects fixed during acceptance**: `KI-008` (session probe omitted the partition cookies, so every real session was reported expired and the bridge self-destructed; P0), `KI-009` (an ERR_ABORTED initial load was treated as fatal: misleading error plus a page stuck in the QR-only server render; P1), `KI-010` (CA uninstall lacked `-Z`, so no fingerprint could be read and uninstall never worked; P1).
+
+**Remaining issues**: `KI-007` (automatic CA install needs a different elevation mechanism: security-model change plus ADR), `KI-011` (P0, blocks browser acceptance), `KI-012` (some direct hosts get no response through mitmproxy; environment-dependent), `KI-013` (TUN interference needs an environment pre-check / wording), `KI-006` (the other two expiry signals of Q-001).

@@ -1,5 +1,6 @@
 # SWUFE WebVPN Bridge 桌面应用（`app/`）
 
+> 开发版运行说明见 [docs/operations/development-run.md](../docs/operations/development-run.md)（前置条件、启动、管理员权限操作、自检与重置）。
 > M2 交付：Electron 外壳（登录 WebView / Session Broker / Proxy Orchestrator / Cert Manager / Allowlist Store / IPC）。
 > 桥本体仍在仓库根的 `swufe_bridge/`（Python sidecar）；本目录只负责编排与界面。
 

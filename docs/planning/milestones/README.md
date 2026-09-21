@@ -27,7 +27,7 @@ docs/planning/milestones/<MILESTONE_ID>-<short-name>.md
 | M1 桥核心 | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon 请求改写 + Cookie 注入 + 单测/集成测 |
 | M2 桌面编排 | [M2-desktop-orchestration.md](M2-desktop-orchestration.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Electron 可登录、开桥、设置系统代理、安装 CA |
 | M3 体验打磨 | [M3-experience-polish.md](M3-experience-polish.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI、调试日志、进程捕获、文案可用 |
-| M4 验收 | [M4-acceptance.md](M4-acceptance.md) | Planned | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | 双平台 P0 用例通过并完成教务浏览器验收 |
+| M4 验收 | [M4-acceptance.md](M4-acceptance.md) | In Progress | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | 双平台 P0 用例通过并完成教务浏览器验收（2026-09-21：macOS 除教务浏览器验收外全部通过且已记录；Windows 延期；教务验收失败于 `KI-011`，故未完成） |
 | M5 开源准备（可选） | 未建文件 | Candidate | — | Candidate，首个开源准备工作确定后再建文件 |
 
 > 阶段划分、依赖与 Spec 索引见 [roadmap.md](../roadmap.md)；M5 只有 roadmap 中的候选行，尚未建文件。

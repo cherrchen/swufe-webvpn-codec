@@ -53,7 +53,9 @@ Method:        The user installs and runs it locally; the app launches the
                Development equivalent: local Node + Python venv + mitmdump
                (from M2: run `uv sync` in the repository root, then
                `npm --prefix app install && npm --prefix app start`; the app spawns the sidecar via
-               `<repo>/.venv/bin/python -m swufe_bridge.sidecar`, see [app/README.md](../../app/README.md))
+               `<repo>/.venv/bin/python -m swufe_bridge.sidecar`, see [app/README.md](../../app/README.md);
+               the full procedure - prerequisites / start / administrator operations / self-check /
+               troubleshooting / reset - is in [development-run.md](development-run.md))
 Distribution:  TBD - embedded Python runtime versus an external mitmproxy
                executable is not yet chosen (size/signing trade-off, see
                ADR-0002, decided during implementation)

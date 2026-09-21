@@ -22,10 +22,12 @@
 
 **Regression policy**: L0 runs on every PR; L1/L2 run locally when the relevant module changes; L3 runs before a release. The case set (TC-A01..TC-H02) and priorities live in the phase 1 spec's `verification.md`; the release gate is section 6 of [docs/verification/verification-strategy.md](../verification/verification-strategy.md).
 
+**How L3 is executed (from M4 on)**: follow the "M4 双平台验收执行手册" in [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) step by step (each step names the executor, command, expectation and where its evidence lands); both platforms share `npm run acceptance:check` to collect redacted evidence (OS / proxy / trust store / CA permissions / bridge liveness / curl controls plus `redaction-self-check`) and to fill the manual's result table. Prerequisite: **turn off the TUN / virtual-interface mode of any other proxy tool first** (`KI-013`); the actions that need a human (administrator password, CAS/MFA login, system-extension authorization) are performed by the tester.
+
 ## 2. Coverage expectations
 
 ```text
-Coverage target: TBD (no numeric target; the current baseline is 190 green L0/L1/L2 cases plus 70 app unit cases)
+Coverage target: TBD (no numeric target; the current baseline is 190 green L0/L1/L2 cases plus 71 app unit cases)
 Coverage tool:   TBD (not adopted in M1; the layers and cases are the current regression evidence)
 Exceptions:      the L3 and manual layers are excluded from coverage and
                  replaced by manual steps
@@ -93,7 +95,7 @@ Documentation-check workflow: [docs-check.yml](../../.github/workflows/docs-chec
 | ---- | ---------- |
 | Test data | Real data is limited to "the tester's own SWUFE account" and **must never be committed**; everything else uses constructed sample URLs and configurations |
 | External dependencies | L0 has none; L1/L2 use a fake WebVPN upstream (recorded traffic or a stub); L3 uses the real `webvpn.swufe.edu.cn` (authorised devices only) |
-| Environment isolation | L3 needs exclusive use of the system proxy (the app refuses to start when a system proxy is already in use); the same test machine must not run Clash / mihomo / sing-box at the same time |
+| Environment isolation | L3 needs exclusive use of the system proxy (the app refuses to start when a system proxy is already in use); the same test machine must not run Clash / mihomo / sing-box at the same time, and **their TUN / virtual-interface mode must be off as well** (fake-ip DNS makes upstream connections through the bridge hang, `KI-013`; `PROXY_CONFLICT` cannot see TUN) |
 | Sensitivity | Logs and test output must not contain session cookies or response bodies; never commit real cookies, accounts or personal data |
 
 ## 7. Relationship to verification

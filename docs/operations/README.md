@@ -49,7 +49,8 @@
 部署方式:    用户本机安装并运行；应用启动时以子进程拉起 mitmproxy sidecar
              开发等效方式：本机 Node + Python venv + mitmdump
              （M2 起：根目录 `uv sync` 后 `npm --prefix app install && npm --prefix app start`，
-              App 会用 `<repo>/.venv/bin/python -m swufe_bridge.sidecar` 拉起 sidecar，见 [app/README.md](../../app/README.md)）
+              App 会用 `<repo>/.venv/bin/python -m swufe_bridge.sidecar` 拉起 sidecar，见 [app/README.md](../../app/README.md)；
+              完整步骤（前置条件 / 启动 / 管理员权限操作 / 自检 / 排障 / 重置）见 [development-run.md](development-run.md)）
 分发形态:    TBD —— 嵌入式 Python 运行时与外置 mitmproxy 可执行文件两种方案
              尚未选定（体积与签名取舍见 ADR-0002，实现阶段决定）
 发布流程:    TBD —— 尚无发布流水线；当前 CI 做文档检查（npm run docs:check）与
