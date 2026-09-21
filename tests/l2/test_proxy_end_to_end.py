@@ -233,6 +233,8 @@ def test_ready_line_reports_the_effective_loopback_listener(bridge) -> None:
     assert ready["includeSwufeWildcard"] is False
     assert ready["cookies"] == 1
     assert ready["debug"] is True
+    # Capture is opt-in: the default config must not add a local mode.
+    assert "swufe-capture" not in bridge["sidecar"].stderr
 
 
 def test_tc_f01_allowlisted_request_is_rewritten_end_to_end(bridge, webvpn) -> None:
@@ -352,3 +354,37 @@ def test_ec_006_empty_allowlist_refuses_to_start(tmp_path: Path) -> None:
 
     assert result.returncode == 2
     assert "swufe-error ALLOWLIST_EMPTY" in result.stderr
+
+
+def test_an_invalid_capture_spec_is_rejected_before_anything_starts(tmp_path: Path) -> None:
+    """A comma inside a pattern is a config error, not a local-mode enable (ADR-0006)."""
+    config_path = tmp_path / "capture.json"
+    write_runtime_config(
+        config_path,
+        runtime_config(allowlist={"hosts": [ALLOWLISTED_HOST], "includeSwufeWildcard": False}),
+    )
+    raw = json.loads(config_path.read_text(encoding="utf-8"))
+    raw["capture"] = {"processes": ["/bin/a,b"]}
+    config_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "swufe_bridge.sidecar",
+            "--config",
+            str(config_path),
+            "--port",
+            str(free_port()),
+            "--confdir",
+            str(tmp_path / "mitmproxy"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=READY_TIMEOUT,
+    )
+
+    assert result.returncode == 2
+    assert "swufe-error CONFIG_INVALID" in result.stderr
+    assert "capture.processes[0]" in result.stderr
+    assert "swufe-capture" not in result.stderr

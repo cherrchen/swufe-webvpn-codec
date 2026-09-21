@@ -68,6 +68,8 @@ class BridgeRuntimeConfig:
     webvpn_base: str = DEFAULT_WEBVPN_BASE
     wrd_key: str = DEFAULT_KEY
     wrd_iv: str = DEFAULT_IV
+    # mitmproxy intercept patterns (local mode); empty means system-proxy mode.
+    capture_processes: tuple[str, ...] = ()
 
     @property
     def webvpn_host(self) -> str:
@@ -101,6 +103,28 @@ def _parse_cookies(raw: object) -> tuple[Cookie, ...]:
                 raise ConfigError(f"cookies[{index}].{key} must be a string or null")
         cookies.append(Cookie(name=name, value=value, domain=domain, path=path))
     return tuple(cookies)
+
+
+def _parse_capture_processes(raw: object) -> tuple[str, ...]:
+    """mitmproxy intercept patterns for local mode.
+
+    A comma separates entries in a mitmproxy intercept spec, so patterns must not
+    contain one (see ADR-0006).
+    """
+    if not isinstance(raw, (list, tuple)):
+        raise ConfigError("capture.processes must be a list")
+    patterns: list[str] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, str):
+            raise ConfigError(f"capture.processes[{index}] must be a string")
+        pattern = item.strip()
+        if not pattern or "," in pattern:
+            raise ConfigError(
+                f"capture.processes[{index}] must be a non-empty process pattern without commas"
+            )
+        if pattern not in patterns:
+            patterns.append(pattern)
+    return tuple(patterns)
 
 
 def _require_wrd_secret(value: object, field: str) -> str:
@@ -143,6 +167,14 @@ def parse_runtime_config(data: Mapping[str, object]) -> BridgeRuntimeConfig:
     if not isinstance(debug, bool):
         raise ConfigError("debug must be a boolean")
 
+    raw_capture = data.get("capture")
+    if raw_capture is None:
+        capture_processes: tuple[str, ...] = ()
+    elif isinstance(raw_capture, Mapping):
+        capture_processes = _parse_capture_processes(raw_capture.get("processes", []))
+    else:
+        raise ConfigError("capture must be a JSON object")
+
     return BridgeRuntimeConfig(
         allowlist=allowlist,
         cookies=_parse_cookies(data.get("cookies", [])),
@@ -150,6 +182,7 @@ def parse_runtime_config(data: Mapping[str, object]) -> BridgeRuntimeConfig:
         webvpn_base=_parse_webvpn_base(data.get("webvpnBase", DEFAULT_WEBVPN_BASE)),
         wrd_key=_require_wrd_secret(data.get("wrdKey", DEFAULT_KEY), "key"),
         wrd_iv=_require_wrd_secret(data.get("wrdIv", DEFAULT_IV), "IV"),
+        capture_processes=capture_processes,
     )
 
 
@@ -190,6 +223,7 @@ def write_runtime_config(path: Path | str, cfg: BridgeRuntimeConfig) -> None:
         "webvpnBase": cfg.webvpn_base,
         "wrdKey": cfg.wrd_key,
         "wrdIv": cfg.wrd_iv,
+        "capture": {"processes": list(cfg.capture_processes)},
     }
     fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -270,6 +304,15 @@ class ConfigWatcher:
     @property
     def error(self) -> str | None:
         return self._error
+
+    @property
+    def stamp(self) -> tuple[int, int] | None:
+        """mtime+size of the config as of the last successful ``get()``.
+
+        Lets the capture loop tell "the same config is still there" from "the
+        config was rewritten", so a failed attempt is not retried in a loop.
+        """
+        return self._stamp
 
     @property
     def config(self) -> BridgeRuntimeConfig | None:

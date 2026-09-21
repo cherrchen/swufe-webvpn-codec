@@ -63,11 +63,14 @@ def main(argv: list[str] | None = None) -> int:
     confdir = Path(args.confdir)
     confdir.mkdir(parents=True, exist_ok=True)
 
+    # `--mode regular@<port>` (never `--listen-port`): a global listen port applies
+    # to every mode, so mitmproxy's duplicate-listen-address check would reject the
+    # `local:` mode added at runtime for process capture (ADR-0006).
     mitmdump_argv = [
         "--listen-host",
         LISTEN_HOST,
-        "--listen-port",
-        str(args.port),
+        "--mode",
+        f"regular@{args.port}",
         "-s",
         str(ADDON_SCRIPT),
         # Lazy upstream connections: with the default (eager) mitmproxy dials the

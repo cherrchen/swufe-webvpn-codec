@@ -10,16 +10,22 @@ already in WebVPN form is left alone instead of being wrapped twice.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from mitmproxy import ctx, http
 from mitmproxy.net.http.cookies import format_cookie_header, parse_cookie_headers
+from mitmproxy.proxy import mode_specs
+from mitmproxy.utils import asyncio_utils
+from mitmproxy_rs.local import LocalRedirector
 
 from swufe_bridge.allowlist import match as allowlist_match, now_iso
+from swufe_bridge.capture import POLL_INTERVAL_SECONDS, LocalCapture
 from swufe_bridge.config import BridgeRuntimeConfig, ConfigWatcher
 from swufe_bridge.rewrite import (
     is_rewritable_content_type,
@@ -83,11 +89,41 @@ def report_error(code: str, message: str) -> None:
     print(f"swufe-error {code} {message}", file=sys.stderr, flush=True)
 
 
+def report_capture(enabled: bool, processes: Sequence[str], error: str | None) -> None:
+    """Report the process-capture state to the Electron host.
+
+    The key set is frozen (``enabled`` / ``processes`` / ``error``) and never
+    carries traffic data (INV-001, see docs/api/bridge-control-protocol.md).
+    """
+    payload = {"enabled": enabled, "processes": list(processes), "error": error}
+    print("swufe-capture " + json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+
+
+def regular_listen_port(modes: Sequence[str]) -> int | None:
+    """The port the regular listener ended up on, or ``None``.
+
+    The sidecar passes ``--mode regular@<port>`` and never ``--listen-port``
+    (ADR-0006): a global ``listen_port`` would make the ``local`` mode collide
+    with ``regular`` in mitmproxy's duplicate-listen-address check.
+    """
+    for spec in modes:
+        try:
+            mode = mode_specs.ProxyMode.parse(spec)
+        except ValueError:
+            continue
+        port = mode.listen_port(None)
+        if port is not None:
+            return port
+    return None
+
+
 class BridgeAddon:
     def __init__(self, config_path: str | os.PathLike[str] | None = None) -> None:
         self._config_path = Path(config_path) if config_path else None
         self._watcher = ConfigWatcher(self._config_path) if self._config_path else None
         self._reported_error: str | None = None
+        self._capture: LocalCapture | None = None
+        self._reported_capture_error: str | None = None
 
     # --- mitmproxy lifecycle -------------------------------------------------
 
@@ -113,7 +149,7 @@ class BridgeAddon:
         cfg = self._config()
         summary = {
             "listen_host": listen_host,
-            "listen_port": ctx.options.listen_port,
+            "listen_port": regular_listen_port(ctx.options.mode) or ctx.options.listen_port,
             "config": str(self._watcher.path) if self._watcher else "",
             "allowlist": list(cfg.allowlist.hosts) if cfg else [],
             "includeSwufeWildcard": cfg.allowlist.include_swufe_wildcard if cfg else False,
@@ -121,6 +157,68 @@ class BridgeAddon:
             "debug": cfg.debug if cfg else False,
         }
         print("swufe-ready " + json.dumps(summary, ensure_ascii=False), file=sys.stderr, flush=True)
+
+        # Capture is optional and asynchronous: the first enable triggers an OS
+        # authorization prompt, so readiness must not wait for it (ADR-0006).
+        self._capture = self._build_capture()
+        asyncio_utils.create_task(self._capture_loop(), name="swufe-capture", keep_ref=True)
+
+    # --- process capture (REQ-003) -------------------------------------------
+
+    def _build_capture(self) -> LocalCapture:
+        return LocalCapture(
+            get_modes=lambda: list(ctx.options.mode),
+            set_modes=lambda modes: setattr(ctx.options, "mode", list(modes)),
+            local_state=self._local_mode_state,
+            describe_spec=LocalRedirector.describe_spec,
+            unavailable_reason=LocalRedirector.unavailable_reason,
+            sleep=asyncio.sleep,
+        )
+
+    def _local_mode_state(self, mode: str) -> tuple[bool, str | None]:
+        """``(is_running, error)`` of a mode instance in the proxy server list."""
+        try:
+            instance = ctx.master.addons.get("proxyserver").servers[mode]
+        except KeyError:
+            return (False, "local 模式未注册")
+        except Exception as exc:  # malformed spec / proxy server not loaded
+            return (False, str(exc))
+        error = instance.last_exception
+        return (instance.is_running, str(error) if error else None)
+
+    async def _capture_loop(self) -> None:
+        while True:
+            try:
+                await self._capture_tick()
+            except Exception as exc:  # a bad tick must not stop later ones
+                self._report_capture(False, None, str(exc))
+            await asyncio.sleep(POLL_INTERVAL_SECONDS)
+
+    async def _capture_tick(self) -> None:
+        cfg = self._config()
+        if cfg is None or self._capture is None:
+            return
+        stamp = self._watcher.stamp if self._watcher else None
+        if not self._capture.pending(cfg.capture_processes, stamp):
+            return
+        result = await self._capture.apply(cfg.capture_processes, stamp)
+        self._report_capture(
+            result.enabled,
+            cfg.capture_processes if result.enabled else (),
+            result.error,
+        )
+
+    def _report_capture(
+        self, enabled: bool, processes: Sequence[str] | None, error: str | None
+    ) -> None:
+        """Report capture state, collapsing a repeated failure into one line (S8)."""
+        if error is None:
+            self._reported_capture_error = None
+        elif error == self._reported_capture_error:
+            return
+        else:
+            self._reported_capture_error = error
+        report_capture(enabled, processes or (), error)
 
     # --- hooks ---------------------------------------------------------------
 

@@ -61,7 +61,7 @@ def test_store_reads_file_with_settings_sibling_key(store: AllowlistStore) -> No
                 "hosts": ["Jwxt.SWUFE.edu.cn", "portal.swufe.edu.cn"],
                 "includeSwufeWildcard": True,
                 "updatedAt": "2026-09-21T00:00:00+00:00",
-                "settings": {"bridgePort": 8080, "debugLogging": False, "capturePids": []},
+                "settings": {"bridgePort": 8080, "debugLogging": False, "captureMode": "selected-apps", "captureProcesses": ["/usr/bin/curl"]},
             }
         ),
         encoding="utf-8",
@@ -152,6 +152,52 @@ def test_has_rewritable_hosts_false_when_empty_and_no_wildcard() -> None:
     cfg = parse_runtime_config({"allowlist": {"hosts": [], "includeSwufeWildcard": False}})
 
     assert cfg.has_rewritable_hosts is False
+
+
+def test_runtime_config_capture_defaults_and_dedupes_patterns() -> None:
+    assert parse_runtime_config({}).capture_processes == ()
+    assert parse_runtime_config({"capture": {}}).capture_processes == ()
+    assert parse_runtime_config({"capture": {"processes": []}}).capture_processes == ()
+
+    cfg = parse_runtime_config(
+        {
+            "capture": {
+                "processes": [
+                    "/Applications/Google Chrome.app/",
+                    "  /usr/bin/curl ",
+                    "/Applications/Google Chrome.app/",
+                ]
+            }
+        }
+    )
+
+    assert cfg.capture_processes == ("/Applications/Google Chrome.app/", "/usr/bin/curl")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"capture": []},
+        {"capture": {"processes": "/usr/bin/curl"}},
+        {"capture": {"processes": [""]}},
+        {"capture": {"processes": ["   "]}},
+        {"capture": {"processes": ["/bin/a,b"]}},
+        {"capture": {"processes": [5]}},
+    ],
+)
+def test_runtime_config_rejects_malformed_capture(payload: dict[str, object]) -> None:
+    with pytest.raises(ConfigError):
+        parse_runtime_config(payload)
+
+
+def test_capture_processes_survive_a_write_round_trip(tmp_path: Path) -> None:
+    path = tmp_path / "bridge-config.json"
+    cfg = parse_runtime_config({"capture": {"processes": ["/usr/bin/curl"]}})
+
+    write_runtime_config(path, cfg)
+
+    assert json.loads(path.read_text(encoding="utf-8"))["capture"] == {"processes": ["/usr/bin/curl"]}
+    assert load_runtime_config(path).capture_processes == ("/usr/bin/curl",)
 
 
 def test_write_runtime_config_is_owner_only_and_round_trips(tmp_path: Path) -> None:
