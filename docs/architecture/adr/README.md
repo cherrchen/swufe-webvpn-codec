@@ -54,6 +54,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0009](ADR-0009-monorepo-layout.md) | 仓库改为路径式 monorepo：应用入 apps/<app>、桥入 bridges/<bridge> | Accepted | 2026-09-21 | — |
 | [ADR-0010](ADR-0010-pnpm-workspaces.md) | Node 工具链切换到 pnpm 11 workspaces：单一锁文件与 workspace 脚本转发 | Accepted | 2026-09-21 | 取代 ADR-0009 备选表中「继续用 npm」一行的结论（ADR-0009 的布局决策本身仍有效） |
 | [ADR-0011](ADR-0011-refuse-start-on-fake-ip-dns.md) | fake-ip（TUN / 虚拟网卡）环境同样以 `PROXY_CONFLICT` 拒绝开桥 | Accepted | 2026-09-21 | 不取代 ADR-0004：仅扩展其开桥前冲突判据（系统代理判据与清除语义不变） |
+| [ADR-0012](ADR-0012-react-antd-multiwindow-renderer.md) | 渲染层迁移到 React + Ant Design 6，桌面界面改为四窗口结构 | Proposed | 2026-09-23 | 不取代任何既有 ADR：只约束渲染层框架、构建方式与窗口结构（ADR-0003 的 Electron 选择仍有效） |
 
 ## 规则
 

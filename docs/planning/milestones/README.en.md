@@ -31,6 +31,7 @@ Examples: `M1-mitm-bridge.md` (numeric) or `2026-09-20-packaging.md` (date-based
 | M3 experience polish | [M3-experience-polish.md](M3-experience-polish.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI, debug logging, process capture and copy usable |
 | M4 acceptance | [M4-acceptance.md](M4-acceptance.md) | In Progress | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Dual-platform P0 cases pass and browser acceptance on the academic-affairs site is done (2026-09-21: on macOS everything including the browser acceptance passed - the M5 re-verification passed after the `KI-011` fix; Windows is deferred by `KI-001`; `KI-014` is unresolved (`KI-013` was fixed on 2026-09-21, see ADR-0011), so the milestone is not done) |
 | M5 open-source preparation (optional) | no file yet | Candidate | — | Candidate; create the file once the first open-source preparation task is decided |
+| M6 UI rework | [M6-ui-rework.md](M6-ui-rework.md) | Planned | [002-desktop-ui-multiwindow](../../../specs/002-desktop-ui-multiwindow/spec.md) | Migrate the renderer to React + Ant Design 6 and fix it into a four-window layout (zero-scroll main window; capture/log/allowlist in secondary windows) |
 
 > Phase breakdown, dependencies and the spec index live in [roadmap.md](../roadmap.md); M5 is only a candidate row in the roadmap and has no file yet.
 

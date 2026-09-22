@@ -24,6 +24,7 @@ specs/001-phase1-local-bridge/     ← the first spec of this project (phase 1 l
 | Spec | Title | Related REQs | Status | Link |
 | ---- | ----- | ------------ | ------ | ---- |
 | 001-phase1-local-bridge | phase 1 local bridge and academic-system browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | Implemented (2026-09-21: the macOS side fully passes; `Verified` awaits the Windows side, see `KI-001`) | [spec.md](001-phase1-local-bridge/spec.md) |
+| 002-desktop-ui-multiwindow | desktop UI rework (React + Ant Design, multiple windows) | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012, NFR-003 / NFR-005 / NFR-007 | Approved (2026-09-23: ADR-0012 accepted and all Q2 items resolved; implementation is paused on the requester's instruction) | [spec.md](002-desktop-ui-multiwindow/spec.md) |
 
 > Register one row per spec here, and mirror it in [roadmap.md](../docs/planning/roadmap.md); long-lived facts never live in a spec.
 

@@ -29,6 +29,7 @@ docs/planning/milestones/<MILESTONE_ID>-<short-name>.md
 | M3 体验打磨 | [M3-experience-polish.md](M3-experience-polish.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI、调试日志、进程捕获、文案可用 |
 | M4 验收 | [M4-acceptance.md](M4-acceptance.md) | In Progress | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | 双平台 P0 用例通过并完成教务浏览器验收（2026-09-21：macOS 侧含教务浏览器验收已全部通过——`KI-011` 修复后 M5 复验通过；Windows 延期 `KI-001`；`KI-014` 未决（`KI-013` 已于 2026-09-21 修复，见 ADR-0011），故未完成） |
 | M5 开源准备（可选） | 未建文件 | Candidate | — | Candidate，首个开源准备工作确定后再建文件 |
+| M6 界面重构 | [M6-ui-rework.md](M6-ui-rework.md) | Planned | [002-desktop-ui-multiwindow](../../../specs/002-desktop-ui-multiwindow/spec.md) | 渲染层迁移到 React + Ant Design 6 并固定为四窗口结构（主窗口零滚动，捕获/日志/Allowlist 进二级窗口） |
 
 > 阶段划分、依赖与 Spec 索引见 [roadmap.md](../roadmap.md)；M5 只有 roadmap 中的候选行，尚未建文件。
 

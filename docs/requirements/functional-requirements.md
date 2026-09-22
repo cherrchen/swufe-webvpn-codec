@@ -51,6 +51,7 @@
 | REQ-009 | 可观测性（状态与调试日志） | Should | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
 | REQ-010 | 证书生命周期 | Must | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
 | REQ-011 | 平台支持 | Must | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
+| REQ-012 | 多窗口界面结构 | Must | Proposed | [002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/) |
 
 （完整条目按上方模板在本文档内展开。）
 
@@ -78,6 +79,7 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 - 托盘图标显示连接状态非第一期必做。
 - 不强制暗色主题（可跟随系统，非必须）。
 - 错误信息不得仅靠颜色表达。
+- 界面结构（主窗口尺寸与零滚动、二级窗口划分）由 REQ-012（多窗口界面结构）定义；本条要求的界面能力集合不变。
 
 **关联 Spec**
 - [specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/)
@@ -131,6 +133,7 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 - macOS 下进程捕获可能触发辅助功能/网络扩展授权，UI 须给出引导；首次启用需在系统提示内确认，未确认则界面显示启用失败、引导文案与「重试」。
 - 系统代理被其它软件占用时，启用「指定应用」同样以 `PROXY_CONFLICT` 拒绝（与 REQ-004 一致）。
 - 进程捕获失败不改变桥状态（桥继续可用），只显示失败原因。
+- 捕获方式的选择仍在主窗口；候选应用列表与勾选（进程捕获的应用选择）在独立的二级窗口中（REQ-012）；互斥与切换语义不变。
 - WebSocket 尽力支持，不作为第一期验收阻断项；HTTP/3 建议禁用或回落 TCP。
 - 本需求不包含 TUN / sing-box 透明网关（见 [非目标](../overview/goals-and-non-goals.md)）。
 
@@ -188,6 +191,7 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 - 通配默认关闭，需用户显式勾选。
 - 主机名不合法（非小写合法 hostname）时不写入 allowlist。
 - UI 增删主机 / 勾选通配后立即生效（无需重启），并在重启 App 后保持（TC-B05 / TC-H02）。
+- 编辑界面的位置见 REQ-012（多窗口界面结构）：主机增删与通配勾选在独立的 Allowlist 窗口中完成，主窗口只显示摘要；匹配与持久化语义不变。
 - allowlist 为空时启动桥接返回 `ALLOWLIST_EMPTY`。
 
 **关联 Spec**
@@ -294,6 +298,7 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 **边界与例外**
 - 调试日志默认关闭，由用户显式开启。
 - 调试日志用于诊断，不作为审计或流量留存手段。
+- 日志面板所在窗口与缓冲归属见 REQ-012（多窗口界面结构）：日志在独立的二级窗口中呈现，最近 200 条缓冲由 Electron Main 持有（关闭窗口不丢失历史）；关闭开关仍清空缓冲，记录字段与最小化不变。
 
 **关联 Spec**
 - [specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/)
@@ -350,6 +355,37 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 **关联 Spec**
 - [specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/)
 
+### REQ-012 多窗口界面结构
+
+- Status: Proposed
+- Priority: Must
+- Related: G-002 / G-004 / [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md) / [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) / REQ-001 / REQ-003 / REQ-005 / REQ-009
+- Source: 需求方决定（2026-09-23）——现有单窗口承载状态、配置与长列表，高频动作需要滚动才能完成
+
+**描述**
+系统应当把桌面界面固定为「一个主窗口 + 若干非模态二级窗口」的结构：主窗口为**固定尺寸、不可缩放且不出现滚动**的高频操作界面（连接状态、登录、桥接开关、捕获方式选择、allowlist 摘要、证书操作、系统代理状态与调试日志开关）；进程捕获的应用选择、调试日志、Allowlist 编辑各自在独立的二级窗口中完成。二级窗口非模态（打开期间主窗口仍可操作），且每一类同一时刻最多只有一个实例（重复触达入口即聚焦已有窗口）。长内容不得回到主窗口；主窗口内出现溢出时，处置方式是把内容移入二级窗口，而不是引入滚动。
+
+**理由**
+高频动作（开桥、看状态）与长内容（候选应用列表、日志、主机列表）混在同一窗口时，信息层级被内容长度破坏，用户必须滚动才能完成主路径动作。按「高频留主窗口、长内容进二级窗口」拆分，既保证主窗口一屏可读，又允许用户并行操作（例如边看日志边开桥）；窗口状态仍由 Electron Main 单一权威维护，界面之间不互相读写。
+
+**验收标准**
+1. 主窗口的基线尺寸固定且不可由用户拖拽缩放（尺寸只随内容缩放系数 `zoomFactor` 按比例自适应并 clamp 到工作区）；页面与任何内容区域都不出现滚动条。
+2. 主窗口只承载高频内容：候选应用列表、调试日志表格与主机编辑列表不出现在主窗口。
+3. 进程捕获的应用选择、调试日志、Allowlist 编辑各自在独立窗口中可用，改动立即生效（无需重启）。
+4. 每一类二级窗口同一时刻最多一个实例；重复触达入口即聚焦已有窗口。
+5. 二级窗口非模态：其打开期间主窗口仍可操作（含开桥/关桥）。
+6. 关闭主窗口等同退出应用，且退出仍清除本 App 设置的系统代理（与 REQ-003 / NFR-004 一致）。
+7. 同一事件（桥状态、调试日志、会话过期）的变化在主窗口与所有已打开的二级窗口中一致可见。
+
+**边界与例外**
+- 二级窗口的数量与内容划分由对应 Spec 的 `ui-ux.md` 固定；本需求只约束窗口结构与复用/非模态语义。
+- 暗色主题与托盘图标不在本需求范围（沿用既有非目标与开放问题）。
+- 平台差异（窗口行为、权限对话框）由平台验收覆盖；双平台范围不变（REQ-011）。
+- 本条不改变任何数据面语义：IPC 既有方法与事件签名不变，新增窗口控制与只读日志方法属向后兼容扩展。
+
+**关联 Spec**
+- [specs/002-desktop-ui-multiwindow/](../../specs/002-desktop-ui-multiwindow/)
+
 ## 需求 ⇒ 验证映射
 
 每条需求的验证归属在对应 Feature Spec 的 [verification.md](../../specs/001-phase1-local-bridge/verification.md) 中维护，本文件只保留总览：
@@ -367,3 +403,4 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 | REQ-009 | TC-F04 / TC-H01 | Pending |
 | REQ-010 | TC-E01 / TC-E02 / TC-E03 | Pending |
 | REQ-011 | 手工平台验收（macOS / Windows 各一测试机） | Pending |
+| REQ-012 | TC-J01 / TC-J02 / TC-J03 / TC-J11（见 [002-desktop-ui-multiwindow/verification.md](../../specs/002-desktop-ui-multiwindow/verification.md)） | Pending |

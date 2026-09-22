@@ -5,6 +5,7 @@
 > Owner: cherrchen
 > Created: 2026-09-20
 > Related: REQ-001..REQ-011 / NFR-001..NFR-007 / ADR-0001..ADR-0006
+> 界面结构提示（2026-09-23）：本 Spec 的**界面结构部分**已被 [spec 002](../002-desktop-ui-multiwindow/spec.md) 取代——REQ-009 的日志面板位置、REQ-005 的 allowlist 编辑界面、REQ-003 的候选应用列表归属改为「主窗口 + 三个非模态二级窗口」（新增 [REQ-012](../../docs/requirements/functional-requirements.md)）。本 Spec 的结论与历史验收证据（含 AC-009 等）保留不变，界面结构的当前事实以 002 为准。
 
 ## Status
 

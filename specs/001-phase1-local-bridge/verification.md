@@ -4,6 +4,7 @@
 > Status: In Progress
 > Owner: cherrchen
 > Last Updated: 2026-09-21
+> 界面结构提示（2026-09-23）：本文件中的界面结构相关记录（REQ-009 日志面板、REQ-005 allowlist 编辑界面、REQ-003 候选应用列表、AC-009 等）描述的是迁移前的单窗口实现；对应的界面结构事实已由 [spec 002](../002-desktop-ui-multiwindow/spec.md)（[REQ-012](../../docs/requirements/functional-requirements.md)）取代，002 将重新执行这些用例。本文件的历史证据与结论保留不变。
 
 > 本文件建立 **Requirement → Verification** 映射，是「Feature 是否完成」的判定依据。
 > 规则见 [verification-strategy.md](../../docs/verification/verification-strategy.md)。

@@ -24,6 +24,7 @@ specs/001-phase1-local-bridge/     ← 本项目第一个 Spec（Phase 1 本机�
 | Spec | 标题 | 关联 REQ | Status | 链接 |
 | ---- | ---- | -------- | ------ | ---- |
 | 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | Implemented（2026-09-21：macOS 侧全部通过；`Verified` 待 Windows 侧，见 `KI-001`） | [spec.md](001-phase1-local-bridge/spec.md) |
+| 002-desktop-ui-multiwindow | 桌面界面重构（React + Ant Design 多窗口） | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012、NFR-003 / NFR-005 / NFR-007 | Approved（2026-09-23：ADR-0012 通过、Q2 全部收敛；实现按任务方指示暂缓） | [spec.md](002-desktop-ui-multiwindow/spec.md) |
 
 > 每个 Spec 在此登记一行，并在 [roadmap.md](../docs/planning/roadmap.md) 同步注册；长期事实不属于 Spec。
 

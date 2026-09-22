@@ -53,6 +53,7 @@ The system shall …
 | REQ-009 | Observability (status and debug log) | Should | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
 | REQ-010 | Certificate lifecycle | Must | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
 | REQ-011 | Platform support | Must | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
+| REQ-012 | Multi-window UI structure | Must | Proposed | [002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/) |
 
 (Expand full entries inline using the template above.)
 
@@ -80,6 +81,7 @@ CAS/MFA and certificate-trust onboarding require a GUI (see ADR-0003); "state vi
 - A tray icon showing connection state is not required in Phase 1.
 - A dark theme is not forced (following the system is optional).
 - Errors must not be communicated by colour alone.
+- The window structure (main-window size and zero scrolling, the split into secondary windows) is defined by REQ-012 (multi-window UI structure); the set of UI capabilities above is unchanged.
 
 **Related spec**
 - [specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/)
@@ -133,6 +135,7 @@ Phase 1 does not implement a TUN/transparent gateway. The system proxy covers or
 - On macOS, per-process capture may trigger accessibility/network-extension prompts; the UI must guide the user. The first enable must be confirmed in the system prompt; otherwise the UI shows a failure with guidance and a retry button.
 - When another tool owns the system proxy, selecting apps is refused with `PROXY_CONFLICT` as well (consistent with REQ-004).
 - A capture failure does not change the bridge state (the bridge stays usable); only the reason is shown.
+- The capture-mode choice stays in the main window; the candidate application list and its checkboxes (application selection for process capture) live in a dedicated secondary window (REQ-012); exclusivity and switching semantics are unchanged.
 - WebSocket is best-effort and not an acceptance blocker; HTTP/3 should be disabled or fall back to TCP.
 - TUN / sing-box transparent gateway is not part of this requirement (see [non-goals](../overview/goals-and-non-goals.md)).
 
@@ -190,6 +193,7 @@ Only allowlist hosts need and are allowed to go through WebVPN; sending everythi
 - The wildcard is off by default and must be enabled explicitly by the user.
 - Invalid hostnames (not lowercase valid hostnames) are not written into the allowlist.
 - Hosts added/removed and the wildcard toggle take effect immediately (no restart) and survive an app restart (TC-B05 / TC-H02).
+- Where the editing UI lives is defined by REQ-012 (multi-window UI structure): adding/removing hosts and the wildcard toggle happen in a dedicated allowlist window while the main window shows a summary only; matching and persistence semantics are unchanged.
 - Starting the bridge with an empty allowlist returns `ALLOWLIST_EMPTY`.
 
 **Related spec**
@@ -296,6 +300,7 @@ Visible state is part of experience goal G-002 and a prerequisite for troublesho
 **Boundaries and exceptions**
 - Debug logging is off by default and enabled explicitly by the user.
 - The debug log is for diagnosis, not for auditing or traffic retention.
+- The window the log panel lives in and the ownership of the buffer are defined by REQ-012 (multi-window UI structure): the log is shown in a dedicated secondary window and the 200 most recent records are held by the Electron Main process (closing the window does not lose history); turning the switch off still clears the buffer, and the record fields and minimisation rules are unchanged.
 
 **Related spec**
 - [specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/)
@@ -352,6 +357,37 @@ The product targets desktop-browser use by SWUFE students and staff; two desktop
 **Related spec**
 - [specs/001-phase1-local-bridge/](../../specs/001-phase1-local-bridge/)
 
+### REQ-012 Multi-window UI structure
+
+- Status: Proposed
+- Priority: Must
+- Related: G-002 / G-004 / [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md) / [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) / REQ-001 / REQ-003 / REQ-005 / REQ-009
+- Source: product owner decision (2026-09-23) — the single window mixed status, configuration and long lists, so frequent actions required scrolling
+
+**Description**
+The system shall fix the desktop UI into "one main window plus non-modal secondary windows": the main window is a **fixed-size, non-resizable, scroll-free** surface for frequent actions (connection status, login, bridge switch, capture-mode choice, allowlist summary, certificate actions, system-proxy state and the debug-log switch); application selection for process capture, the debug log and allowlist editing each happen in their own secondary window. Secondary windows are non-modal (the main window stays operable while they are open) and at most one instance of each kind exists at a time (re-entering an entry point focuses the existing window). Long content must not return to the main window; when the main window would overflow, the remedy is moving content into a secondary window rather than adding scrolling.
+
+**Rationale**
+Mixing frequent actions (start the bridge, read status) with long content (candidate application list, log, host list) in one window breaks the information hierarchy and forces the user to scroll to complete the main path. Splitting it into "frequent content stays, long content moves out" keeps the main window readable at a glance and allows parallel work (for example watching the log while starting the bridge); the state is still owned solely by the Electron Main process, and windows never read or write each other.
+
+**Acceptance criteria**
+1. The main window has a fixed baseline size and cannot be drag-resized by the user (only the content zoom factor `zoomFactor` changes its size proportionally, clamped to the work area); neither the page nor any content area shows a scrollbar.
+2. The main window carries frequent content only: the candidate application list, the debug-log table and the host editing list do not appear in it.
+3. Application selection for process capture, the debug log and allowlist editing are each usable in a dedicated window, and changes take effect immediately (no restart).
+4. At most one instance of each secondary window kind exists at a time; re-entering an entry point focuses the existing window.
+5. Secondary windows are non-modal: the main window stays operable (including starting/stopping the bridge) while they are open.
+6. Closing the main window equals quitting the app, and quitting still clears the system proxy this app set (consistent with REQ-003 / NFR-004).
+7. Changes of the same event (bridge status, debug log, session expiry) are visible consistently in the main window and in every open secondary window.
+
+**Boundaries and exceptions**
+- The number of secondary windows and their content split are fixed by the corresponding spec's `ui-ux.md`; this requirement only constrains the window structure plus the reuse and non-modality semantics.
+- A dark theme and a tray icon are out of scope here (the existing non-goals and open questions stand).
+- Platform differences (window behaviour, permission dialogs) are covered by platform acceptance; the dual-platform scope is unchanged (REQ-011).
+- This requirement changes no data-plane semantics: existing IPC methods and events keep their signatures, and the added window-control and read-only log methods are backward-compatible additions.
+
+**Related spec**
+- [specs/002-desktop-ui-multiwindow/](../../specs/002-desktop-ui-multiwindow/)
+
 ## Requirement → verification mapping
 
 Per-requirement verification lives in each feature spec's [verification.md](../../specs/001-phase1-local-bridge/verification.md); this file keeps the overview only:
@@ -369,3 +405,4 @@ Per-requirement verification lives in each feature spec's [verification.md](../.
 | REQ-009 | TC-F04 / TC-H01 | Pending |
 | REQ-010 | TC-E01 / TC-E02 / TC-E03 | Pending |
 | REQ-011 | Manual platform acceptance (one macOS and one Windows test machine) | Pending |
+| REQ-012 | TC-J01 / TC-J02 / TC-J03 / TC-J11 (see [002-desktop-ui-multiwindow/verification.md](../../specs/002-desktop-ui-multiwindow/verification.md)) | Pending |

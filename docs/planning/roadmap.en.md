@@ -19,6 +19,7 @@
 | [M3 experience polish](milestones/M3-experience-polish.md) | Allowlist UI, debug logging, process capture, copy | G-002 / G-003 | TBD | Done (the real capture scope and the log panel against a live bridge still need a human to authorise the system extension; see the milestone's remaining issues) |
 | [M4 acceptance](milestones/M4-acceptance.md) | macOS + Windows academic-affairs browser acceptance, defect burn-down | G-001 / G-002 / G-003 | TBD | In Progress (2026-09-21: on macOS, including the academic-affairs browser acceptance, everything **now passes** - after the `KI-011` fix the M5 re-verification passed TC-G01/G02; Windows is deferred by `KI-001`; `KI-013`/`KI-014` are unresolved) |
 | M5 open-source preparation (optional) | Open-source cleanup, README, follow-up TUN design memo | G-004 | TBD | Candidate |
+| [M6 UI rework](milestones/M6-ui-rework.md) | Migrate the renderer to React + Ant Design 6 (Vite multi-entry), fixed 720×560 zero-scroll main window, capture/log/allowlist in secondary windows | G-002 / G-004 | TBD | Planned (milestone and spec 002 created on 2026-09-23; not scheduled yet, no earlier than the M4 open items converge) |
 
 > Every timeframe is `TBD`: the original package defines no calendar dates (it only gives milestone ordering and dependencies). Milestone completion definitions and exit criteria live in [milestones/](milestones/README.md); M5 is a candidate row only and has no milestone file yet.
 
@@ -29,6 +30,7 @@ Each feature spec is registered here with one row; details live in `specs/<id>-<
 | Spec | Title | Related REQ | Phase | Status | Link |
 | ---- | ----- | ----------- | ----- | ------ | ---- |
 | 001-phase1-local-bridge | Phase 1 local bridge and academic-affairs browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | M1–M4 | Implemented (2026-09-21: everything passes on macOS; not yet `Verified` because the Windows side is deferred) | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
+| 002-desktop-ui-multiwindow | Desktop UI rework (React + Ant Design, multiple windows) | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012, NFR-003 / NFR-005 / NFR-007 | M6 | Approved (2026-09-23: ADR-0012 accepted and all Q2 items resolved; implementation paused, not started) | [spec.md](../../specs/002-desktop-ui-multiwindow/spec.md) |
 
 > Phase 1 is one spec; add another row here per [specs/README.md](../../specs/README.md) when a later spec is created. REQ/NFR are defined in [requirements/](../requirements/README.md); this table only references IDs.
 
