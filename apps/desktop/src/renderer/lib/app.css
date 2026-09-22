@@ -1,0 +1,19 @@
+/* Window-level reset: every window fills its viewport and the document never scrolls. */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* Secondary windows scroll inside their list/table area, never at document level. */
+.window-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}

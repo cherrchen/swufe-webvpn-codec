@@ -1,9 +1,10 @@
-/** Electron Main entry: wires the store, session broker, orchestrator, IPC and window. */
+/** Electron Main entry: wires the store, session broker, orchestrator, IPC and windows. */
 
-import { app, BrowserWindow } from 'electron'
+import { app } from 'electron'
 import { join } from 'node:path'
 
 import { CONFDIR_NAME } from './constants'
+import { createDebugLogBuffer } from './debug-log-buffer'
 import { registerIpc } from './ipc'
 import { ProxyOrchestrator } from './orchestrator'
 import { resolveRepoRoot } from './paths'
@@ -12,7 +13,7 @@ import { SessionBroker } from './session-broker'
 import { installShutdown } from './shutdown'
 import { SidecarProcess } from './sidecar'
 import { AppStore } from './store'
-import { createMainWindow } from './windows'
+import { createWindowRegistry, type WindowRegistry } from './window-registry'
 
 /** `--user-data-dir[=]<dir>` / `SWUFE_USER_DATA_DIR`: isolate config and cookies for tests. */
 function applyUserDataOverride(): void {
@@ -29,7 +30,7 @@ function applyUserDataOverride(): void {
 
 applyUserDataOverride()
 
-let mainWindow: BrowserWindow | null = null
+let windows: WindowRegistry | null = null
 let orchestrator: ProxyOrchestrator | null = null
 
 async function start(): Promise<void> {
@@ -58,21 +59,23 @@ async function start(): Promise<void> {
   })
   await orchestrator.recoverOnLaunch()
 
+  // Closing the main window quits the app; secondary windows never outlive it (EC2-004).
+  windows = createWindowRegistry({
+    appRoot,
+    devServerUrl: process.env.SWUFE_RENDERER_URL,
+    onMainClosed: () => app.quit(),
+  })
+
   registerIpc({
     store,
     session,
     orchestrator,
     certManager,
-    broadcast: (channel, payload) => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
-    },
+    windows,
+    debugLogs: createDebugLogBuffer(),
   })
 
-  mainWindow = createMainWindow(appRoot)
-  mainWindow.on('closed', () => {
-    mainWindow = null
-    app.quit()
-  })
+  windows.openMain()
 }
 
 /** NFR-004: quitting always clears our own proxy before the process goes away. */
@@ -83,9 +86,15 @@ function install(): void {
   }
 
   app.on('second-instance', () => {
-    if (!mainWindow) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
+    const main = windows?.mainWindow() ?? null
+    if (!main) return
+    if (main.isMinimized()) main.restore()
+    main.show()
+    main.focus()
+  })
+
+  app.on('window-all-closed', () => {
+    app.quit()
   })
 
   installShutdown(async () => {

@@ -18,8 +18,8 @@ import {
   DEFAULT_WEBVPN_BASE,
   DEFAULT_WRD_IV,
   DEFAULT_WRD_KEY,
-  MAX_CAPTURE_PROCESSES,
 } from './constants'
+import { MAX_CAPTURE_PROCESSES } from '../shared/limits'
 import type { AllowlistConfig, CaptureMode } from '../shared/types'
 
 export interface AppSettings {

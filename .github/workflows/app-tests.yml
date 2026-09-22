@@ -1,8 +1,9 @@
 name: app-tests
 
 # Electron app (M2): type check all three tsconfigs and run the Electron-free unit
-# suite. The suite deliberately never imports `electron`, so no binary download and
-# no display are needed here; L3/real-machine checks stay manual
+# suite; M6 adds the renderer component suite (vitest + jsdom). Neither suite
+# imports `electron` or needs a display, so no binary download is needed here;
+# L3/real-machine checks stay manual
 # (see docs/development/testing-strategy.md).
 # This workflow does not build installers, deploy, release or publish anything.
 
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   app:
-    name: Typecheck and unit tests
+    name: Typecheck, unit and UI tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,3 +45,8 @@ jobs:
 
       - name: Unit tests
         run: pnpm --filter swufe-webvpn-bridge run test:unit
+
+      # Renderer component tests (vitest + jsdom, M6): observable UI behaviour of
+      # the four windows. No Electron binary and no display required either.
+      - name: UI component tests
+        run: pnpm --filter swufe-webvpn-bridge run test:ui

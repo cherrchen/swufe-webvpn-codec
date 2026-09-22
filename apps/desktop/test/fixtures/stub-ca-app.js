@@ -29,7 +29,8 @@ const { SessionBroker } = require(path.join(appRoot, 'dist', 'main', 'session-br
 const { ProxyOrchestrator } = require(path.join(appRoot, 'dist', 'main', 'orchestrator.js'))
 const { SidecarProcess } = require(path.join(appRoot, 'dist', 'main', 'sidecar.js'))
 const { registerIpc } = require(path.join(appRoot, 'dist', 'main', 'ipc.js'))
-const { createMainWindow } = require(path.join(appRoot, 'dist', 'main', 'windows.js'))
+const { createDebugLogBuffer } = require(path.join(appRoot, 'dist', 'main', 'debug-log-buffer.js'))
+const { createWindowRegistry } = require(path.join(appRoot, 'dist', 'main', 'window-registry.js'))
 const { createSystemProxy } = require(path.join(appRoot, 'dist', 'main', 'platform', 'index.js'))
 const { installShutdown } = require(path.join(appRoot, 'dist', 'main', 'shutdown.js'))
 
@@ -47,9 +48,7 @@ const stubbedCertManager = {
   },
 }
 
-let mainWindow = null
 let orchestrator = null
-let quitting = false
 
 async function start() {
   await app.whenReady()
@@ -68,21 +67,22 @@ async function start() {
   })
   await orchestrator.recoverOnLaunch()
 
+  const windows = createWindowRegistry({
+    appRoot,
+    devServerUrl: process.env.SWUFE_RENDERER_URL,
+    onMainClosed: () => app.quit(),
+  })
+
   registerIpc({
     store,
     session,
     orchestrator,
     certManager: stubbedCertManager,
-    broadcast: (channel, payload) => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
-    },
+    windows,
+    debugLogs: createDebugLogBuffer(),
   })
 
-  mainWindow = createMainWindow(appRoot)
-  mainWindow.on('closed', () => {
-    mainWindow = null
-    app.quit()
-  })
+  windows.openMain()
   console.log(`swufe-verify 启动完成 userData=${userDataDir} webvpnBase=${store.getSettings().webvpnBase}`)
 }
 

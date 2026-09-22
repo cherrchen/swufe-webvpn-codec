@@ -93,6 +93,13 @@ export interface SwufeBridgeApi {
   setCaptureMode(mode: CaptureMode): Promise<void>
   setCaptureProcesses(patterns: string[]): Promise<void>
   setDebugLogging(enabled: boolean): Promise<void>
+  /** Opens (or focuses) the capture-window picker; one instance per window kind. */
+  openCaptureWindow(): Promise<void>
+  openLogWindow(): Promise<void>
+  openAllowlistWindow(): Promise<void>
+  /** The Main-side ring buffer, newest first, at most `MAX_DEBUG_LOG_ENTRIES`. */
+  getDebugLogs(): Promise<DebugLogEvent[]>
+  clearDebugLogs(): Promise<void>
   onDebugLog(cb: (e: DebugLogEvent) => void): () => void
   /** Main → Renderer status pushes (see docs/api/electron-ipc.md § `onStatus`). */
   onStatus(cb: (status: BridgeStatus) => void): () => void

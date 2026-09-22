@@ -13,8 +13,6 @@ export const LOGIN_PARTITION = 'persist:swufe-login'
 
 /** Capture is opt-in: the system proxy is the default (REQ-003, ADR-0006). */
 export const DEFAULT_CAPTURE_MODE: CaptureMode = 'system-proxy'
-/** Upper bound on selected patterns; mirrors `capture.processes` in the runtime config. */
-export const MAX_CAPTURE_PROCESSES = 32
 
 /** Never rewritten by the bridge: the login flow itself (INV-004). */
 export const AUTH_HOST = 'authserver.swufe.edu.cn'

@@ -1,4 +1,4 @@
-/** IPC surface: registers all 15 documented methods and wires Main → Renderer events. */
+/** IPC surface: the 16 documented commands, 5 window/log additions, and Main → Renderer events. */
 
 import { ipcMain } from 'electron'
 
@@ -7,22 +7,24 @@ import {
   CHANNEL_DEBUG_LOG,
   CHANNEL_SESSION_EXPIRED,
   CHANNEL_STATUS,
-  MAX_CAPTURE_PROCESSES,
 } from './constants'
+import { MAX_CAPTURE_PROCESSES } from '../shared/limits'
+import type { DebugLogBuffer } from './debug-log-buffer'
 import type { ProxyOrchestrator } from './orchestrator'
 import { listCaptureCandidates } from './platform'
 import type { CertManager } from './platform/types'
 import type { SessionBroker } from './session-broker'
 import { isCaptureMode, normalizeCapturePatterns } from './store'
 import type { AppStore } from './store'
+import type { WindowRegistry } from './window-registry'
 
 export interface IpcContext {
   store: AppStore
   session: SessionBroker
   orchestrator: ProxyOrchestrator
   certManager: CertManager
-  /** `webContents.send` on the main window. */
-  broadcast: (channel: string, payload?: unknown) => void
+  windows: WindowRegistry
+  debugLogs: DebugLogBuffer
 }
 
 function requireAllowlist(raw: unknown): AllowlistConfig {
@@ -79,6 +81,15 @@ export function registerIpc(ctx: IpcContext): void {
   handle('setAllowlist', (raw) => {
     ctx.store.setAllowlist(requireAllowlist(raw))
     ctx.orchestrator.refreshRuntimeConfig()
+    // The allowlist summary lives in the main window while edits happen in the
+    // allowlist window; the status event is the only push channel, so Main
+    // re-broadcasts it after a config change and every window re-reads (AC2-007).
+    void ctx.orchestrator
+      .status()
+      .then((status) => ctx.windows.broadcast(CHANNEL_STATUS, status))
+      .catch((error: unknown) =>
+        console.warn(`swufe-ui allowlist 变更后广播状态失败：${String(error)}`),
+      )
   })
   handle('getSettings', () => {
     const settings = ctx.store.getSettings()
@@ -101,18 +112,46 @@ export function registerIpc(ctx: IpcContext): void {
     withCaptureCode(ctx.orchestrator.setCaptureProcesses(requirePatterns(raw))),
   )
   handle('setDebugLogging', (raw) => {
-    ctx.store.updateSettings({ debugLogging: raw === true })
+    const enabled = raw === true
+    ctx.store.updateSettings({ debugLogging: enabled })
     ctx.orchestrator.refreshRuntimeConfig()
+    if (!enabled) {
+      // Logging off means "no history": the buffer and the window both go away (EC2-002).
+      ctx.debugLogs.clear()
+      ctx.windows.close('log')
+    }
   })
 
-  // Main → Renderer events.
-  ctx.orchestrator.onStatus((status) => ctx.broadcast(CHANNEL_STATUS, status))
-  ctx.orchestrator.onDebug((event) => ctx.broadcast(CHANNEL_DEBUG_LOG, event))
-  ctx.orchestrator.onSessionExpired(() => ctx.broadcast(CHANNEL_SESSION_EXPIRED))
+  // Window control (each kind is a single instance; the registry focuses the live one).
+  handle('openCaptureWindow', () => {
+    ctx.windows.open('capture')
+  })
+  handle('openLogWindow', () => {
+    ctx.windows.open('log')
+  })
+  handle('openAllowlistWindow', () => {
+    ctx.windows.open('allowlist')
+  })
+  handle('getDebugLogs', () => ctx.debugLogs.snapshot())
+  handle('clearDebugLogs', () => ctx.debugLogs.clear())
+
+  // Main → Renderer events (broadcast to every live window).
+  ctx.orchestrator.onStatus((status) => ctx.windows.broadcast(CHANNEL_STATUS, status))
+  ctx.orchestrator.onDebug((event) => {
+    // Buffer first: the log window must be able to restore history after a reopen.
+    ctx.debugLogs.push(event)
+    ctx.windows.broadcast(CHANNEL_DEBUG_LOG, event)
+  })
+  ctx.orchestrator.onSessionExpired(() => ctx.windows.broadcast(CHANNEL_SESSION_EXPIRED))
   ctx.session.onChange(() => {
     // A fresh capture must reach a running sidecar without a restart.
     ctx.orchestrator.refreshRuntimeConfig()
     if (ctx.session.loggedIn) ctx.orchestrator.clearSessionExpiredNotice()
-    void ctx.orchestrator.status().then((status) => ctx.broadcast(CHANNEL_STATUS, status))
+    void ctx.orchestrator
+      .status()
+      .then((status) => ctx.windows.broadcast(CHANNEL_STATUS, status))
+      .catch((error: unknown) =>
+        console.warn(`swufe-ui allowlist 变更后广播状态失败：${String(error)}`),
+      )
   })
 }
