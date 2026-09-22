@@ -53,7 +53,7 @@ The system shall …
 | REQ-009 | Observability (status and debug log) | Should | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
 | REQ-010 | Certificate lifecycle | Must | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
 | REQ-011 | Platform support | Must | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
-| REQ-012 | Multi-window UI structure | Must | Proposed | [002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/) |
+| REQ-012 | Multi-window UI structure | Must | Implemented | [002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/) |
 
 (Expand full entries inline using the template above.)
 
@@ -359,7 +359,7 @@ The product targets desktop-browser use by SWUFE students and staff; two desktop
 
 ### REQ-012 Multi-window UI structure
 
-- Status: Proposed
+- Status: Implemented (2026-09-23; evidence in [002's verification.md](../../specs/002-desktop-ui-multiwindow/verification.md))
 - Priority: Must
 - Related: G-002 / G-004 / [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md) / [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) / REQ-001 / REQ-003 / REQ-005 / REQ-009
 - Source: product owner decision (2026-09-23) — the single window mixed status, configuration and long lists, so frequent actions required scrolling

@@ -1,6 +1,6 @@
 # 依赖策略
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 
 **用途**：规定引入外部依赖前的评估要求。目标是**降低长期风险**，不是禁止依赖。
 
@@ -52,6 +52,8 @@ Update cadence: TBD（更新节奏待决策）
 
 `pnpm-workspace.yaml` 的 `allowBuilds` 逐个列出**允许执行安装脚本**的依赖（当前为 `electron`、`esbuild`）；未列入的依赖若带安装脚本，`pnpm install` 会以 `ERR_PNPM_IGNORED_BUILDS` 失败——先在 `allowBuilds` 中评审并显式列入，是继续安装的必需步骤。
 
+M6 新增的渲染层依赖（见第 5 节「依赖记录（M6 新增）」）安装时未触发该错误，故 `allowBuilds` 未增补。
+
 ## 4. 安全与合规
 
 - 依赖漏洞扫描工具：`TBD`（本期未引入；Node 侧 devDependencies 与 Python 侧 `bridges/python/uv.lock` 均已被版本锁定）；
@@ -74,6 +76,104 @@ Update cadence: TBD（更新节奏待决策）
 | esbuild | 打包沙箱 preload（`apps/desktop/src/preload/index.ts` → `apps/desktop/dist/preload/index.js`） | M2 新增（`apps/desktop/` devDependency，锁定 0.28.2）。Electron `sandbox: true` 的 preload 不能 `require` 相对路径，必须产出单文件；esbuild 已是 tsx 的传递依赖，直接声明以便固定打包行为 |
 | tsx | 运行 `apps/desktop/test/**/*.test.ts`（Node 内置 test runner 的 TS 加载器） | M2 新增（`apps/desktop/` devDependency，锁定 4.23.15）。选它是因为仓库根文档检查脚本已用同一方案（不引入第二套 TS 运行方式） |
 | typescript、@types/node | 仅用于本仓库文档检查脚本与 `apps/desktop/` 的类型检查 | Node 侧；`apps/desktop/` 与仓库根使用同一大版本（typescript 5.x、@types/node 22.x），不引入 Markdown parser 或框架 |
+| react、react-dom | 渲染层组件化（四窗口共用组件树） | M6 新增（`apps/desktop/` devDependency，锁定 19.3.0）；理由与取舍见 [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) |
+| antd | 组件库（表单 / 开关 / 单选 / 表格 / 模态 / 布局） | M6 新增（锁定 6.6.5）；运行期样式经 `@ant-design/cssinjs` 注入，故 CSP 的 `style-src` 放宽到 `'self' 'unsafe-inline'`（`script-src` 不放宽） |
+| @ant-design/icons | 界面图标 | M6 新增（锁定 6.3.4）；与 antd 同族版本 |
+| vite | 渲染层构建（四个 HTML 入口 + 共享 chunk）与开发期 dev server | M6 新增（锁定 7.3.6）；产物落在 `apps/desktop/dist/renderer/` |
+| @vitejs/plugin-react | 开发期 Fast Refresh | M6 新增（锁定 5.2.0）；仅 dev 生效 |
+| vitest | 渲染层组件测试运行器（第二套测试运行器） | M6 新增（锁定 3.2.7）；按本策略第 1 节须有 ADR 说明理由，见 [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) |
+| jsdom | vitest 的 DOM 环境 | M6 新增（锁定 26.1.0） |
+| @testing-library/react、@testing-library/dom | 组件测试（`@testing-library/dom` 是 RTL 16 的必需 peer） | M6 新增（锁定 16.3.3 / 10.4.2） |
+| @types/react、@types/react-dom | React 类型 | M6 新增（锁定 19.3.0）；仅类型 |
+
+### 依赖记录（M6 新增）
+
+M6 把渲染层从裸 DOM 迁移到 React 19 + Ant Design 6（多窗口，见 [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md)，Accepted 2026-09-23）。以下 10 项全部为 `apps/desktop/package.json` 的 `devDependencies`（用 caret，锁在仓库根 `pnpm-lock.yaml`），许可证均为 **MIT**；`react`/`react-dom`/`antd`/`@ant-design/icons` 属运行期依赖树，但按当前仓库约定与 `electron`/`esbuild` 同级放在 `devDependencies`（渲染层由 Vite 打进 `dist/renderer`，本期无打包分发形态）——因此所有新增依赖均随包分发、无 CDN。
+
+```text
+Dependency:   react / react-dom
+Version:      ^19.3.0（pnpm-lock.yaml 锁定 19.3.0）
+Purpose:      渲染层组件化：四个窗口共用组件树，状态与订阅集中在 hooks
+Alternatives: 继续裸 DOM（多窗口与表单/表格状态手工维护，成本随窗口数增长）；Svelte / Vue（引入第二套框架，ADR-0012 已评估并否决）
+License:      MIT
+Risk:         渲染层产物随包分发（无 CDN）；按仓库约定放在 devDependencies，本期无打包分发形态
+```
+
+```text
+Dependency:   antd
+Version:      ^6.6.5（pnpm-lock.yaml 锁定 6.6.5）
+Purpose:      组件库：表单 / 开关 / 单选 / 表格 / 模态 / 布局
+Alternatives: 手写全部控件（需自行实现焦点管理、模态与表格的可访问性）；引入其它组件库（与 antd 功能重叠，按第 1 节禁止）
+License:      MIT
+Risk:         运行期经 @ant-design/cssinjs 注入 <style>，故 CSP 的 style-src 放宽到 'self' 'unsafe-inline'（script-src 不放宽，见 SC2-004）；产出 antd 共享 chunk，体积记入验收报告
+```
+
+```text
+Dependency:   @ant-design/icons
+Version:      ^6.3.4（pnpm-lock.yaml 锁定 6.3.4）
+Purpose:      界面图标
+Alternatives: 内联 SVG（重复维护、与主题不联动）；其它图标库（视觉与 antd 不共享）
+License:      MIT
+Risk:         与 antd 同族版本；仅被引用的图标进入产物
+```
+
+```text
+Dependency:   vite
+Version:      ^7.3.6（pnpm-lock.yaml 锁定 7.3.6）
+Purpose:      渲染层构建（多入口 + 共享 chunk，产物 apps/desktop/dist/renderer/{main,capture,logs,allowlist}.html + assets/*）与开发期 dev server（HMR）
+Alternatives: 继续用 esbuild 手写多入口（需自建 HTML / 资源管线与刷新机制）；webpack（配置与依赖树更重）
+License:      MIT
+Risk:         平台二进制随可选依赖分发；需 Node ^20.19 || >=22.12，仓库 engines.node >= 22 与 CI 的 node 22 满足（本机实测 Node v24.18.0）
+```
+
+```text
+Dependency:   @vitejs/plugin-react
+Version:      ^5.2.0（pnpm-lock.yaml 锁定 5.2.0）
+Purpose:      开发期 Fast Refresh（仅 vite dev 生效）
+Alternatives: 无（React 与 Vite 的标准组合）；不使用则开发期每次改动整页刷新
+License:      MIT
+Risk:         仅 dev 依赖；开发期 CSP 需 script-src 'unsafe-inline' 供其刷新 preamble，生产 CSP 不放宽
+```
+
+```text
+Dependency:   vitest
+Version:      ^3.2.7（pnpm-lock.yaml 锁定 3.2.7）
+Purpose:      渲染层组件测试运行器（第二套测试运行器，跑 apps/desktop/test/ui/**/*.test.tsx）
+Alternatives: node:test（无 DOM 环境与组件渲染约定，须自建 jsdom 胶水）；jest（配置与 ESM/TS 支持成本更高）
+License:      MIT
+Risk:         按第 1 节「禁止引入第二套功能等价的依赖」，此处属**例外**：既有 node:test + tsx 无法覆盖 DOM 组件行为，理由与取舍见 ADR-0012（Accepted 2026-09-23）；需 Node >= 22
+```
+
+```text
+Dependency:   jsdom
+Version:      ^26.1.0（pnpm-lock.yaml 锁定 26.1.0）
+Purpose:      vitest 的 DOM 环境（vitest.config.ts 的 environment: 'jsdom'）
+Alternatives: happy-dom（API 覆盖有差异，元件依赖未验证）；真实浏览器（CI 无显示器，且与第二层实机断言重复）
+License:      MIT
+Risk:         仅 dev 依赖；需 Node >= 18
+```
+
+```text
+Dependency:   @testing-library/react / @testing-library/dom
+Version:      ^16.3.3 / ^10.4.2（pnpm-lock.yaml 锁定 16.3.3 / 10.4.2）
+Purpose:      组件测试以可观察行为为断言口径（文案、禁用规则、调用与参数、事件驱动的状态更新、空态/失败态）；@testing-library/dom 是 RTL 16 的必需 peer
+Alternatives: enzyme（不适配 React 19）
+License:      MIT
+Risk:         仅 dev 依赖
+```
+
+```text
+Dependency:   @types/react / @types/react-dom
+Version:      ^19.3.0（pnpm-lock.yaml 锁定 19.3.0）
+Purpose:      React 类型（tsconfig.renderer.json 的 JSX 类型检查）
+Alternatives: 无（标准做法）
+License:      MIT
+Risk:         仅类型，不进入运行期
+```
+
+- **安装脚本审批结论**：本轮 `pnpm install` **未**报 `ERR_PNPM_IGNORED_BUILDS`，故 `pnpm-workspace.yaml` 的 `allowBuilds` **未增补**（仍为 `electron: true`、`esbuild: true`）——新增的 10 项依赖均无需要批准的安装脚本。
+- **Node engines 结论**：vite 7 需 `^20.19 || >=22.12`、vitest 3 需 `>=22`、jsdom 26 需 `>=18`；仓库 `engines.node >= 22` 与 CI 的 node 22 均满足（本机实测 Node v24.18.0），无需调整 `engines`。
+- **测试运行器分工**：`test:unit`（`node:test` + tsx，Main 侧无 Electron 依赖的逻辑）与 `test:ui`（vitest + jsdom，渲染层组件）并存；分层、组织与运行方式见 [testing-strategy.md](testing-strategy.md)。
 
 ### 依赖记录（M2 新增）
 

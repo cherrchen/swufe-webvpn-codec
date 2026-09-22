@@ -1,6 +1,6 @@
 # 接口
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 
 **用途**：定义模块之间、系统与外部之间的**边界**：谁提供、谁消费、契约是什么、兼容性如何保证。
 **不写**：具体字段级 API 定义（→ [docs/api/](../api/README.md)）、数据实体（→ [data-model.md](data-model.md)）。
@@ -22,8 +22,8 @@
 
 ```mermaid
 flowchart LR
-    UI["Telemetry UI / Login WebView"] -->|"IF-001 调用"| Shell["App Shell（Main）"]
-    Shell -->|"IF-001 事件"| UI
+    UI["Telemetry UI（四窗口）/ Login WebView"] -->|"IF-001 调用"| Shell["App Shell（Main）"]
+    Shell -->|"IF-001 事件（广播到全部存活窗口）"| UI
     Shell -->|"IF-003"| Codec["WRD Codec"]
     Orch["Proxy Orchestrator"] -->|"IF-002"| Addon["Bridge Addon（sidecar）"]
     Addon -->|"IF-003"| Codec
@@ -33,7 +33,7 @@ flowchart LR
     UI -->|"IF-006"| AS["authserver.swufe.edu.cn（登录）"]
 ```
 
-说明：进程内边界（IF-001）为稳定契约（Internal）；IF-003 同为进程内但接口仍可随实现调整（Evolving）；进程间边界（IF-002）与外部边界（IF-004～IF-006）随 sidecar 实现方式与外部系统演进而变化。`IF-006` 的两条方向分别对应「登录（authserver → webvpn）」与「改写后的业务请求（Bridge Addon → webvpn）」，登录流量不得进入改写路径。
+说明：进程内边界（IF-001）为稳定契约（Internal）；IF-003 同为进程内但接口仍可随实现调整（Evolving）；进程间边界（IF-002）与外部边界（IF-004～IF-006）随 sidecar 实现方式与外部系统演进而变化。`IF-006` 的两条方向分别对应「登录（authserver → webvpn）」与「改写后的业务请求（Bridge Addon → webvpn）」，登录流量不得进入改写路径。自 M6 起，IF-001 的消费方是四窗口渲染层（主 / 捕获 / 日志 / Allowlist）与 Login WebView，三类事件（`onStatus` / `onDebugLog` / `onSessionExpired`）由 Main 广播到全部存活窗口而非单窗口。
 
 ## 接口契约
 
@@ -42,13 +42,14 @@ flowchart LR
 - 提供方：App Shell（Electron Main）。
 - 消费方：Telemetry UI、Login WebView（Renderer）。
 - 稳定性：Internal（仅 App 内使用；破坏性变更仍需评估）。
-- 输入：方法调用 `login` / `logout` / `getSession`、`startBridge` / `stopBridge` / `getStatus`、`getAllowlist` / `setAllowlist` / `getSettings`、`installCa` / `uninstallCa` / `getCaStatus`、`listCaptureCandidates` / `setCaptureMode` / `setCaptureProcesses`、`setDebugLogging`；事件订阅 `onDebugLog` / `onStatus` / `onSessionExpired`（后两者为 M2 新增，`getSettings` 亦为 M2 新增且不返回 WRD key/IV）。M3 以 `setCaptureMode`（`'system-proxy' | 'selected-apps'`）取代 M2 的 `setCapturePids`，并新增 `setCaptureProcesses`（intercept pattern 字符串数组，整体覆盖写入）。
-- 输出：`BridgeStatus`（含 `localCaptureEnabled` 与 `captureError`）、`AllowlistConfig`、CA 状态、会话状态、`DebugLogEvent`。字段级定义见 [api/electron-ipc.md](../api/electron-ipc.md)。
+- 输入：21 个命令方法——会话 `login` / `logout` / `getSession`；桥控 `startBridge` / `stopBridge` / `getStatus`；allowlist `getAllowlist` / `setAllowlist`；设置与证书 `getSettings` / `installCa` / `uninstallCa` / `getCaStatus`；捕获 `listCaptureCandidates` / `setCaptureMode` / `setCaptureProcesses`；日志 `setDebugLogging` / `getDebugLogs` / `clearDebugLogs`；窗口 `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow`。其中 16 个为既有方法（`getSettings` 不返回 WRD key/IV；`setCaptureMode` 取 `'system-proxy' | 'selected-apps'`；`setCaptureProcesses` 为 intercept pattern 字符串数组，整体覆盖写入；`setCapturePids`（M2）已由 `setCaptureMode` 取代），M6 新增 5 个（窗口入口 3 个 + 日志缓冲读 / 清 2 个，语义见 [api/electron-ipc.md](../api/electron-ipc.md)）。事件订阅 3 个：`onDebugLog` / `onStatus` / `onSessionExpired`，签名均不变（后两者与 `getSettings` 同为 M2 新增），但 M6 起由 Main **广播到全部存活窗口**（M2/M3 只投递主窗口）。
+- 输出：`BridgeStatus`（含 `localCaptureEnabled` 与 `captureError`）、`AllowlistConfig`、CA 状态、会话状态、`DebugLogEvent`（日志窗口挂载时经 `getDebugLogs` 取得的环形缓冲副本，最新在前、≤200）。字段级定义见 [api/electron-ipc.md](../api/electron-ipc.md)。
+- 副作用（M6 补充）：`setDebugLogging(false)` 除落盘与下发配置外，还清空 Main 的环形缓冲并关闭日志窗口；`setAllowlist` 成功后 Main 额外广播一次当前 `status`（各窗口据此重读 allowlist 摘要；推送通道仍是 `onStatus`，不新增事件）。
 - 错误模型：`BridgeStatus.error.code` 取固定错误码 `PROXY_CONFLICT` / `CA_MISSING` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `BRIDGE_CRASH` / `ALLOWLIST_EMPTY`（切到「指定应用」捕获方式而系统代理被其它软件占用时同样返回 `PROXY_CONFLICT`；开桥前若网关主机解析到 fake-ip 段 `198.18.0.0/15`——Clash / mihomo / sing-box 的 TUN 模式——同样以 `PROXY_CONFLICT` 拒绝，见 [ADR-0011](adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）；CA 操作用 `{ok, message}`。进程捕获失败不进入 `error`，只出现在 `BridgeStatus.captureError`。Electron 的 `invoke` rejection 只保留 `message` / `stack`，因此 `setCaptureMode` / `setCaptureProcesses` 的拒绝消息形如 `<CODE>：<message>`（如 `PROXY_CONFLICT：…`），Renderer 解析前缀决定是否弹出代理冲突模态。
-- 幂等性：`getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` 为幂等读；`setAllowlist`、`setCaptureMode`、`setCaptureProcesses`（整体覆盖写入）幂等；`startBridge` / `stopBridge` / `installCa` / `uninstallCa` 非幂等（重复调用按状态机处置）。
+- 幂等性：`getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` / `listCaptureCandidates` / `getDebugLogs` 为幂等读；`setAllowlist`、`setCaptureMode`、`setCaptureProcesses`（整体覆盖写入）、`clearDebugLogs` 幂等；`openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` 幂等（每类窗口单实例，重复调用即聚焦已有窗口）；`startBridge` / `stopBridge` / `installCa` / `uninstallCa` 非幂等（重复调用按状态机处置）。
 - 版本策略：preload 与 Main 同构建同版本，不跨版本混用。
 - 兼容性承诺：新增方法/字段向后兼容；删除或改签名属破坏性变更（允许的例外见「兼容性策略」）。
-- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)。
+- 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[specs/002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)、[ADR-0012](adr/ADR-0012-react-antd-multiwindow-renderer.md)。
 
 ### IF-002 Main ↔ mitm sidecar 控制
 
@@ -130,7 +131,7 @@ flowchart LR
 
 | 接口 | 测试位置 | 覆盖内容 |
 | ---- | -------- | -------- |
-| IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-D01、TC-D02、TC-C01–C04、TC-E01–E03、TC-B05、TC-H01） | 会话/桥控/allowlist/CA/进程捕获 IPC 的行为与错误码 |
+| IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-D01、TC-D02、TC-C01–C04、TC-E01–E03、TC-B05、TC-H01；界面部分已被 Spec 002 取代）+ [specs/002-desktop-ui-multiwindow/verification.md](../../specs/002-desktop-ui-multiwindow/verification.md)（AC2-010 的方法面复核与 TC-J02 / TC-J05–TC-J07 的窗口路径） | 会话/桥控/allowlist/CA/进程捕获 IPC 的行为与错误码；21 个命令方法与 3 个事件的签名、广播面与窗口路径 |
 | IF-002 | L1 `bridges/python/tests/l1/test_addon_reload.py`（配置热更新与失败回退）、L1 `bridges/python/tests/l1/test_addon_capture.py`（local 模式叠加与 `swufe-capture` 上报）+ L2 `bridges/python/tests/l2/test_proxy_end_to_end.py`（`swufe-ready` 行含 `listen_port`、退出码 `2`、回环监听） | 配置文件热加载语义、就绪/诊断行格式与启动失败退出码、进程捕获模式叠加与回报 |
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-A01–A05） | codec 向量与 URL 互转一致 |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-C01–C04） | 冲突拒绝、设置与清除代理 |

@@ -1,6 +1,6 @@
 # Interfaces
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 >
 > Chinese source of truth: [interfaces.md](interfaces.md)
 
@@ -24,8 +24,8 @@
 
 ```mermaid
 flowchart LR
-    UI["Telemetry UI / Login WebView"] -->|"IF-001 calls"| Shell["App Shell (Main)"]
-    Shell -->|"IF-001 events"| UI
+    UI["Telemetry UI (four windows) / Login WebView"] -->|"IF-001 calls"| Shell["App Shell (Main)"]
+    Shell -->|"IF-001 events (broadcast to every live window)"| UI
     Shell -->|"IF-003"| Codec["WRD Codec"]
     Orch["Proxy Orchestrator"] -->|"IF-002"| Addon["Bridge Addon (sidecar)"]
     Addon -->|"IF-003"| Codec
@@ -35,7 +35,7 @@ flowchart LR
     UI -->|"IF-006"| AS["authserver.swufe.edu.cn (login)"]
 ```
 
-Description: the in-process boundary IF-001 is a stable contract (Internal); IF-003 is also in-process but may still change with the implementation (Evolving); the inter-process boundary (IF-002) and the external boundaries (IF-004–IF-006) change with the sidecar implementation and the external systems. The two IF-006 edges correspond to "login (authserver → webvpn)" and "rewritten business requests (Bridge Addon → webvpn)"; login traffic must not enter the rewrite path.
+Description: the in-process boundary IF-001 is a stable contract (Internal); IF-003 is also in-process but may still change with the implementation (Evolving); the inter-process boundary (IF-002) and the external boundaries (IF-004–IF-006) change with the sidecar implementation and the external systems. The two IF-006 edges correspond to "login (authserver → webvpn)" and "rewritten business requests (Bridge Addon → webvpn)"; login traffic must not enter the rewrite path. Since M6, IF-001's consumer is the four-window renderer (main / capture / logs / allowlist) plus Login WebView, and the three events (`onStatus` / `onDebugLog` / `onSessionExpired`) are broadcast by Main to every live window rather than to a single window.
 
 ## Interface contracts
 
@@ -44,13 +44,14 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 - Provider: App Shell (Electron Main).
 - Consumer: Telemetry UI, Login WebView (Renderer).
 - Stability: Internal (app-internal only; breaking changes still need assessment).
-- Input: method calls `login` / `logout` / `getSession`, `startBridge` / `stopBridge` / `getStatus`, `getAllowlist` / `setAllowlist` / `getSettings`, `installCa` / `uninstallCa` / `getCaStatus`, `listCaptureCandidates` / `setCaptureMode` / `setCaptureProcesses`, `setDebugLogging`; event subscriptions `onDebugLog` / `onStatus` / `onSessionExpired` (the last two, and `getSettings`, were added in M2; `getSettings` never returns the WRD key/IV). M3 replaces M2's `setCapturePids` with `setCaptureMode` (`'system-proxy' | 'selected-apps'`) and adds `setCaptureProcesses` (an array of intercept-pattern strings, written as a whole-set overwrite).
-- Output: `BridgeStatus` (including `localCaptureEnabled` and `captureError`), `AllowlistConfig`, CA status, session state, `DebugLogEvent`. Field-level definitions in [api/electron-ipc.md](../api/electron-ipc.md).
+- Input: 21 command methods — session `login` / `logout` / `getSession`; bridge control `startBridge` / `stopBridge` / `getStatus`; allowlist `getAllowlist` / `setAllowlist`; settings and certificates `getSettings` / `installCa` / `uninstallCa` / `getCaStatus`; capture `listCaptureCandidates` / `setCaptureMode` / `setCaptureProcesses`; logging `setDebugLogging` / `getDebugLogs` / `clearDebugLogs`; windows `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow`. 16 of them are pre-existing (`getSettings` never returns the WRD key/IV; `setCaptureMode` takes `'system-proxy' | 'selected-apps'`; `setCaptureProcesses` is an array of intercept-pattern strings written as a whole-set overwrite; M2's `setCapturePids` was replaced by `setCaptureMode`), and M6 added 5 (three window entry points plus reading/clearing the log buffer; semantics in [api/electron-ipc.md](../api/electron-ipc.md)). Event subscriptions: `onDebugLog` / `onStatus` / `onSessionExpired` — signatures unchanged (the last two, and `getSettings`, came in M2), but since M6 Main **broadcasts to every live window** (M2/M3 delivered to the main window only).
+- Output: `BridgeStatus` (including `localCaptureEnabled` and `captureError`), `AllowlistConfig`, CA status, session state, `DebugLogEvent` (the ring-buffer copy the log window fetches through `getDebugLogs` on mount: newest first, ≤200). Field-level definitions in [api/electron-ipc.md](../api/electron-ipc.md).
+- Side effects (added in M6): besides persisting and pushing the config, `setDebugLogging(false)` clears Main's ring buffer and closes the log window; after a successful `setAllowlist` Main broadcasts the current `status` once more (windows re-read the allowlist summary from it; the push channel is still `onStatus`, no new event is added).
 - Error model: `BridgeStatus.error.code` takes the fixed codes `PROXY_CONFLICT` / `CA_MISSING` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `BRIDGE_CRASH` / `ALLOWLIST_EMPTY` (switching to the "selected apps" capture mode while another application occupies the system proxy also returns `PROXY_CONFLICT`; when the gateway host resolves into the fake-ip range `198.18.0.0/15` — Clash / mihomo / sing-box TUN mode — the start is refused with `PROXY_CONFLICT` too, see [ADR-0011](adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md)); CA operations use `{ok, message}`. A process-capture failure never enters `error`; it only shows up in `BridgeStatus.captureError`. Electron's `invoke` rejection keeps only `message` / `stack`, so rejections from `setCaptureMode` / `setCaptureProcesses` look like `<CODE>：<message>` (e.g. `PROXY_CONFLICT：…`) and the Renderer parses that prefix to decide whether to open the proxy-conflict modal.
-- Idempotency: `getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` are idempotent reads; `setAllowlist`, `setCaptureMode` and `setCaptureProcesses` (whole-set overwrite) are idempotent; `startBridge` / `stopBridge` / `installCa` / `uninstallCa` are not (repeated calls are handled by the state machine).
+- Idempotency: `getStatus` / `getSession` / `getAllowlist` / `getSettings` / `getCaStatus` / `listCaptureCandidates` / `getDebugLogs` are idempotent reads; `setAllowlist`, `setCaptureMode`, `setCaptureProcesses` (whole-set overwrite) and `clearDebugLogs` are idempotent; `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` are idempotent (one instance per window kind, a repeated call focuses the existing window); `startBridge` / `stopBridge` / `installCa` / `uninstallCa` are not (repeated calls are handled by the state machine).
 - Versioning: preload and Main are built and versioned together; no cross-version mixing.
 - Compatibility commitment: added methods/fields are backward compatible; removals or signature changes are breaking (allowed exceptions in "Compatibility strategy").
-- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md), [ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md).
+- Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [specs/002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/spec.md), [ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md), [ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md), [ADR-0012](adr/ADR-0012-react-antd-multiwindow-renderer.md).
 
 ### IF-002 Main ↔ mitm sidecar control
 
@@ -132,7 +133,7 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 
 | Interface | Test location | Coverage |
 | --------- | ------------- | -------- |
-| IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-D01, TC-D02, TC-C01–C04, TC-E01–E03, TC-B05, TC-H01) | Session / bridge-control / allowlist / CA / process-capture IPC behaviour and error codes |
+| IF-001 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-D01, TC-D02, TC-C01–C04, TC-E01–E03, TC-B05, TC-H01; the UI part was superseded by spec 002) + [specs/002-desktop-ui-multiwindow/verification.md](../../specs/002-desktop-ui-multiwindow/verification.md) (the AC2-010 method-surface review and the window paths of TC-J02 / TC-J05–TC-J07) | Session / bridge-control / allowlist / CA / process-capture IPC behaviour and error codes; the signatures, broadcast surface and window paths of the 21 command methods and 3 events |
 | IF-002 | L1 `bridges/python/tests/l1/test_addon_reload.py` (config hot reload and failure fallback), L1 `bridges/python/tests/l1/test_addon_capture.py` (local-mode overlay and `swufe-capture` reporting) + L2 `bridges/python/tests/l2/test_proxy_end_to_end.py` (`swufe-ready` line with `listen_port`, exit code `2`, loopback listener) | config-file hot-reload semantics, readiness/diagnostic line formats and startup-failure exit code, process-capture mode overlay and reporting |
 | IF-003 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-A01–A05) | codec vectors and URL conversion consistency |
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-C01–C04) | conflict refusal, proxy set and clear |

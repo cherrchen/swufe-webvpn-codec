@@ -25,6 +25,12 @@ Status:           Phase 1 delivered (M1 bridge core / M2 desktop orchestration /
                   2026-09-21 decision documents the workaround only) is unresolved, so it is not
                   `Verified` yet (KI-007, the automatic CA install, is fixed — see ADR-0008;
                   KI-013, the TUN / fake-ip interference, is fixed — see ADR-0011)
+                  M6 UI rework (spec 002) is delivered and advanced to `Implemented`: the renderer is a
+                  four-window React 19 + Ant Design 6 structure (720×560 strictly scroll-free main
+                  window; capture/log/allowlist as single-instance non-modal secondary windows; the
+                  200-entry debug-log ring buffer lives in Main); every machine-executable acceptance
+                  case passes. Unverified items carry over from 001: the Windows real machine, the
+                  campus page under a real session, and the real process-capture scope
 Primary language: Python 3 (bridge sidecar/Addon, WRD codec, see `bridges/python/swufe_bridge/`) + TypeScript (Electron app, from M2);
                   Markdown docs (`docs/` + `specs/`) plus Node documentation-check scripts form the bulk
 Repository type:  Documentation-first (docs/ + specs/) + implementation (Python bridge `bridges/python/`,
@@ -46,6 +52,7 @@ Owner:            cherrchen
 | UI/UX conventions | [docs/ui-ux/](docs/ui-ux/README.en.md) |
 | Feature what/why/how | [specs/](specs/README.en.md) |
 | Phase 1 feature implementation and verification | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
+| Desktop UI structure (four windows, scroll-free main window, secondary windows) | [specs/002-desktop-ui-multiwindow/](specs/002-desktop-ui-multiwindow/spec.md) |
 | Technical decisions (why) | [docs/architecture/adr/](docs/architecture/adr/README.en.md) |
 | Testing strategy | [docs/development/testing-strategy.md](docs/development/testing-strategy.md) |
 | Documentation rules and language policy | [docs/development/documentation-rules.md](docs/development/documentation-rules.md) |

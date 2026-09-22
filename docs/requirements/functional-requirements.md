@@ -51,7 +51,7 @@
 | REQ-009 | 可观测性（状态与调试日志） | Should | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
 | REQ-010 | 证书生命周期 | Must | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
 | REQ-011 | 平台支持 | Must | Accepted | [001-phase1-local-bridge](../../specs/001-phase1-local-bridge/) |
-| REQ-012 | 多窗口界面结构 | Must | Proposed | [002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/) |
+| REQ-012 | 多窗口界面结构 | Must | Implemented | [002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/) |
 
 （完整条目按上方模板在本文档内展开。）
 
@@ -357,7 +357,7 @@ CAS/MFA 与证书信任引导需要 GUI（见 ADR-0003）；同时「状态可�
 
 ### REQ-012 多窗口界面结构
 
-- Status: Proposed
+- Status: Implemented（2026-09-23；验证证据见 [002 的 verification.md](../../specs/002-desktop-ui-multiwindow/verification.md)）
 - Priority: Must
 - Related: G-002 / G-004 / [ADR-0003](../architecture/adr/ADR-0003-electron-gui-for-phase-1.md) / [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) / REQ-001 / REQ-003 / REQ-005 / REQ-009
 - Source: 需求方决定（2026-09-23）——现有单窗口承载状态、配置与长列表，高频动作需要滚动才能完成

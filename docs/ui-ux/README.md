@@ -1,6 +1,6 @@
 # UI / UX 文档
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 
 **用途**：记录界面结构、交互约定、状态与可访问性要求。
 **不写**：实现细节（框架、组件库、样式方案 → 属于 Spec 或 ADR）、接口字段（→ [docs/api/](../api/README.md)）。
@@ -9,9 +9,10 @@
 
 | 文件 | 内容 |
 | ---- | ---- |
-| [main-window.md](main-window.md) | 主窗口（第一期唯一界面）：结构、状态、交互、文案 |
+| [main-window.md](main-window.md) | 主窗口（720×560 固定、零滚动）：结构、状态、交互、尺寸与内容缩放、文案 |
+| [secondary-windows.md](secondary-windows.md) | 二级窗口（捕获 / 日志 / Allowlist）：共同约定、结构、状态、交互、文案 |
 
-第一期只有主窗口一个界面；托盘图标非必须，是否实现未定（见 [main-window.md](main-window.md) 的开放问题）。设计系统/视觉规范文档 `TBD`（第一期未定义）。
+界面固定为四个窗口：主窗口承载全部高频内容且严格零滚动，三类长内容（捕获应用选择、调试日志、Allowlist 编辑）各自进入非模态二级窗口（每类单实例）；结构事实由 [Spec 002](../../specs/002-desktop-ui-multiwindow/spec.md) 与 [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) 决定。托盘图标非必须，是否实现未定（见 [main-window.md](main-window.md) 的开放问题）。设计系统/视觉规范文档 `TBD`（尚未定义）。
 
 > 新增界面时在上表补一行，并按下方「界面文档模板」新建 `docs/ui-ux/<surface>.md`。
 
@@ -20,7 +21,7 @@
 ```markdown
 # <界面名称>
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 
 ## 目标
 

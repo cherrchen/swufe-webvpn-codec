@@ -1,6 +1,6 @@
 # 组件
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 
 **用途**：列出系统的构成单元（模块、服务、包、进程、任务），说明各自职责、边界与依赖方向。
 **不写**：接口字段（→ [interfaces.md](interfaces.md)）、数据实体（→ [data-model.md](data-model.md)）。
@@ -11,11 +11,11 @@
 
 > 「代码位置」为已落地实现的真实路径；尚未实现的组件仍为 `TBD（实现首个任务确定）`。
 > M1（桥核心）已实现 WRD Codec、Bridge Addon（含配置面与 sidecar 入口）与 Allowlist Store 的库层；M2 已落地 Electron 侧全部组件
-> （`apps/desktop/src/`），Windows 平台适配已实现、真机验证待 M4；M3 补齐捕获方式（进程捕获）、allowlist 增删界面与调试日志面板；M5（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）给 Bridge Addon 增加网关自有命名空间直通与 bootstrap 文档升级。
+> （`apps/desktop/src/`），Windows 平台适配已实现、真机验证待 M4；M3 补齐捕获方式（进程捕获）、allowlist 增删界面与调试日志面板；M5（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）给 Bridge Addon 增加网关自有命名空间直通与 bootstrap 文档升级；M6（[ADR-0012](adr/ADR-0012-react-antd-multiwindow-renderer.md)）把渲染层迁移到 React 19 + Ant Design 6 的四窗口结构，并新增 Window Registry 与 Debug Log Buffer。
 
 | 组件 | 类型 | 职责（一句话） | 代码位置 | 状态 |
 | ---- | ---- | -------------- | -------- | ---- |
-| App Shell | 进程内模块（Electron Main） | 窗口/托盘（可选）、配置持久化，并作为 Main 侧编排入口暴露 preload IPC | `apps/desktop/src/main/index.ts`（组合根、单实例锁、退出清理 `shutdown.ts`）、`apps/desktop/src/main/ipc.ts`（IF-001）、`apps/desktop/src/main/windows.ts`、`apps/desktop/src/main/store.ts` | Implemented (M2；托盘未实现) |
+| App Shell | 进程内模块（Electron Main） | 窗口/托盘（可选）、配置持久化，并作为 Main 侧编排入口暴露 preload IPC | `apps/desktop/src/main/index.ts`（组合根、单实例锁、退出清理 `shutdown.ts`）、`apps/desktop/src/main/ipc.ts`（IF-001）、`apps/desktop/src/main/store.ts`、窗口注册表 `apps/desktop/src/main/window-registry.ts` 与窗口策略 `apps/desktop/src/main/window-policy.ts` | Implemented (M2；托盘未实现) |
 | Login WebView | 进程内模块（Electron Renderer / BrowserWindow） | 承载官方 WebVPN / CAS 登录并保证防环 | `apps/desktop/src/main/session-broker.ts`（`openLogin`，`persist:swufe-login` 分区 + `setProxy({mode:'direct'})`） | Implemented (M2) |
 | Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与失效检测 | `apps/desktop/src/main/session-broker.ts`（采集/清除/监视）、`apps/desktop/src/main/session-probe.ts`（失效信号分类，纯函数） | Implemented (M2；Q-001 的另两个信号留 M3/M4) |
 | Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、在「系统代理 / 指定应用」两种捕获方式间切换、代理冲突检测 | `apps/desktop/src/main/orchestrator.ts`、`apps/desktop/src/main/state-machine.ts`、`apps/desktop/src/main/sidecar.ts`、`apps/desktop/src/main/platform/`（`exec.ts`、`parse.ts` 与 darwin/win32 适配） | Implemented (M2；Windows 真机验证待 M4) |
@@ -23,7 +23,9 @@
 | Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入；网关自有根命名空间直通；命中网关 bootstrap 判据的 HTML 升级到网关原生 URL 空间 | `bridges/python/swufe_bridge/addon.py`（响应反向改写纯函数与 bootstrap 判据 `bridges/python/swufe_bridge/rewrite.py`；配置面 `bridges/python/swufe_bridge/config.py`；进程入口 `bridges/python/swufe_bridge/sidecar.py`） | Implemented (M1；M5 增加直通与升级) |
 | Cert Manager | 进程内模块（Electron Main） | 本机 MITM CA 的安装/卸载与状态查询 | `apps/desktop/src/main/platform/darwin/cert.ts`、`apps/desktop/src/main/platform/win32/cert.ts`、`apps/desktop/src/main/platform/ca-files.ts`；CA 生成入口 `bridges/python/swufe_bridge/ca.py` | Implemented (M2；系统信任库写入的真机验证待人工，见 [M2 完成记录](../planning/milestones/M2-desktop-orchestration.md)) |
 | Allowlist Store | 进程内模块（Electron Main） | 主机列表与通配选项的读写（路由判定唯一数据源） | `apps/desktop/src/main/store.ts`（`<userData>/config.json` 读写与校验）+ `bridges/python/swufe_bridge/allowlist.py`（匹配语义与校验）+ `bridges/python/swufe_bridge/config.py`（`AllowlistStore`） | Implemented (M2；编辑界面已在 M3 落地) |
-| Telemetry UI | 进程内模块（Electron Renderer） | 捕获方式选择、allowlist 增删、状态展示与调试日志面板 | `apps/desktop/src/renderer/renderer.ts`、`apps/desktop/static/{index.html,styles.css}`、`apps/desktop/src/preload/index.ts` | Implemented (M3：状态条/桥开关/证书/代理状态/调试开关 + 捕获方式区、allowlist 编辑与日志面板) |
+| Telemetry UI | 进程内模块（Electron Renderer，React 19 + Ant Design 6） | 四窗口界面：主窗口（状态条、登录/重新登录、桥接开关、捕获方式与进程捕获状态、allowlist 摘要、CA、诊断）与捕获 / 日志 / Allowlist 三个二级窗口 | 四个入口 `apps/desktop/src/renderer/{main,capture,logs,allowlist}.html` → `entry/{main,capture,logs,allowlist}.tsx` → `windows/{main,capture,logs,allowlist}/`；共享库 `apps/desktop/src/renderer/lib/`（`AppShell.tsx`、`ErrorBoundary.tsx`、`theme.ts`、`bridge-api.ts`、`hooks.ts`、`log-batch.ts`、`log-format.ts`、`messages.ts`、`app.css`）；`apps/desktop/src/preload/index.ts` | Implemented (M6：迁移到 React + 四窗口；旧裸 DOM 渲染层 `renderer.ts` / `static/` 已删除) |
+| Window Registry | 进程内模块（Electron Main） | 四窗口的创建 / 复用聚焦 / 关闭与跨窗口广播 | `apps/desktop/src/main/window-registry.ts`、`apps/desktop/src/main/window-policy.ts`（尺寸与动作策略，无 Electron 依赖，可单测） | Implemented (M6) |
+| Debug Log Buffer | 进程内模块（Electron Main） | 调试日志的最近 200 条环形缓冲（窗口关闭不丢历史） | `apps/desktop/src/main/debug-log-buffer.ts`、容量常量 `apps/desktop/src/shared/limits.ts` | Implemented (M6) |
 
 ## 组件关系
 
@@ -38,6 +40,8 @@ flowchart TD
     Shell --> CertMgr["Cert Manager"]
     Shell --> AllowStore["Allowlist Store"]
     Shell --> Codec["WRD Codec"]
+    Shell --> WinReg["Window Registry"]
+    Shell --> DebugBuf["Debug Log Buffer"]
     SessionBroker --> LoginWV
     ProxyOrch --> AllowStore
     ProxyOrch -->|"IF-002"| Addon["Bridge Addon（sidecar）"]
@@ -46,7 +50,7 @@ flowchart TD
     Addon -->|"IF-003"| Codec
 ```
 
-说明：Telemetry UI 是叶子（只经 preload IPC 调用 App Shell），App Shell 是 Main 侧的组合根；Session Broker 读取 Login WebView 的 session，是 Cookie 的唯一读取点；Proxy Orchestrator 依赖 Allowlist Store 作为路由数据源，并经本地控制口驱动 sidecar 内的 Bridge Addon（含运行时叠加 / 移除 local 捕获模式）；WrdCodec 无 IO、不被任何组件反向依赖，由 Bridge Addon 与 App Shell 共同使用。
+说明：Telemetry UI 是叶子（只经 preload IPC 调用 App Shell），App Shell 是 Main 侧的组合根；Session Broker 读取 Login WebView 的 session，是 Cookie 的唯一读取点；Proxy Orchestrator 依赖 Allowlist Store 作为路由数据源，并经本地控制口驱动 sidecar 内的 Bridge Addon（含运行时叠加 / 移除 local 捕获模式）；WrdCodec 无 IO、不被任何组件反向依赖，由 Bridge Addon 与 App Shell 共同使用。Window Registry 与 Debug Log Buffer 是 Main 内部模块：由组合根创建并注入 IPC 层，前者承载窗口生命周期（渲染层只能经 `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` 触达），后者承载调试日志缓冲（渲染层只能经 `getDebugLogs` / `clearDebugLogs` 读取与清空）。
 
 ## 组件详情
 
@@ -55,8 +59,8 @@ flowchart TD
 - 职责：窗口与托盘（托盘非必须）生命周期、配置持久化、Main 侧编排入口，并暴露 preload 接口 `window.swufeBridge`。
 - 不负责：不做流量改写（Bridge Addon）；不实现 allowlist 匹配逻辑（Allowlist Store）；不直接调用 OS 专有 API（集中在 Cert Manager 与 Proxy Orchestrator）。
 - 输入：Renderer 经 `window.swufeBridge` 的 IPC 调用；启动参数与用户数据目录。
-- 输出：IPC 响应（`BridgeStatus`、`AllowlistConfig`、CA 状态等）；`onDebugLog` 事件。
-- 依赖：Session Broker、Proxy Orchestrator、Cert Manager、Allowlist Store、WrdCodec、Login WebView。
+- 输出：IPC 响应（`BridgeStatus`、`AllowlistConfig`、CA 状态等）；`onDebugLog` / `onStatus` / `onSessionExpired` 事件（广播到全部存活窗口）。
+- 依赖：Session Broker、Proxy Orchestrator、Cert Manager、Allowlist Store、WrdCodec、Login WebView、Window Registry、Debug Log Buffer。
 - 被谁依赖：Telemetry UI、Login WebView（经 preload）。
 - 关键不变式：应用退出必须触发系统代理清除（见 [data-model.md](data-model.md) INV-002）。
 - 相关测试：TC-H01、TC-D02。
@@ -156,15 +160,39 @@ flowchart TD
 
 ### Telemetry UI
 
-- 职责：一级「捕获方式」选择（系统代理 / 指定应用，含进程捕获状态、macOS 授权引导与重试）、可编辑 allowlist（增删主机 + `*.swufe.edu.cn` 勾选）、状态条与日志面板，以及 CA / 调试日志开关等界面（Renderer）。
-- 不负责：不直接调用 OS API；不做改写；不持有 Cookie 明文。
+- 职责：四个窗口的界面——主窗口（状态条、登录/重新登录、桥接开关、捕获方式单选与进程捕获状态行、allowlist 摘要、CA 安装/卸载、系统代理只读行、调试日志开关、消息行；720×560 固定、`resizable: false`、零滚动）与三个二级窗口（捕获：应用筛选与复选选择；日志：时间 / 域名 / 结果三列，最新在前、≤200；Allowlist：增删主机与 `*.swufe.edu.cn` 勾选）。四窗口共用 `AppShell`（`ErrorBoundary` + antd `ConfigProvider` / `App`），各窗口自持状态并经 preload IPC 读写 Main。
+- 不负责：不直接调用 OS API；不做改写；不持有 Cookie 明文；不持有窗口生命周期（Window Registry）与日志缓冲（Debug Log Buffer）。
 - 输入：`BridgeStatus`（含 `localCaptureEnabled` / `captureError`）、`DebugLogEvent`、`AllowlistConfig`、`AppSettingsView`（`captureMode` / `captureProcesses`）、`CaptureCandidate[]`、CA 状态。
-- 输出：用户操作对应的 IPC 调用。
+- 输出：用户操作对应的 IPC 调用（含 `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` / `getDebugLogs` / `clearDebugLogs`）。
 - 依赖：App Shell（经 preload IPC）。
 - 被谁依赖：无（叶子）。
-- 关键不变式：错误不得仅靠颜色表达（无障碍）；日志面板默认随「调试日志」开关隐藏、最多保留最近 200 条、只有时间 / 域名 / 结果三列，不含正文与 Cookie；allowlist 修改与捕获方式切换立即生效（无需重启）。
+- 关键不变式：渲染层无 Node 集成——四窗口 `webPreferences` 均为 `contextIsolation: true` + `nodeIntegration: false` + `sandbox: true` 且共用同一个 preload；错误不得仅靠颜色表达（无障碍）；日志表格只有时间 / 域名 / 结果三列，不含正文与 Cookie；allowlist 修改与捕获方式切换立即生效（无需重启）。
 - 相关测试：TC-H01、TC-H02、TC-F04、TC-B05。
-- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)。
+- 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[specs/002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/spec.md)、[ADR-0003](adr/ADR-0003-electron-gui-for-phase-1.md)、[ADR-0012](adr/ADR-0012-react-antd-multiwindow-renderer.md)。
+
+### Window Registry
+
+- 职责：四窗口的创建参数、复用聚焦、关闭与跨窗口广播（`openMain()` / `open(kind)` / `close(kind)` / `closeAll()` / `broadcast(channel, payload?)` / `count(kind)` / `mainWindow()`）。
+- 不负责：不做业务编排（App Shell / Proxy Orchestrator）；不持有日志缓冲（Debug Log Buffer）；不决定界面内容（Telemetry UI）。
+- 输入：`createWindowRegistry({ appRoot, devServerUrl?, onMainClosed })`；窗口动作调用。
+- 输出：`BrowserWindow`；经 `webContents.send` 的广播（`onStatus` / `onDebugLog` / `onSessionExpired`）。
+- 依赖：`window-policy.ts`（`WINDOW_SPECS`、`decideWindowAction`、`mainWindowSize`、`clampZoomFactor`，无 Electron 依赖）。
+- 被谁依赖：App Shell（组合根创建并注入 IPC 层）。
+- 关键不变式：每类窗口单实例（已存在则 `restore()` / `show()` / `focus()`；`decideWindowAction` 只返回 `create` 或 `focus`）；二级窗口不设 `parent`（非模态，主窗口仍可操作）；主窗口 `closed` → `onMainClosed()`（组合根中即 `app.quit()`）；四个窗口一律 `show: false` + `ready-to-show` 再显示，`did-fail-load` 打日志；加载路径二选一——`devServerUrl` 存在时 `loadURL('<url>/<entry>.html')`，否则 `loadFile('<appRoot>/dist/renderer/<entry>.html')`。
+- 相关测试：`apps/desktop/test/window-policy.test.ts`。
+- 相关 Spec / ADR：[specs/002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/spec.md)、[ADR-0012](adr/ADR-0012-react-antd-multiwindow-renderer.md)。
+
+### Debug Log Buffer
+
+- 职责：保存调试日志的最近 200 条（`push(event)` / `snapshot()` / `clear()` / `size()`），供日志窗口挂载时恢复历史。
+- 不负责：不落盘；不裁剪字段（`DebugLogEvent` 键集合固定）；不做渲染层的合并渲染（合并窗口是渲染层 `log-batch.ts` 的职责）。
+- 输入：`DebugLogEvent`；容量（默认 `MAX_DEBUG_LOG_ENTRIES`）。
+- 输出：`snapshot()` 返回的 `DebugLogEvent[]` 副本。
+- 依赖：`shared/limits.ts` 的 `MAX_DEBUG_LOG_ENTRIES`。
+- 被谁依赖：App Shell（组合根创建并注入 IPC 层）、IPC 层（`onDebugLog` 写入、`getDebugLogs` 读取、`clearDebugLogs` 与 `setDebugLogging(false)` 清空）。
+- 关键不变式：容量 ≤ `MAX_DEBUG_LOG_ENTRIES`（200）、最新在前、超容量丢最旧；**仅内存、不落盘**（NFR-003）；`snapshot()` 返回副本，调用方改动不影响缓冲。
+- 相关测试：`apps/desktop/test/debug-log-buffer.test.ts`。
+- 相关 Spec / ADR：[specs/002-desktop-ui-multiwindow](../../specs/002-desktop-ui-multiwindow/spec.md)、[ADR-0012](adr/ADR-0012-react-antd-multiwindow-renderer.md)。
 
 ## 依赖规则
 
@@ -190,3 +218,5 @@ flowchart TD
 | Cert Manager | cherrchen | CA / 信任模型（ADR-0002、REQ-010）是否改变 |
 | Allowlist Store | cherrchen | 默认值与通配语义（INV-003）是否改变 |
 | Telemetry UI | cherrchen | 是否引入新的 IPC 或展示敏感数据 |
+| Window Registry | cherrchen | 单实例复用、二级窗口非模态、主窗口关闭即退出（ADR-0012）是否改变 |
+| Debug Log Buffer | cherrchen | 容量上限与「仅内存不落盘」（NFR-003）是否改变 |

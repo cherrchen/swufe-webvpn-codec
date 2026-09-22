@@ -1,6 +1,6 @@
 # Dependency Policy
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 >
 > Chinese source of truth: [dependency-policy.md](dependency-policy.md)
 
@@ -54,6 +54,8 @@ Update cadence: TBD (cadence still to be decided)
 
 `allowBuilds` in `pnpm-workspace.yaml` lists, one by one, the dependencies whose **install scripts may run** (currently `electron` and `esbuild`); a dependency with install scripts that is not listed makes `pnpm install` fail with `ERR_PNPM_IGNORED_BUILDS` — reviewing it and adding it to `allowBuilds` explicitly is the required step before the install can proceed.
 
+The renderer dependencies added in M6 (see "Dependency records (added in M6)" in section 5) did not trigger that error during installation, so `allowBuilds` was not extended.
+
 ## 4. Security and compliance
 
 - Vulnerability scanning tool: `TBD` (not adopted this phase; both the Node devDependencies and the Python side are pinned in `bridges/python/uv.lock`);
@@ -76,6 +78,104 @@ The project licence is MIT (see [LICENSE](../../LICENSE)).
 | esbuild | Bundle the sandboxed preload (`apps/desktop/src/preload/index.ts` → `apps/desktop/dist/preload/index.js`) | Added in M2 (`apps/desktop/` devDependency, pinned 0.28.2). A `sandbox: true` preload cannot `require` relative paths, so a single file is mandatory; esbuild was already a transitive dependency of tsx and is declared directly to pin the bundling behaviour |
 | tsx | Run `apps/desktop/test/**/*.test.ts` (TypeScript loader for Node's built-in test runner) | Added in M2 (`apps/desktop/` devDependency, pinned 4.23.15). Chosen because the repository-root documentation scripts already use the same approach (no second TS runtime) |
 | typescript, `@types/node` | Only for this repository's documentation check scripts and for `apps/desktop/` type checking | Node side; `apps/desktop/` and the repository root use the same major versions (typescript 5.x, @types/node 22.x); no Markdown parser or framework is introduced |
+| react, react-dom | componentised renderer (one component tree shared by the four windows) | Added in M6 (`apps/desktop/` devDependency, pinned 19.3.0); rationale and trade-offs in [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) |
+| antd | component library (forms / switches / radios / tables / modals / layout) | Added in M6 (pinned 6.6.5); it injects runtime styles through `@ant-design/cssinjs`, so the CSP `style-src` is relaxed to `'self' 'unsafe-inline'` (`script-src` is not relaxed) |
+| @ant-design/icons | UI icons | Added in M6 (pinned 6.3.4); same major family as antd |
+| vite | renderer build (four HTML entries plus shared chunks) and the development dev server | Added in M6 (pinned 7.3.6); output lands in `apps/desktop/dist/renderer/` |
+| @vitejs/plugin-react | Fast Refresh during development | Added in M6 (pinned 5.2.0); effective in dev only |
+| vitest | renderer component test runner (a second test runner) | Added in M6 (pinned 3.2.7); section 1 of this policy requires an ADR for it, see [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) |
+| jsdom | DOM environment for vitest | Added in M6 (pinned 26.1.0) |
+| @testing-library/react, @testing-library/dom | component testing (`@testing-library/dom` is a required peer of RTL 16) | Added in M6 (pinned 16.3.3 / 10.4.2) |
+| @types/react, @types/react-dom | React types | Added in M6 (pinned 19.3.0); types only |
+
+### Dependency records (added in M6)
+
+M6 migrated the renderer from bare DOM to React 19 + Ant Design 6 (multiple windows, see [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md), Accepted 2026-09-23). All 10 items below are `devDependencies` of `apps/desktop/package.json` (caret ranges, pinned by the root `pnpm-lock.yaml`) and all are **MIT**; `react`/`react-dom`/`antd`/`@ant-design/icons` belong to the runtime dependency tree but follow the current repository convention of sitting in `devDependencies` next to `electron`/`esbuild` (the renderer is bundled by Vite into `dist/renderer`, and this phase has no packaged distribution form) — so every added dependency ships with the package and none is loaded from a CDN.
+
+```text
+Dependency:   react / react-dom
+Version:      ^19.3.0 (pnpm-lock.yaml pins 19.3.0)
+Purpose:      Componentise the renderer: the four windows share one component tree with state and subscriptions in hooks
+Alternatives: keep bare DOM (multi-window plus hand-maintained form/table state, cost grows with each window); Svelte / Vue (a second framework; evaluated and rejected in ADR-0012)
+License:      MIT
+Risk:         The renderer output ships with the package (no CDN); kept in devDependencies per repository convention, and this phase has no packaged distribution form
+```
+
+```text
+Dependency:   antd
+Version:      ^6.6.5 (pnpm-lock.yaml pins 6.6.5)
+Purpose:      Component library: forms / switches / radios / tables / modals / layout
+Alternatives: hand-write every control (focus management, modal and table accessibility have to be built); another component library (functionally overlaps antd, forbidden by section 1)
+License:      MIT
+Risk:         Runtime styles are injected as <style> by @ant-design/cssinjs, so the CSP style-src is relaxed to 'self' 'unsafe-inline' (script-src is not relaxed, see SC2-004); produces the antd shared chunk, whose size goes into the acceptance report
+```
+
+```text
+Dependency:   @ant-design/icons
+Version:      ^6.3.4 (pnpm-lock.yaml pins 6.3.4)
+Purpose:      UI icons
+Alternatives: inline SVG (duplicated maintenance, no theme linkage); another icon library (visual language not shared with antd)
+License:      MIT
+Risk:         Same major family as antd; only referenced icons reach the bundle
+```
+
+```text
+Dependency:   vite
+Version:      ^7.3.6 (pnpm-lock.yaml pins 7.3.6)
+Purpose:      Renderer build (multiple entries + shared chunks: apps/desktop/dist/renderer/{main,capture,logs,allowlist}.html plus assets/*) and the development dev server (HMR)
+Alternatives: keep hand-rolling multiple entries with esbuild (needs a bespoke HTML/asset pipeline and refresh mechanism); webpack (heavier configuration and dependency tree)
+License:      MIT
+Risk:         Platform binaries ship through optional dependencies; requires Node ^20.19 || >=22.12, satisfied by the repository's engines.node >= 22 and by node 22 in CI (Node v24.18.0 verified locally)
+```
+
+```text
+Dependency:   @vitejs/plugin-react
+Version:      ^5.2.0 (pnpm-lock.yaml pins 5.2.0)
+Purpose:      Fast Refresh during development (vite dev only)
+Alternatives: none (the standard React + Vite combination); without it every edit does a full reload in dev
+License:      MIT
+Risk:         dev-only; the development CSP needs script-src 'unsafe-inline' for its refresh preamble, the production CSP is not relaxed
+```
+
+```text
+Dependency:   vitest
+Version:      ^3.2.7 (pnpm-lock.yaml pins 3.2.7)
+Purpose:      Renderer component test runner (a second test runner, running apps/desktop/test/ui/**/*.test.tsx)
+Alternatives: node:test (no DOM environment or component-rendering conventions, would need bespoke jsdom glue); jest (higher configuration and ESM/TS support cost)
+License:      MIT
+Risk:         Section 1 forbids a functionally equivalent second dependency; this is an **exception**: the existing node:test + tsx cannot cover DOM component behaviour, and the rationale and trade-offs are recorded in ADR-0012 (Accepted 2026-09-23); requires Node >= 22
+```
+
+```text
+Dependency:   jsdom
+Version:      ^26.1.0 (pnpm-lock.yaml pins 26.1.0)
+Purpose:      DOM environment for vitest (environment: 'jsdom' in vitest.config.ts)
+Alternatives: happy-dom (API coverage differs and this component set is unverified against it); a real browser (CI has no display, and it would duplicate the CDP real-machine assertions)
+License:      MIT
+Risk:         dev-only; requires Node >= 18
+```
+
+```text
+Dependency:   @testing-library/react / @testing-library/dom
+Version:      ^16.3.3 / ^10.4.2 (pnpm-lock.yaml pins 16.3.3 / 10.4.2)
+Purpose:      Component tests assert observable behaviour (copy, disabled rules, calls and arguments, event-driven state updates, empty and failure states); @testing-library/dom is a required peer of RTL 16
+Alternatives: enzyme (does not support React 19)
+License:      MIT
+Risk:         dev-only
+```
+
+```text
+Dependency:   @types/react / @types/react-dom
+Version:      ^19.3.0 (pnpm-lock.yaml pins 19.3.0)
+Purpose:      React types (JSX type checking in tsconfig.renderer.json)
+Alternatives: none (standard practice)
+License:      MIT
+Risk:         types only, never shipped
+```
+
+- **Install-script approval outcome**: this round `pnpm install` did **not** report `ERR_PNPM_IGNORED_BUILDS`, so `allowBuilds` in `pnpm-workspace.yaml` was **not extended** (it still lists `electron: true` and `esbuild: true`) — none of the 10 added dependencies ships an install script that needs approval.
+- **Node engines outcome**: vite 7 needs `^20.19 || >=22.12`, vitest 3 needs `>=22` and jsdom 26 needs `>=18`; the repository's `engines.node >= 22` and node 22 in CI both satisfy that (Node v24.18.0 verified locally), so `engines` needs no change.
+- **Test-runner split**: `test:unit` (`node:test` + tsx, Electron-free Main-side logic) and `test:ui` (vitest + jsdom, renderer components) coexist; layers, organisation and how to run them are in [testing-strategy.md](testing-strategy.md).
 
 ### Dependency records (added in M2)
 

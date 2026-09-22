@@ -1,6 +1,6 @@
 # 数据流
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 
 **用途**：描述数据在系统中的流转路径、变换与落点，用于评估影响面与排障。
 **不写**：实体定义（→ [data-model.md](data-model.md)）、接口签名（→ [interfaces.md](interfaces.md)）。
@@ -36,6 +36,8 @@ flowchart LR
 | DF-005 | 系统代理设置与清除 | 开桥 / 关桥 / 会话过期 / 退出 / 切换捕获方式 | OS 当前代理设置；`captureMode` | 读 OS 代理 → 已启用且非本桥则拒绝启动（`PROXY_CONFLICT`）→ 解析配置的网关主机，落在 fake-ip 段（`198.18.0.0/15`）同样以 `PROXY_CONFLICT` 拒绝（[ADR-0011](adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）→ `system-proxy` 时设 `127.0.0.1:<bridge_port>` 并记「由本 App 设置」标记；`selected-apps` 时不设置，并在切换时撤销此前由本 App 设置过的（清标记）→ 关闭时仅在标记存在时清除 | 系统代理指向本桥或恢复原状 | `AppSettings.systemProxyManagedByApp`（运行时标记） | [components.md](components.md)、[api/electron-ipc.md](../api/electron-ipc.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md) |
 | DF-006 | allowlist 读写 | UI 增删主机 / 切换通配 / App 启动 | `AllowlistConfig` | 主机小写化 + 精确匹配；可选 swufe 通配（apex 或 `.swufe.edu.cn` 后缀）；硬编码排除 `webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` | 路由判定结果 | `userData/config.json` | [data-model.md](data-model.md)、[api/electron-ipc.md](../api/electron-ipc.md) |
 | DF-007 | 捕获方式切换与进程捕获 | 用户选择「指定应用 / 系统代理」或增删候选应用；开桥时下发配置 | `captureMode`、`captureProcesses`（intercept pattern）、OS 进程列表 | 枚举候选应用（macOS `ps -Ao pid=,comm=`、Windows `tasklist /fo csv /nh`）→ 应用按 `.app` 包路径归并为一行、非应用用可执行文件全路径 → 整体覆盖写入 `bridge-config.json` 的 `capture.processes`（`system-proxy` 下恒为 `[]`）→ sidecar 每秒轮询配置，把 `local:<spec>` 叠加到同一个 mitmproxy 实例（切回系统代理则移除）并回报 `swufe-capture` | `localCaptureEnabled` / `BridgeStatus.captureError`；被捕获应用的流量进入本机桥 | `userData/config.json`（`settings.captureMode` / `captureProcesses`）与 `userData/bridge-config.json`（`capture.processes`） | [components.md](components.md)、[api/bridge-control-protocol.md](../api/bridge-control-protocol.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md) |
+| DF-008 | 窗口打开（二级窗口） | 主窗口点 `[选择应用…]` / `[管理…]`，或打开「调试日志」开关（日志窗口由开关关闭后重开同样走此路径） | Renderer 的 `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` 调用 | Main 查窗口注册表：已存在则 `restore()` / `show()` / `focus()`；否则按 `WINDOW_SPECS` 创建（生产 `loadFile('<appRoot>/dist/renderer/<entry>.html')`，开发期 `loadURL('<devServerUrl>/<entry>.html')`）并 `ready-to-show` 后显示 → 新窗口挂载后自行经 preload 拉取初始状态（`getStatus` / `getSettings` / `getAllowlist` / `getCaStatus` / `listCaptureCandidates` / `getDebugLogs`） | 窗口出现且显示与 Main 一致的当前状态 | 无 | [components.md](components.md)（Window Registry）、[api/electron-ipc.md](../api/electron-ipc.md) |
+| DF-009 | 广播到全部窗口 | 桥状态变化 / 调试日志产生 / 会话过期 / `setAllowlist` 成功 | `BridgeStatus`、`DebugLogEvent` | Main 遍历**全部存活窗口** `webContents.send`（`onStatus` / `onDebugLog` / `onSessionExpired`；M2/M3 只投递主窗口）；调试日志事件**先写入 Main 环形缓冲（≤200、最新在前、仅内存）再广播**；渲染层按常规 100ms 合并渲染（饱和且 >50 条/秒时 250ms） | 各窗口刷新状态条 / 日志表格 / 会话过期模态 | 环形缓冲仅驻留内存（不落盘） | [components.md](components.md)（Debug Log Buffer）、[api/electron-ipc.md](../api/electron-ipc.md)、[ADR-0012](adr/ADR-0012-react-antd-multiwindow-renderer.md) |
 
 ## 数据生命周期
 
@@ -43,8 +45,8 @@ flowchart LR
 | ---- | ---- | -------- |
 | 采集 / 接收 | DF-003 从登录 WebView 的 session 采集 WebVPN 会话 Cookie | 仅采集会话所需 Cookie 及最小附属状态；不采集密码 |
 | 校验 | DF-003 失效检测：探测登录页标记、`Set-Cookie` 清空、连续改写后 302 到 CAS | 每次桥运行期间持续进行；命中即触发停桥流程 |
-| 存储 | `userData/config.json`（settings + allowlist，settings 含 `captureMode` / `captureProcesses`）、`userData/bridge-config.json`（下发 sidecar 的运行时配置）、`userData/session.bin`（加密）或 Electron Session 持久分区、CA 用 mitmproxy 专用 confdir | 运行时配置随每次开桥 / 设置变更整体覆盖写入；Cookie 存用户目录且权限收紧；CA 私钥仅本机 |
-| 使用 / 派生 | DF-001/DF-002 使用 Cookie 与 allowlist；DF-005 使用「由本 App 设置」标记；DF-007 使用 `captureMode` / `captureProcesses` 并回报捕获状态 | 会话与标记只在桥运行期间有效，标记随清除动作失效；进程捕获只在桥 `running` 且捕获方式为 `selected-apps` 时生效 |
+| 存储 | `userData/config.json`（settings + allowlist，settings 含 `captureMode` / `captureProcesses`）、`userData/bridge-config.json`（下发 sidecar 的运行时配置）、`userData/session.bin`（加密）或 Electron Session 持久分区、CA 用 mitmproxy 专用 confdir | 运行时配置随每次开桥 / 设置变更整体覆盖写入；Cookie 存用户目录且权限收紧；CA 私钥仅本机；调试日志环形缓冲只驻留 Main 内存（≤200 条、最新在前），不落盘 |
+| 使用 / 派生 | DF-001/DF-002 使用 Cookie 与 allowlist；DF-005 使用「由本 App 设置」标记；DF-007 使用 `captureMode` / `captureProcesses` 并回报捕获状态；DF-008/DF-009 用窗口注册表与环形缓冲把状态、日志与过期通知投递到全部存活窗口 | 会话与标记只在桥运行期间有效，标记随清除动作失效；进程捕获只在桥 `running` 且捕获方式为 `selected-apps` 时生效 |
 | 归档 / 删除 | 退出登录清 Cookie；卸载 CA 移除信任；关闭/退出清除本 App 设置的系统代理 | 不保留历史会话；无云端账号体系 |
 
 ## 一致性要求
@@ -58,6 +60,8 @@ flowchart LR
 | DF-002 | 改写前后 URL 语义稳定：客户端侧始终呈现真实主机名，仅上行改走 WebVPN；例外只允许两处——网关自有根命名空间直通与命中判据的 bootstrap 文档升级（ADR-0007），且升级只改变入口文档的地址（不改变页面内容） | 语义不稳定会导致跳转到不可达地址，暴露为改写结果异常（见 R1）；判据误命中会把普通页面也升级，靠「≤8192 B + 双标记」与 L1 用例兜住 |
 | DF-001 | 改写只作用于 allowlist 主机；`webvpn.swufe.edu.cn` / `authserver.swufe.edu.cn` 永不二次包装 | 违反即形成环路，登录与桥流量出现自环（`SESSION_EXPIRED` 或登录失败） |
 | DF-007 | 互斥：`captureMode = 'selected-apps'` 时不设置系统代理，并撤销此前由本 App 设置过的；`captureMode = 'system-proxy'` 时 `capture.processes` 恒为空；进程捕获失败不得改变桥状态（仍 `running`） | 违反互斥会让被捕获应用的 `CONNECT` 经系统代理进入 transparent 层并硬失败（静默半坏）；捕获失败只更新 `captureError` 与 `localCaptureEnabled` |
+| DF-008 | 单实例：同一类窗口至多存在一个（重复触达入口即聚焦已有窗口）；二级窗口不设 `parent`、不阻塞主窗口；主窗口关闭即退出 | 违反即出现重复窗口或主窗口被模态阻塞（对应 AC2-008 的单实例口径） |
+| DF-009 | 顺序与有界：调试日志先写入 Main 环形缓冲再广播（重开窗口的历史与推流不重不漏）；缓冲 ≤200 条且最新在前；广播只发给存活窗口 | 顺序颠倒会让重开窗口的历史与推流错位；缓冲不设界即内存无上限（NFR-003） |
 
 ## 异常路径
 

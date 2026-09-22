@@ -1,6 +1,6 @@
 # Development run
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 >
 > Chinese source of truth: [development-run.md](development-run.md)
 
@@ -49,6 +49,17 @@ pnpm start --user-data-dir=/tmp/swufe-dev         # isolated profile
 | `SWUFE_REPO_ROOT` | Overrides the repository root (defaults to two levels above the app directory, i.e. the repository root) |
 | `SWUFE_PYTHON` | Interpreter for the sidecar / CA entry point (default `<repo>/bridges/python/.venv/bin/python`, falling back to `uv run --project <repo>/bridges/python python`) |
 | `SWUFE_PROBE_INTERVAL_MS` | Session-expiry probe interval (default 30000ms; acceptance runs may lower it, e.g. 8000) |
+| `SWUFE_RENDERER_URL` | Where the renderer is loaded from: when set, Main switches to `loadURL('<url>/<entry>.html')` with the development CSP (otherwise it loads the static output under `apps/desktop/dist/renderer/*.html`). It affects the renderer load path only — never the bridge, the sidecar or the system proxy |
+
+### 3.1 Renderer development (HMR, from M6)
+
+```bash
+pnpm --filter swufe-webvpn-bridge run dev:renderer        # vite dev server, fixed at 127.0.0.1:5173 (strictPort)
+SWUFE_RENDERER_URL=http://127.0.0.1:5173 pnpm start       # in a second terminal; renderer edits hot-reload
+```
+
+- The renderer is now a React + Ant Design four-window app (`src/renderer/{main,capture,logs,allowlist}.html`) whose build output lives in `apps/desktop/dist/renderer/` (four HTML files plus `assets/*`, including the antd shared chunk).
+- **Production and day-to-day runs are unchanged**: still `pnpm start` (it runs `pnpm run build` — `tsc -p tsconfig.json && vite build && pnpm run build:preload` — then `electron .`, loading the static output); `dev:renderer` + `SWUFE_RENDERER_URL` merely avoid a full rebuild and restart while editing renderer code.
 
 ## 4. Operations that need administrator rights
 

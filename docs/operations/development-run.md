@@ -1,6 +1,6 @@
 # 开发版运行说明（development run）
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 >
 > English counterpart: [development-run.en.md](development-run.en.md)
 
@@ -50,6 +50,17 @@ pnpm start --user-data-dir=/tmp/swufe-dev         # 使用隔离 profile
 | `SWUFE_REPO_ROOT` | 覆盖仓库根路径（默认取应用目录上两级，即仓库根） |
 | `SWUFE_PYTHON` | 指定运行 sidecar / CA 生成入口的解释器（默认 `<repo>/bridges/python/.venv/bin/python`，缺失时回退 `uv run --project <repo>/bridges/python python`） |
 | `SWUFE_PROBE_INTERVAL_MS` | 会话过期探测间隔（默认 30000ms；验收时可调小，如 8000） |
+| `SWUFE_RENDERER_URL` | 渲染层加载来源：设置后 Main 改为 `loadURL('<url>/<entry>.html')` 并使用开发期 CSP（默认加载静态产物 `apps/desktop/dist/renderer/*.html`）。只影响渲染层加载路径，不影响桥、sidecar 与系统代理 |
+
+### 3.1 渲染层开发（HMR，M6 起）
+
+```bash
+pnpm --filter swufe-webvpn-bridge run dev:renderer        # vite dev server，固定 127.0.0.1:5173（strictPort）
+SWUFE_RENDERER_URL=http://127.0.0.1:5173 pnpm start       # 另开一个终端；改渲染层代码即时热更新
+```
+
+- 渲染层现在是 React + Ant Design 的四窗口（`src/renderer/{main,capture,logs,allowlist}.html`），构建产物在 `apps/desktop/dist/renderer/`（四个 HTML + `assets/*`，含 antd 共享 chunk）。
+- **生产/日常运行不变**：仍是 `pnpm start`（先 `pnpm run build` —— `tsc -p tsconfig.json && vite build && pnpm run build:preload` —— 再 `electron .`，加载静态产物）；`dev:renderer` + `SWUFE_RENDERER_URL` 只是为了在改渲染层代码时免于整包重建与重启。
 
 ## 4. 需要管理员权限的操作
 

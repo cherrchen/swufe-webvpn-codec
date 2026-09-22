@@ -11,12 +11,13 @@
 | Stage | Phase 1: M1–M4 delivered and **the macOS-side acceptance, including the academic-affairs browser acceptance, fully passes** — after the `KI-011` fix ([ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)) the 2026-09-21 re-verification passes TC-G01/TC-G02; spec 001 is `Implemented`. Not done: the Windows real-machine items are deferred (`KI-001`) and `KI-014` (CAS theme assets truncated by the server; the 2026-09-21 decision documents the workaround only) is unresolved, so the spec is not `Verified` yet (`KI-007`, the automatic CA install, was fixed on 2026-09-21 — see [ADR-0008](docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.en.md); `KI-013`, the TUN / fake-ip interference, was fixed on 2026-09-21 — see [ADR-0011](docs/architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md); see [verification.md](specs/001-phase1-local-bridge/verification.md)) |
 | Repository type | Documentation-first: [docs/](docs/README.en.md) + [specs/](specs/README.en.md); plus the bridge implementation ([bridges/python/](bridges/python/swufe_bridge/wrd_codec.py), [tests](bridges/python/tests/l0/test_wrd_codec.py)) and the desktop app ([apps/desktop/](apps/desktop/README.md)) |
 | Phase 1 feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
+| Phase 2 feature (M6 UI rework) | [specs/002-desktop-ui-multiwindow/](specs/002-desktop-ui-multiwindow/spec.md) (`Implemented`: a four-window React 19 + Ant Design 6 renderer, 720×560 scroll-free main window, capture/log/allowlist as secondary windows) |
 | Owner | cherrchen |
 | License | [MIT](LICENSE) |
 | Documentation version | 1.0 |
 | Initialised | 2026-09-20 |
 
-The repository is **documentation-first** (`docs/` holds long-lived project facts, `specs/` records individual features end to end) and already contains the M1–M4 implementation (bridge core, desktop orchestration, experience polish and the acceptance fixes): without any desktop shell you can start the bridge with `uv run --directory bridges/python python -m swufe_bridge.sidecar --config <bridge-config.json>` (see the [bridge control protocol](docs/api/bridge-control-protocol.en.md)).
+The repository is **documentation-first** (`docs/` holds long-lived project facts, `specs/` records individual features end to end) and already contains the M1–M6 implementation (bridge core, desktop orchestration, experience polish, the acceptance fixes and the UI rework): without any desktop shell you can start the bridge with `uv run --directory bridges/python python -m swufe_bridge.sidecar --config <bridge-config.json>` (see the [bridge control protocol](docs/api/bridge-control-protocol.en.md)).
 
 ## 1. What problem it solves
 
@@ -124,6 +125,7 @@ pnpm run docs:check   # links + bilingual pairs + spec structure in one run
 # Desktop app (apps/desktop/): type check and unit tests
 pnpm --filter swufe-webvpn-bridge run typecheck
 pnpm --filter swufe-webvpn-bridge run test:unit
+pnpm --filter swufe-webvpn-bridge run test:ui   # renderer component tests (vitest + jsdom)
 
 # Desktop app: build and launch (root aliases for apps/desktop/'s build / start)
 pnpm run build        # compile Main + Renderer + preload

@@ -1,7 +1,7 @@
 # Technical Design: 桌面界面重构（React + Ant Design 多窗口）
 
 > Spec ID: 002
-> Status: Draft
+> Status: Implemented
 > Owner: cherrchen
 > Last Updated: 2026-09-23
 
@@ -84,10 +84,10 @@ React 19 下的弹窗/消息不使用 antd 静态方法（`Modal.confirm` / `mes
 | ---- | ---- |
 | `src/main/windows.ts` → `window-registry.ts` + `window-policy.ts` | 由「只建主窗口」扩展为窗口注册表：`openMain()` / `openCapture()` / `openLog()` / `openAllowlist()` / `closeLog()` / `closeAll()` / `broadcast(channel, payload)` / `count(kind)`；窗口创建参数（尺寸、`resizable`、`parent`、preload、标题）集中在一处。**纯策略**（给定已有窗口状态 → `create` \| `focus`）抽为无 Electron 依赖的 `window-policy.ts`，供 App 单测覆盖 |
 | `src/main/debug-log-buffer.ts`（新增） | 日志环形缓冲（≤200 条，最新在前）：`push(event)` / `snapshot()` / `clear()`；容量常量 `MAX_DEBUG_LOG_ENTRIES = 200` 移入 `src/main/constants.ts`（取代渲染层的 `MAX_LOG_ROWS`） |
-| `src/main/ipc.ts` | 新增 4 个命令：`swufe:openCaptureWindow` / `swufe:openLogWindow` / `swufe:openAllowlistWindow` / `swufe:getDebugLogs`；`broadcast` 改为广播到全部存活窗口；`setDebugLogging(false)` 的副作用改为「清空缓冲 + 关闭日志窗口」；调试日志事件在 `broadcast` 之前先写入缓冲 |
+| `src/main/ipc.ts` | 新增 5 个命令：`swufe:openCaptureWindow` / `swufe:openLogWindow` / `swufe:openAllowlistWindow` / `swufe:getDebugLogs` / `swufe:clearDebugLogs`；`broadcast` 改为广播到全部存活窗口；`setDebugLogging(false)` 的副作用改为「清空缓冲 + 关闭日志窗口」；`setAllowlist` 成功后补广播一次当前状态（各窗口重新读取 allowlist 摘要）；调试日志事件在 `broadcast` 之前先写入缓冲 |
 | `src/main/index.ts` | 组合根：创建注册表并注入 `ipc.ts`（`broadcast` / 窗口 opener）；`recoverOnLaunch()`、单实例锁、退出清理（`shutdown.ts`）不变 |
-| `src/preload/index.ts` | 新增 4 个方法转发（`openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` / `getDebugLogs`）；3 个事件订阅签名不变 |
-| `src/shared/types.ts` | `SwufeBridgeApi` 增补 4 个方法；其余类型不变 |
+| `src/preload/index.ts` | 新增 5 个方法转发（`openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` / `getDebugLogs` / `clearDebugLogs`）；3 个事件订阅签名不变 |
+| `src/shared/types.ts` | `SwufeBridgeApi` 增补 5 个方法；其余类型不变 |
 | `apps/desktop/static/`、`src/renderer/renderer.ts` | 迁移完成后删除（clean cutover，SC2-008） |
 
 ### 4. 渲染层结构
@@ -132,7 +132,7 @@ CSP 由 Vite 插件按模式注入 `transformIndexHtml`：生产构建注入严�
 | -------- | -------- | ---- | ------------ |
 | 组件/分层 | 是（组件边界） | `Telemetry UI` 由单窗口裸 DOM 变为「四窗口 React 渲染层 + Main 侧窗口注册表与日志缓冲」；单向依赖规则不变（渲染层仍是叶子） | [components.md](../../docs/architecture/components.md)、[ui-ux/](../../docs/ui-ux/README.md) |
 | 数据流 | 是 | IPC 事件由「只发主窗口」变为「广播到全部窗口」；调试日志缓冲从渲染层移到 Main；窗口打开流程新增一条 Renderer → Main 的控制流 | [data-flow.md](../../docs/architecture/data-flow.md) |
-| 接口 | 是（只增） | IF-001 新增 4 个命令方法；既有方法与事件不变 | [interfaces.md](../../docs/architecture/interfaces.md)、[api/electron-ipc.md](../../docs/api/electron-ipc.md) |
+| 接口 | 是（只增） | IF-001 新增 5 个命令方法；既有方法与事件不变 | [interfaces.md](../../docs/architecture/interfaces.md)、[api/electron-ipc.md](../../docs/api/electron-ipc.md) |
 | 数据模型 | 否 | `userData/config.json`、`bridge-config.json`、会话存储均不变 | [data-model.md](../../docs/architecture/data-model.md)（无需改动） |
 | 是否需要 ADR | 是 | 渲染层框架与多窗口结构属「核心技术栈改变」 | [ADR-0012](../../docs/architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) |
 | 依赖策略 | 是 | 新增 8 个运行期/开发期依赖，含第二套测试运行器 | [dependency-policy.md](../../docs/development/dependency-policy.md) |
@@ -166,6 +166,8 @@ CSP 由 Vite 插件按模式注入 `transformIndexHtml`：生产构建注入严�
 | `openLogWindow(): Promise<void>` | 新增 | 兼容（新增） | 同上 |
 | `openAllowlistWindow(): Promise<void>` | 新增 | 兼容（新增） | 同上 |
 | `getDebugLogs(): Promise<DebugLogEvent[]>` | 新增（幂等只读；最新在前，≤200） | 兼容（新增） | 同上 |
+| `clearDebugLogs(): Promise<void>` | 新增（幂等；清空 Main 环形缓冲，使日志窗口的 [清空] 在窗口重开后仍有效） | 兼容（新增） | 同上 |
+| `setAllowlist(cfg)` | 语义补充：成功后 Main 再广播一次当前状态（各窗口据此重新读取 allowlist 摘要） | 兼容（既有「改动立即生效」的延伸） | 同上 |
 | `setDebugLogging(enabled)` | 语义补充：`false` 时清空缓冲并关闭日志窗口 | 兼容（既有语义「关闭即清空」的延伸） | 同上 |
 | `onStatus` / `onDebugLog` / `onSessionExpired` | 投递范围由主窗口改为**全部窗口** | 兼容（订阅方各自独立，现有主窗口行为不变） | 同上 |
 | IF-002（Main ↔ sidecar）、IF-003、IF-004、IF-005、IF-006 | 无变化 | — | [interfaces.md](../../docs/architecture/interfaces.md) |
@@ -187,12 +189,12 @@ CSP 由 Vite 插件按模式注入 `transformIndexHtml`：生产构建注入严�
 
 | 维度 | 影响 | 处理 |
 | ---- | ---- | ---- |
-| 信任边界（TB-003 Renderer ↔ Main） | IPC 面新增 4 个方法（窗口控制 3、只读日志 1）；事件投递面扩大 | 新方法只做窗口生命周期与只读缓冲读取，不新增数据读取权限（`getDebugLogs` 返回既有 `DebugLogEvent` 键集合）；渲染层仍无 Node 集成 |
+| 信任边界（TB-003 Renderer ↔ Main） | IPC 面新增 5 个方法（窗口控制 3、日志缓冲 2：只读快照与清空）；事件投递面扩大 | 新方法只做窗口生命周期与只读缓冲读取，不新增数据读取权限（`getDebugLogs` 返回既有 `DebugLogEvent` 键集合）；渲染层仍无 Node 集成 |
 | 认证 / 授权 | 无变化 | 登录仍在 Login WebView 内完成；不新增凭据路径 |
 | 输入校验 | allowlist 主机名与捕获 pattern 校验仍在 Main（不变） | 渲染层只做入口提示，判定与校验仍在 `store.ts` / `ipc.ts` |
 | 密钥 / 敏感数据 | 无新增敏感数据；日志缓冲进 Main 内存（≤200 条，不落盘） | 缓冲写入前仍只保留 `ts/host/rewritten/direction/detail`；`detail` 不含正文与 Cookie（INV-001 不变）；WRD key/IV 仍不跨 IPC |
 | CSP / 渲染层攻击面 | antd 运行期注入样式 ⇒ `style-src` 放宽 `'unsafe-inline'` | 只放宽 `style-src`；`script-src 'self'`、`default-src 'none'` 不放宽；无远程资源（SC2-003）；放宽理由与残余风险记录在 [ADR-0012](../../docs/architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) |
-| 依赖风险 | 新增 4 个运行期依赖树（react/react-dom/antd/icons）与 4 个开发期依赖（vite/plugin-react/vitest/jsdom/RTL） | 按 [dependency-policy.md](../../docs/development/dependency-policy.md) 记录版本、许可证（全部 MIT）、传递依赖与维护状态；全部离线打包，无 CDN |
+| 依赖风险 | 新增 4 个运行期依赖树（react / react-dom / antd / @ant-design/icons）与 8 个开发期包（vite、@vitejs/plugin-react、vitest、jsdom、@testing-library/react、@testing-library/dom、@types/react、@types/react-dom） | 按 [dependency-policy.md](../../docs/development/dependency-policy.md) 记录版本、许可证（全部 MIT）、传递依赖与维护状态；全部离线打包，无 CDN |
 | 错误边界 | 渲染层异常不得白屏或静默 | 每窗口 `ErrorBoundary` 显示中文错误与 [重新加载窗口]；错误信息不回显 Cookie/会话内容 |
 
 相关长期事实见 [docs/security/README.md](../../docs/security/README.md)。

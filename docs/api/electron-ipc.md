@@ -1,14 +1,15 @@
 # Electron IPC（`window.swufeBridge`）
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 
 ## 范围
 
 - 提供方：Electron Main 进程（Login WebView / Session Broker / Proxy Orchestrator / Cert Manager / Allowlist Store 的对外收口）。
-- 消费方：Renderer（主窗口 UI，见 [../ui-ux/main-window.md](../ui-ux/main-window.md)）。
+- 消费方：Renderer（四个窗口——主窗口与捕获 / 日志 / Allowlist 三个二级窗口，见 [../ui-ux/main-window.md](../ui-ux/main-window.md) 与 [../ui-ux/secondary-windows.md](../ui-ux/secondary-windows.md)）。
 - 形态：进程内 IPC；preload 脚本暴露命名空间 `window.swufeBridge`（示例名）。
+- 窗口控制：二级窗口的打开/聚焦也经本表面提供（`openCaptureWindow` / `openLogWindow` / `openAllowlistWindow`），窗口生命周期由 Main 的窗口注册表持有，每类单实例。
 - 稳定性：Internal —— 仅供本 App 内部消费，不对外承诺；破坏性变更需同步本文件 + [architecture/interfaces.md](../architecture/interfaces.md) + 相关 Spec。
-- 关联 Spec：[specs/001-phase1-local-bridge/spec.md](../../specs/001-phase1-local-bridge/spec.md)
+- 关联 Spec：[specs/001-phase1-local-bridge/spec.md](../../specs/001-phase1-local-bridge/spec.md)、[specs/002-desktop-ui-multiwindow/spec.md](../../specs/002-desktop-ui-multiwindow/spec.md)
 
 ## 认证与授权
 
@@ -40,6 +41,11 @@
 | `setCaptureMode` | 是（整体覆盖写入） |
 | `setCaptureProcesses` | 是（整体覆盖写入） |
 | `setDebugLogging` | 是 |
+| `openCaptureWindow` | 是（单实例：已打开则聚焦，不重复创建） |
+| `openLogWindow` | 是（单实例：已打开则聚焦，不重复创建） |
+| `openAllowlistWindow` | 是（单实例：已打开则聚焦，不重复创建） |
+| `getDebugLogs` | 是（只读） |
+| `clearDebugLogs` | 是 |
 | `onDebugLog` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
 | `onStatus` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
 | `onSessionExpired` | 是（订阅；重复订阅各自独立，返回各自的取消订阅函数） |
@@ -221,6 +227,7 @@ setAllowlist(cfg: AllowlistConfig): Promise<void>
   | `includeSwufeWildcard` | `boolean` | 是 | 默认 `false` | 勾选后匹配 `swufe.edu.cn` 及 `.swufe.edu.cn` 后缀 |
 
 - 输出：`Promise<void>`。
+- 副作用（M6 补充）：写入成功后 Main 额外广播一次当前 `BridgeStatus`，各窗口据此重读 allowlist 摘要（主窗口的摘要是唯一消费方；推送通道仍是 `onStatus`，不新增事件）。
 - 错误：见 [错误模型](#错误模型)（`hosts` 为空且未开通配时启动桥返回 `ALLOWLIST_EMPTY`）。
 
 ### `getSettings(): Promise<AppSettingsView>`
@@ -325,6 +332,65 @@ setDebugLogging(enabled: boolean): Promise<void>
   | `enabled` | `boolean` | 是 | 默认 `false` | 对应 `AppSettings.debugLogging` |
 
 - 输出：`Promise<void>`。
+- 副作用：`enabled === false` 时除落盘与下发配置外，还会**清空 Main 的调试日志环形缓冲并关闭日志窗口**（既有「关闭即清空」语义的延伸）；`true` 只落盘与下发，日志窗口由渲染层随后调用 `openLogWindow()` 打开。
+- 错误：见 [错误模型](#错误模型)。
+
+### `openCaptureWindow(): Promise<void>`
+
+```ts
+openCaptureWindow(): Promise<void>   // M6 新增：打开或聚焦捕获窗口
+```
+
+- 用途：打开「进程捕获 — 应用选择」二级窗口（主窗口 `[选择应用…]` 的落点）。
+- 输入：无。
+- 输出：`Promise<void>`（只表示窗口创建/聚焦动作完成，不等待页面渲染完成）。
+- 行为：每类窗口单实例——窗口已存在时 `restore()` / `show()` / `focus()`，否则按 `WINDOW_SPECS` 创建；二级窗口非模态（不设 `parent`，主窗口仍可操作）；新窗口挂载后自行经本表面拉取初始状态（`getStatus` / `getSettings` / `listCaptureCandidates`）。
+- 错误：见 [错误模型](#错误模型)。
+
+### `openLogWindow(): Promise<void>`
+
+```ts
+openLogWindow(): Promise<void>   // M6 新增：打开或聚焦日志窗口
+```
+
+- 用途：打开「调试日志」二级窗口（开启调试日志开关后的落点）。
+- 输入：无。
+- 输出：`Promise<void>`。
+- 行为：同 `openCaptureWindow` 的单实例/非模态语义；窗口挂载后经 `getDebugLogs()` 恢复历史（缓冲在 Main，重开不丢）。
+- 错误：见 [错误模型](#错误模型)。
+
+### `openAllowlistWindow(): Promise<void>`
+
+```ts
+openAllowlistWindow(): Promise<void>   // M6 新增：打开或聚焦 Allowlist 窗口
+```
+
+- 用途：打开 Allowlist 编辑窗口（主窗口 `[管理…]` 的落点：增删主机、切换 `*.swufe.edu.cn`）。
+- 输入：无。
+- 输出：`Promise<void>`。
+- 行为：同 `openCaptureWindow` 的单实例/非模态语义；窗口挂载后经 `getAllowlist()` 取初值。
+- 错误：见 [错误模型](#错误模型)。
+
+### `getDebugLogs(): Promise<DebugLogEvent[]>`
+
+```ts
+getDebugLogs(): Promise<DebugLogEvent[]>   // M6 新增：只读
+```
+
+- 用途：读取 Main 环形缓冲中的调试日志副本（日志窗口挂载时恢复历史）。
+- 输入：无。
+- 输出：`DebugLogEvent[]`，**最新在前**、最多 `MAX_DEBUG_LOG_ENTRIES`（200）条；返回值是副本，调用方修改不影响缓冲。缓冲只驻留内存、不落盘（NFR-003）。
+- 错误：见 [错误模型](#错误模型)。
+
+### `clearDebugLogs(): Promise<void>`
+
+```ts
+clearDebugLogs(): Promise<void>   // M6 新增：清空 Main 环形缓冲
+```
+
+- 用途：清空 Main 的调试日志环形缓冲（日志窗口 `[清空]` 的落点）；清空后窗口关闭再打开也不再出现已清空的记录。
+- 输入：无。
+- 输出：`Promise<void>`。
 - 错误：见 [错误模型](#错误模型)。
 
 ### `onDebugLog(cb: (e: DebugLogEvent) => void): () => void`
@@ -342,6 +408,7 @@ onDebugLog(cb: (e: DebugLogEvent) => void): () => void
   | `cb` | `(e: DebugLogEvent) => void` | 是 | — | 事件回调 |
 
 - 输出：取消订阅函数 `() => void`。
+- 投递范围（M6 变更）：Main **广播到全部存活窗口**（此前只投递主窗口）；每个窗口各自订阅并各自渲染。
 - 事件负载：`DebugLogEvent`（见「类型定义」）；`detail` 允许短信息、禁止 body 与 Cookie。
 - 错误：见 [错误模型](#错误模型)。
 
@@ -355,6 +422,7 @@ onStatus(cb: (status: BridgeStatus) => void): () => void
 - 用途：订阅 Main → Renderer 的桥状态推送；每次状态变化（开桥/关桥/失败/过期/会话变化）后 Main 主动推送一次，界面无需轮询。
 - 输入：`cb`（状态回调）。
 - 输出：取消订阅函数 `() => void`（重复订阅各自独立）。
+- 投递范围（M6 变更）：Main **广播到全部存活窗口**（此前只投递主窗口）；`setAllowlist` 成功后的额外广播同样经此通道。
 - 事件负载：`BridgeStatus`（见「类型定义」）。
 - 错误：见 [错误模型](#错误模型)。
 
@@ -368,6 +436,7 @@ onSessionExpired(cb: () => void): () => void
 - 用途：订阅「会话已失效且桥已停止、系统代理已清除」的通知，界面据此弹出重登模态（文案见 [../ui-ux/main-window.md](../ui-ux/main-window.md)）；`getStatus()` 的 `error.code` 同时为 `SESSION_EXPIRED`。
 - 输入：`cb`（无参数回调）。
 - 输出：取消订阅函数 `() => void`。
+- 投递范围（M6 变更）：Main **广播到全部存活窗口**（此前只投递主窗口），二级窗口在前台时事件同样送达。
 - 错误：见 [错误模型](#错误模型)。
 
 ## 错误模型
@@ -404,3 +473,4 @@ onSessionExpired(cb: () => void): () => void
 | 2026-09-20 | 首版：会话、桥控制、allowlist、证书、进程捕获、调试日志共 15 个方法/事件 | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | M2 落地补充三项（不改变上述 15 个方法的语义）：`getSettings`（只读，供界面显示设置初值；WRD key/IV 不跨 IPC）、`onStatus`（Main → Renderer 状态推送）、`onSessionExpired`（会话过期事件，驱动重登模态） | 兼容（新增方法/事件） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [M2 完成记录](../planning/milestones/M2-desktop-orchestration.md) |
 | 2026-09-21 | M3 捕获方式：`setCapturePids` → **`setCaptureProcesses`**（按 intercept pattern 而非 PID，整体覆盖写入）；新增 `setCaptureMode`（`system-proxy` / `selected-apps` 互斥）；`BridgeStatus.captureError`；`CaptureCandidate.pattern`；`AppSettingsView.captureMode` / `.captureProcesses`；`getStatus` 的 `localCaptureEnabled` 语义收紧为「桥 running + 指定应用 + sidecar 已报告 enabled」 | **破坏性**：`setCapturePids` 已删除 | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md) |
+| 2026-09-23 | M6 四窗口界面：新增 5 个方法——`openCaptureWindow` / `openLogWindow` / `openAllowlistWindow`（二级窗口入口，每类单实例、重复调用即聚焦）、`getDebugLogs`（只读返回 Main 环形缓冲副本，最新在前、≤200）、`clearDebugLogs`（清空该缓冲）；`setDebugLogging(false)` 追加副作用（清空缓冲 + 关闭日志窗口）；`setAllowlist` 成功后额外广播一次 `status`；`onDebugLog` / `onStatus` / `onSessionExpired` 的投递范围由「只投递主窗口」改为**全部存活窗口**；既有 16 个方法与事件签名不变（共 21 个方法 / 3 个事件） | 兼容（只增） | [spec 002](../../specs/002-desktop-ui-multiwindow/spec.md) / [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) |

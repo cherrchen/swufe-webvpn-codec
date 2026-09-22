@@ -21,6 +21,9 @@ Status:           Phase 1 已交付（M1 桥核心 / M2 桌面编排 / M3 体验
                   `Implemented`。未完成：Windows 侧真机项延期（KI-001）、KI-014（CAS 主题资源被服务端
                   截断，2026-09-21 决策仅文档化规避）未决，故未到 `Verified`（KI-007 的 CA 自动安装已修复，见
                   ADR-0008；KI-013 的 TUN/fake-ip 干扰已修复，见 ADR-0011）
+                  M6 界面重构（Spec 002）已交付并推进到 `Implemented`：渲染层为 React 19 + Ant Design 6 的四窗口结构
+                  （主窗口 720×560 严格零滚动；捕获/日志/Allowlist 为单实例非模态二级窗口；调试日志 200 条环形缓冲在
+                  Main），可机器执行的验收全部通过；未验证项沿用 001：Windows 真机、真实会话下的教务页面操作、进程捕获真实范围
 Primary language: Python 3（bridge sidecar/Addon、WRD codec，见 `bridges/python/swufe_bridge/`）+ TypeScript（Electron 应用，M2 起）；
                   文档（`docs/` + `specs/`）与 Node 文档检查脚本是主体
 Repository type:  Documentation-first（docs/ + specs/）+ 实现（Python 桥 `bridges/python/`、Electron 应用 `apps/desktop/`）
@@ -41,6 +44,7 @@ Owner:            cherrchen
 | UI/UX 规范 | [docs/ui-ux/](docs/ui-ux/README.md) |
 | Feature 的 What/Why/How | [specs/](specs/README.md) |
 | 第一期 Feature 实现与验证 | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
+| 桌面界面结构（四窗口、零滚动主窗口、二级窗口）| [specs/002-desktop-ui-multiwindow/](specs/002-desktop-ui-multiwindow/spec.md) |
 | 技术决策（为什么这样设计） | [docs/architecture/adr/](docs/architecture/adr/README.md) |
 | 测试策略 | [docs/development/testing-strategy.md](docs/development/testing-strategy.md) |
 | 文档规则与语言要求 | [docs/development/documentation-rules.md](docs/development/documentation-rules.md) |

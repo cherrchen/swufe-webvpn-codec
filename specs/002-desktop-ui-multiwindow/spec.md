@@ -1,7 +1,7 @@
 # Feature: 桌面界面重构（React + Ant Design 多窗口）
 
 > Spec ID: 002
-> Status: Approved
+> Status: Implemented
 > Owner: cherrchen
 > Created: 2026-09-23
 > Related: REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012 / NFR-003 / NFR-007 / [ADR-0003](../../docs/architecture/adr/ADR-0003-electron-gui-for-phase-1.md) / [ADR-0012](../../docs/architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md)（Accepted）
@@ -14,7 +14,9 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 `Approved`（2026-09-23）：[ADR-0012](../../docs/architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) 已评审通过（`Accepted`），Q2-001..Q2-004 全部收敛；**实现尚未开始**（按任务方指示暂缓，任务清单见 [tasks.md](tasks.md) 的 T201 起，[verification.md](verification.md) 仍全部为 `Pending`）。本 Spec 的范围是**渲染层与窗口结构**：桥（`bridges/python/`）、sidecar、系统代理、CA、会话与改写语义均不变；界面之外的行为回归由既有 L0/L1/L2 与 App 单测保护。
+当前为 `Implemented`（2026-09-23）：[ADR-0012](../../docs/architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) 通过（`Accepted`）后实现开始并完成——渲染层迁移到 React 19 + Ant Design 6（Vite 多入口，四个入口 HTML + 共享 chunk），主窗口固定 720×560、`resizable: false`、严格零滚动，进程捕获应用选择 / 调试日志 / Allowlist 编辑进入非模态二级窗口（每类单实例），调试日志的最近 200 条环形缓冲移到 Main（`getDebugLogs` / `clearDebugLogs`）；IPC 面只增 5 个命令方法，既有 16 个命令与 3 个事件签名不变（事件改为广播到全部存活窗口）。[tasks.md](tasks.md) 的 T201..T242 全部完成，[verification.md](verification.md) 记录了全量回归与 macOS 实机验收结果（可机器执行部分全部通过）。
+
+未推进到 `Verified` 的原因（与 001 的遗留一致，登记在 [verification.md](verification.md) 的「未验证 / 无法验证项」）：Windows 真机（`KI-001`）、真实 CAS/MFA 会话下的教务页面操作、进程捕获的系统扩展授权后的真实范围。本 Spec 的范围是**渲染层与窗口结构**：桥（`bridges/python/`）、sidecar、系统代理、CA、会话与改写语义均不变；界面之外的行为回归由既有 L0/L1/L2 与 App 单测保护。
 
 ## Background
 

@@ -1,7 +1,7 @@
 # UI/UX: 桌面界面重构（React + Ant Design 多窗口）
 
 > Spec ID: 002
-> Status: Draft
+> Status: Implemented
 > Owner: cherrchen
 > Last Updated: 2026-09-23
 

@@ -17,7 +17,7 @@
 | [M3 体验打磨](milestones/M3-experience-polish.md) | Allowlist UI、调试日志、进程捕获、文案 | G-002 / G-003 | TBD | Done（真实进程捕获范围与日志面板的桥联动需人工授权系统扩展后复验，见完成记录「遗留问题」） |
 | [M4 验收](milestones/M4-acceptance.md) | macOS + Windows 教务浏览器验收、缺陷收敛 | G-001 / G-002 / G-003 | TBD | In Progress（2026-09-21：macOS 侧含教务浏览器验收**已全部通过**——`KI-011` 修复后 M5 复验 TC-G01/G02 通过；Windows 延期 `KI-001`；`KI-013`/`KI-014` 未决） |
 | M5 开源准备（可选） | 开源清理、README、后续 TUN 设计备忘 | G-004 | TBD | Candidate |
-| [M6 界面重构](milestones/M6-ui-rework.md) | 渲染层迁移到 React + Ant Design 6（Vite 多入口），主窗口 720×560 零滚动，捕获/日志/Allowlist 进二级窗口 | G-002 / G-004 | TBD | Planned（2026-09-23 建立里程碑与 Spec 002，尚未排期；不早于 M4 遗留项收敛） |
+| [M6 界面重构](milestones/M6-ui-rework.md) | 渲染层迁移到 React + Ant Design 6（Vite 多入口），主窗口 720×560 零滚动，捕获/日志/Allowlist 进二级窗口 | G-002 / G-004 | TBD | Done（2026-09-23：实现与可机器执行的验收全部通过，Spec 002 为 `Implemented`；未验证项见 002 的 verification.md——Windows 真机 `KI-001`、真实会话下的教务页面操作、进程捕获真实范围） |
 
 > 时间段一律为 `TBD`：原包未定义日历时间（原包只给出里程碑顺序与依赖，未给日期）。里程碑的完成定义与退出条件见 [milestones/](milestones/README.md)；M5 只保留候选行，尚未建立里程碑文件。
 
@@ -28,7 +28,7 @@
 | Spec | 标题 | 关联 REQ | 阶段 | Status | 链接 |
 | ---- | ---- | -------- | ---- | ------ | ---- |
 | 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | M1–M4 | Implemented（2026-09-21：macOS 侧全部通过，未到 `Verified` 因 Windows 侧延期） | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
-| 002-desktop-ui-multiwindow | 桌面界面重构（React + Ant Design 多窗口） | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012、NFR-003 / NFR-005 / NFR-007 | M6 | Approved（2026-09-23：ADR-0012 通过、Q2 收敛；实现暂缓未开始） | [spec.md](../../specs/002-desktop-ui-multiwindow/spec.md) |
+| 002-desktop-ui-multiwindow | 桌面界面重构（React + Ant Design 多窗口） | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012、NFR-003 / NFR-005 / NFR-007 | M6 | Implemented（2026-09-23：四窗口渲染层、主窗口零滚动、Main 侧日志环形缓冲；可机器执行的验收全部通过，`Verified` 受三项未验证项约束） | [spec.md](../../specs/002-desktop-ui-multiwindow/spec.md) |
 
 > Phase 1 归属一个 Spec；建立后续 Spec 时按 [specs/README.md](../../specs/README.md) 再补一行。REQ/NFR 的规范定义在 [requirements/](../requirements/README.md)，本表只引用 ID。
 

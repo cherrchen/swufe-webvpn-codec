@@ -1,16 +1,17 @@
 # Electron IPC (`window.swufeBridge`)
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-23
 >
 > Chinese source of truth: [electron-ipc.md](electron-ipc.md)
 
 ## Scope
 
 - Provider: the Electron Main process (single outward face of Login WebView / Session Broker / Proxy Orchestrator / Cert Manager / Allowlist Store).
-- Consumer: the Renderer (main window UI, see [../ui-ux/main-window.md](../ui-ux/main-window.md)).
+- Consumer: the Renderer (four windows — the main window plus the capture / logs / allowlist secondary windows, see [../ui-ux/main-window.md](../ui-ux/main-window.md) and [../ui-ux/secondary-windows.md](../ui-ux/secondary-windows.md)).
 - Form: in-process IPC; the preload script exposes the namespace `window.swufeBridge` (placeholder name).
+- Window control: opening/focusing a secondary window also goes through this surface (`openCaptureWindow` / `openLogWindow` / `openAllowlistWindow`); window lifecycle lives in Main's window registry, one instance per kind.
 - Stability: Internal — consumed only inside this app, no external promise; breaking changes update this file + [architecture/interfaces.md](../architecture/interfaces.md) + the related spec.
-- Related spec: [specs/001-phase1-local-bridge/spec.md](../../specs/001-phase1-local-bridge/spec.md)
+- Related spec: [specs/001-phase1-local-bridge/spec.md](../../specs/001-phase1-local-bridge/spec.md), [specs/002-desktop-ui-multiwindow/spec.md](../../specs/002-desktop-ui-multiwindow/spec.md)
 
 ## Authentication and authorisation
 
@@ -42,6 +43,11 @@ Not applicable. Both sides are two processes of the same application on the same
 | `setCaptureMode` | yes (full overwrite) |
 | `setCaptureProcesses` | yes (full overwrite) |
 | `setDebugLogging` | yes |
+| `openCaptureWindow` | yes (single instance: an open window is focused, never duplicated) |
+| `openLogWindow` | yes (single instance: an open window is focused, never duplicated) |
+| `openAllowlistWindow` | yes (single instance: an open window is focused, never duplicated) |
+| `getDebugLogs` | yes (read-only) |
+| `clearDebugLogs` | yes |
 | `onDebugLog` | yes (subscription; repeated subscriptions are independent and each returns its own unsubscribe function) |
 | `onStatus` | yes (subscription; independent per subscription, returns its own unsubscribe function) |
 | `onSessionExpired` | yes (subscription; independent per subscription, returns its own unsubscribe function) |
@@ -223,6 +229,7 @@ setAllowlist(cfg: AllowlistConfig): Promise<void>
   | `includeSwufeWildcard` | `boolean` | yes | default `false` | when ticked, matches `swufe.edu.cn` and the `.swufe.edu.cn` suffix |
 
 - Output: `Promise<void>`.
+- Side effect (added in M6): after a successful write Main broadcasts the current `BridgeStatus` once more so windows re-read the allowlist summary (the main window is the only consumer; the push channel is still `onStatus` and no new event is added).
 - Errors: see [Error model](#error-model) (with empty `hosts` and the wildcard off, starting the bridge returns `ALLOWLIST_EMPTY`).
 
 ### `getSettings(): Promise<AppSettingsView>`
@@ -327,6 +334,65 @@ setDebugLogging(enabled: boolean): Promise<void>
   | `enabled` | `boolean` | yes | default `false` | maps to `AppSettings.debugLogging` |
 
 - Output: `Promise<void>`.
+- Side effect: when `enabled === false`, besides persisting and pushing the config, Main **clears its debug-log ring buffer and closes the log window** (an extension of the existing "closing clears" semantics); `true` only persists and pushes, and the renderer then opens the log window through `openLogWindow()`.
+- Errors: see [Error model](#error-model).
+
+### `openCaptureWindow(): Promise<void>`
+
+```ts
+openCaptureWindow(): Promise<void>   // added in M6: opens or focuses the capture window
+```
+
+- Purpose: open the "process capture — application selection" secondary window (the target of the main window's "choose apps…" action).
+- Input: none.
+- Output: `Promise<void>` (it only reports that the create/focus action finished; it does not wait for the page to render).
+- Behaviour: one instance per window kind — an existing window is `restore()`d / `show()`n / `focus()`ed, otherwise it is created from `WINDOW_SPECS`; secondary windows are non-modal (no `parent`, the main window stays usable); on mount the new window fetches its initial state through this surface (`getStatus` / `getSettings` / `listCaptureCandidates`).
+- Errors: see [Error model](#error-model).
+
+### `openLogWindow(): Promise<void>`
+
+```ts
+openLogWindow(): Promise<void>   // added in M6: opens or focuses the log window
+```
+
+- Purpose: open the "debug log" secondary window (the target after the debug-logging switch is turned on).
+- Input: none.
+- Output: `Promise<void>`.
+- Behaviour: same single-instance / non-modal semantics as `openCaptureWindow`; on mount the window restores history through `getDebugLogs()` (the buffer lives in Main, so reopening loses nothing).
+- Errors: see [Error model](#error-model).
+
+### `openAllowlistWindow(): Promise<void>`
+
+```ts
+openAllowlistWindow(): Promise<void>   // added in M6: opens or focuses the allowlist window
+```
+
+- Purpose: open the allowlist editing window (the target of the main window's "manage…" action: add/remove hosts, toggle `*.swufe.edu.cn`).
+- Input: none.
+- Output: `Promise<void>`.
+- Behaviour: same single-instance / non-modal semantics as `openCaptureWindow`; on mount the window reads its initial values through `getAllowlist()`.
+- Errors: see [Error model](#error-model).
+
+### `getDebugLogs(): Promise<DebugLogEvent[]>`
+
+```ts
+getDebugLogs(): Promise<DebugLogEvent[]>   // added in M6: read-only
+```
+
+- Purpose: read a copy of the debug log held in Main's ring buffer (used by the log window to restore history on mount).
+- Input: none.
+- Output: `DebugLogEvent[]`, **newest first**, at most `MAX_DEBUG_LOG_ENTRIES` (200) entries; the array is a copy, so mutating it never affects the buffer. The buffer is in-memory only and never persisted (NFR-003).
+- Errors: see [Error model](#error-model).
+
+### `clearDebugLogs(): Promise<void>`
+
+```ts
+clearDebugLogs(): Promise<void>   // added in M6: clears Main's ring buffer
+```
+
+- Purpose: clear Main's debug-log ring buffer (the target of the log window's "clear" button); after clearing, closing and reopening the window no longer brings the cleared records back.
+- Input: none.
+- Output: `Promise<void>`.
 - Errors: see [Error model](#error-model).
 
 ### `onDebugLog(cb: (e: DebugLogEvent) => void): () => void`
@@ -344,6 +410,7 @@ onDebugLog(cb: (e: DebugLogEvent) => void): () => void
   | `cb` | `(e: DebugLogEvent) => void` | yes | — | event callback |
 
 - Output: an unsubscribe function `() => void`.
+- Delivery scope (changed in M6): Main **broadcasts to every live window** (previously the main window only); each window subscribes and renders on its own.
 - Event payload: `DebugLogEvent` (see "Type definitions"); `detail` may hold a short message and must not hold bodies or cookies.
 - Errors: see [Error model](#error-model).
 
@@ -357,6 +424,7 @@ onStatus(cb: (status: BridgeStatus) => void): () => void
 - Purpose: subscribe to Main → Renderer bridge-status pushes; Main pushes once after every status change (start/stop/failure/expiry/session change) so the UI never has to poll.
 - Input: `cb` (status callback).
 - Output: unsubscribe function `() => void` (independent per subscription).
+- Delivery scope (changed in M6): Main **broadcasts to every live window** (previously the main window only); the extra broadcast after a successful `setAllowlist` rides the same channel.
 - Event payload: `BridgeStatus` (see "Type definitions").
 - Errors: see the [error model](#error-model).
 
@@ -370,6 +438,7 @@ onSessionExpired(cb: () => void): () => void
 - Purpose: subscribe to "the session expired and the bridge has stopped with the system proxy cleared", so the UI can show the re-login modal (copy in [../ui-ux/main-window.md](../ui-ux/main-window.md)); `getStatus().error.code` is `SESSION_EXPIRED` at the same time.
 - Input: `cb` (no-argument callback).
 - Output: unsubscribe function `() => void`.
+- Delivery scope (changed in M6): Main **broadcasts to every live window** (previously the main window only), so the event also arrives while a secondary window is in front.
 - Errors: see the [error model](#error-model).
 
 ## Error model
@@ -406,3 +475,4 @@ The full post-expiry handling (stop bridge → clear system proxy → stop proce
 | 2026-09-20 | First version: session, bridge control, allowlist, certificate, process capture and debug logging — 15 methods/events total | — | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | M2 added three items (the semantics of the 15 methods above are unchanged): `getSettings` (read-only, for UI defaults; the WRD key/IV never cross IPC), `onStatus` (Main → Renderer status pushes) and `onSessionExpired` (session-expiry event driving the re-login modal) | Compatible (added methods/events) | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [M2 completion record](../planning/milestones/M2-desktop-orchestration.en.md) |
 | 2026-09-21 | M3 capture modes: `setCapturePids` → **`setCaptureProcesses`** (intercept patterns instead of PIDs, full overwrite); new `setCaptureMode` (`system-proxy` / `selected-apps`, mutually exclusive); `BridgeStatus.captureError`; `CaptureCandidate.pattern`; `AppSettingsView.captureMode` / `.captureProcesses`; `getStatus().localCaptureEnabled` now means "bridge running + selected apps + the sidecar reported enabled" | **Breaking**: `setCapturePids` is gone | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.en.md) |
+| 2026-09-23 | M6 four-window UI: 5 added methods — `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` (secondary-window entry points, one instance per kind, a repeated call focuses), `getDebugLogs` (read-only copy of Main's ring buffer, newest first, ≤200) and `clearDebugLogs` (clears that buffer); `setDebugLogging(false)` gained a side effect (clears the buffer and closes the log window); a successful `setAllowlist` broadcasts `status` once more; the delivery scope of `onDebugLog` / `onStatus` / `onSessionExpired` changed from "the main window only" to **every live window**; the 16 pre-existing methods and all event signatures are unchanged (21 methods / 3 events in total) | Compatible (additive only) | [spec 002](../../specs/002-desktop-ui-multiwindow/spec.md) / [ADR-0012](../architecture/adr/ADR-0012-react-antd-multiwindow-renderer.md) |

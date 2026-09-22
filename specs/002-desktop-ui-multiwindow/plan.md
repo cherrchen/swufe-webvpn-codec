@@ -1,7 +1,7 @@
 # Implementation Plan: 桌面界面重构（React + Ant Design 多窗口）
 
 > Spec ID: 002
-> Status: Draft
+> Status: Implemented
 > Owner: cherrchen
 > Last Updated: 2026-09-23
 
@@ -97,7 +97,7 @@
 | [docs/ui-ux/main-window.md](../../docs/ui-ux/main-window.md)（+ `.en.md`） | 重写：720×560 固定零滚动主窗口、四窗口信息层级、状态与文案表更新 | Phase 4 | cherrchen |
 | `docs/ui-ux/secondary-windows.md`（新增，+ `.en.md`）与 [docs/ui-ux/README.md](../../docs/ui-ux/README.md)（+ `.en.md`） | 新增二级窗口文档（捕获 / 日志 / Allowlist）并登记索引 | Phase 4 | cherrchen |
 | [docs/architecture/components.md](../../docs/architecture/components.md)、[interfaces.md](../../docs/architecture/interfaces.md)、[data-flow.md](../../docs/architecture/data-flow.md)（+ `.en.md`） | `Telemetry UI` 改为四窗口渲染层；新增窗口注册表与日志缓冲；IF-001 广播面与新增方法；数据流补窗口打开与广播路径 | Phase 4 | cherrchen |
-| [docs/api/electron-ipc.md](../../docs/api/electron-ipc.md)（+ `.en.md`） | 新增 4 个方法（含幂等性、错误模型不变）、事件投递范围说明、`setDebugLogging` 副作用、变更记录行 | Phase 4 | cherrchen |
+| [docs/api/electron-ipc.md](../../docs/api/electron-ipc.md)（+ `.en.md`） | 新增 5 个方法（含幂等性、错误模型不变）、事件投递范围说明、`setDebugLogging` 副作用、变更记录行 | Phase 4 | cherrchen |
 | [docs/development/dependency-policy.md](../../docs/development/dependency-policy.md)（+ `.en.md`） | 记录 8 个新增依赖（版本 / 用途 / 许可证 / 风险 / 替代方案）与 pnpm `allowBuilds` 结论 | Phase 4 | cherrchen |
 | [docs/development/testing-strategy.md](../../docs/development/testing-strategy.md)（+ `.en.md`） | 新增「渲染层组件测试（vitest + jsdom）」层与 `test:ui`、与 CDP 实机断言的职责分工 | Phase 4 | cherrchen |
 | [apps/desktop/README.md](../../apps/desktop/README.md) | 构建命令（Vite）、生成物路径（`dist/renderer/*.html`）、`test:ui`、窗口结构与环境变量（开发期 dev server） | Phase 4 | cherrchen |

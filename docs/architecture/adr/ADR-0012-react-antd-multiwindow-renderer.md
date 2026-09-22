@@ -25,7 +25,7 @@ M3 加入「捕获方式 / 候选应用列表 / 调试日志面板」之后，�
 
 同时存在约束：
 
-- 渲染层必须**完全离线可用**：现有 CSP 为 `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:`，不允许 CDN 与远程字体/图标（[security/README.md](../../security/README.md) TB-003、[csp 相关约定在实现中固定](../../../apps/desktop/static/index.html)）。
+- 渲染层必须**完全离线可用**：现有 CSP 为 `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:`，不允许 CDN 与远程字体/图标（[security/README.md](../../security/README.md) TB-003、[csp 相关约定在实现中固定](../../../apps/desktop/vite.config.ts)）。
 - 渲染层是叶子：只能经 preload `window.swufeBridge` 调用 Main（[components.md](../../architecture/components.md) 的单向依赖规则），状态权威在 Main。
 - [dependency-policy.md](../../development/dependency-policy.md) 第 1 节禁止「引入第二套功能等价的依赖」，其中「引入第二套等价方案」与「Native build」两类判定需要 ADR（第 2 节：基础设施级/难以替换的依赖记 ADR）；`[ADR-0003](ADR-0003-electron-gui-for-phase-1.md)` 只决定了「用 Electron 而非纯 CLI」，未约束渲染层框架，因此本次属**核心技术栈改变**，按 [adr/README.md](README.md) 的「何时必须写 ADR」必须落 ADR。
 - 产品侧决定（2026-09-23）：主窗口固定 720×560 且**不出现滚动**；进程捕获的应用选择、调试日志、Allowlist 编辑各自进入**二级窗口**；二级窗口非模态、每类最多一个实例。
@@ -43,7 +43,7 @@ M3 加入「捕获方式 / 候选应用列表 / 调试日志面板」之后，�
    - 三个二级窗口（捕获 / 日志 / Allowlist）**非模态**、**每类单实例复用**（重复触达入口即聚焦已有窗口）；
    - 长内容一律进二级窗口；主窗口溢出时的处置是「把内容再收进二级窗口」，**禁止**用滚动兜底；
    - 主窗口关闭仍等同于退出应用（沿用现有行为），二级窗口随之退出。
-4. **状态与数据流**：状态权威仍在 Electron Main（不变）。IPC 事件（`onStatus` / `onDebugLog` / `onSessionExpired`）由「只投递主窗口」改为**广播到全部存活窗口**；调试日志的最近 200 条环形缓冲由渲染层**移到 Main**（窗口关闭不丢历史，`setDebugLogging(false)` 时清空并关闭日志窗口）；IPC 面只新增 `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` / `getDebugLogs` 四个方法，既有方法与事件签名不变。
+4. **状态与数据流**：状态权威仍在 Electron Main（不变）。IPC 事件（`onStatus` / `onDebugLog` / `onSessionExpired`）由「只投递主窗口」改为**广播到全部存活窗口**；调试日志的最近 200 条环形缓冲由渲染层**移到 Main**（窗口关闭不丢历史，`setDebugLogging(false)` 时清空并关闭日志窗口）；IPC 面只新增 `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` / `getDebugLogs` / `clearDebugLogs` 五个方法（`clearDebugLogs` 清空 Main 环形缓冲，使日志窗口的 [清空] 在窗口重开后仍有效），既有方法与事件签名不变。
 5. **CSP**：允许把 `style-src` 放宽为 `'self' 'unsafe-inline'`（antd 6 仍以 `@ant-design/cssinjs` 在运行期注入 `<style>`）；`default-src 'none'`、`script-src 'self'`、`img-src 'self' data:` **不放宽**；所有前端资源随包分发，禁止运行时外联。CSP 由构建插件按模式注入（生产严格、开发期额外允许 dev server 源与 HMR WebSocket）。
 6. **测试栈（第二套测试运行器的例外）**：渲染层组件测试使用 `vitest` 3.2.7 + `jsdom` 26.1.0 + `@testing-library/react` 16.3.3（全部 dev 依赖、MIT）。理由：既有 `node:test` + `tsx` 无法提供 DOM 环境与组件渲染；`test:ui` 与既有 `test:unit` 分工明确（前者只测可观察的界面行为，后者继续覆盖 Main 侧 electron-free 逻辑），且不引入浏览器运行时（CI 无显示器依赖）。不可在 jsdom 中测量的断言（主窗口零滚动、多窗口数量、窗口打开时延）由既有 CDP 实机方式验证。
 7. **清理**：迁移完成后删除 `apps/desktop/static/`、`src/renderer/renderer.ts` 与其构建路径，不保留双实现或特性开关。
