@@ -4,7 +4,7 @@
  */
 
 export const CA_WARNING_TEXT = '本证书用于在本机解密并改写 HTTPS，仅限个人设备；可随时卸载。'
-export const CA_PROMPT_INSTALLING = '正在安装本机 CA：请在随后弹出的系统授权窗口输入管理员密码…'
+export const CA_PROMPT_INSTALLING = '正在安装本机 CA：请在随后弹出的系统窗口中确认（Windows 需点「是(Y)」；macOS 需输入管理员密码）…'
 export const CA_INSTALLED = '本机 CA 已安装并被系统信任。'
 export const CA_UNINSTALLING = '正在卸载本机 CA…'
 export const CA_UNINSTALLED = '本机 CA 已卸载。'

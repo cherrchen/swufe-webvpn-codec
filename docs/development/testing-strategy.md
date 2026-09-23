@@ -28,7 +28,7 @@
 ## 2. 覆盖要求
 
 ```text
-Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 217 个用例（L0 103 + L1 103 + L2 11）、103 个 App 单测用例（`test:unit`）与 36 个渲染层组件用例（`test:ui`）全绿）
+Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 217 个用例（L0 103 + L1 103 + L2 11）、110 个 App 单测用例（`test:unit`）与 36 个渲染层组件用例（`test:ui`）全绿）
 Coverage tool:   TBD（M1 未引入；层与用例即当前的可回归证据）
 Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 ```

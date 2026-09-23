@@ -20,7 +20,9 @@ export const AUTH_HOST = 'authserver.swufe.edu.cn'
 export const BRIDGE_READY_TIMEOUT_MS = 30_000
 export const SIDECAR_STOP_TIMEOUT_MS = 5_000
 export const COMMAND_TIMEOUT_MS = 10_000
-/** macOS authorization dialogs (admin password / Touch ID) outlive the default command timeout. */
+/** OS confirmation dialogs outlive the default command timeout: the macOS admin-password /
+ * Touch ID prompt, and the Windows certificate dialogs that block `certutil -addstore Root`
+ * ("安全警告") and `-delstore Root` ("根证书存储") until the user clicks 是(Y) (KI-021). */
 export const PRIVILEGE_PROMPT_TIMEOUT_MS = 120_000
 export const SESSION_PROBE_INTERVAL_MS = 30_000
 export const SESSION_PROBE_TIMEOUT_MS = 5_000

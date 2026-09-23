@@ -143,7 +143,7 @@ The main-window strings are fixed as follows (the single source of truth for err
 | Allowlist entry | `管理…` | opens the allowlist window |
 | CA state | `读取中…` / `已安装并被系统信任` / `已安装，但系统尚未信任` / `未安装` | |
 | CA risk notice | title `安装本机 CA`, body `本证书用于在本机解密并改写 HTTPS，仅限个人设备；可随时卸载。`, buttons `确认安装` / `取消` | NFR-005; must be shown before installing |
-| CA operation results | `正在安装本机 CA：请在随后弹出的系统授权窗口输入管理员密码…` / `本机 CA 已安装并被系统信任。` / `安装失败：<msg>` / `正在卸载本机 CA…` / `本机 CA 已卸载。` / `卸载失败：<msg>` | message row |
+| CA operation results | `正在安装本机 CA：请在随后弹出的系统窗口中确认（Windows 需点「是(Y)」；macOS 需输入管理员密码）…` / `本机 CA 已安装并被系统信任。` / `安装失败：<msg>` / `正在卸载本机 CA…` / `本机 CA 已卸载。` / `卸载失败：<msg>` | message row |
 | Proxy-conflict modal | title `检测到代理环境冲突`, body = `BridgeStatus.error.message`, button `知道了` | REQ-004 / ADR-0004 / ADR-0011; both the CA path and the selected-apps path use this modal |
 | Session-expiry modal | title `会话已过期`, body = `BridgeStatus.error.message` (fallback `WebVPN 会话已失效。桥接已停止并已清除系统代理。`), buttons `去登录` / `取消` | REQ-002 |
 | System-proxy line | `系统代理：已指向本桥 127.0.0.1:<port>` / `系统代理：未由本 App 设置（捕获方式：指定应用）` / `系统代理：未由本 App 设置` | read-only |

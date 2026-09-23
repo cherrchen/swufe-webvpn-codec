@@ -30,7 +30,7 @@
 ## 2. Coverage expectations
 
 ```text
-Coverage target: TBD (no numeric target; the current baseline is 217 green L0/L1/L2 cases (L0 103 + L1 103 + L2 11), 103 app unit cases (`test:unit`) and 36 renderer component cases (`test:ui`))
+Coverage target: TBD (no numeric target; the current baseline is 217 green L0/L1/L2 cases (L0 103 + L1 103 + L2 11), 110 app unit cases (`test:unit`) and 36 renderer component cases (`test:ui`))
 Coverage tool:   TBD (not adopted in M1; the layers and cases are the current regression evidence)
 Exceptions:      the L3 and manual layers are excluded from coverage and
                  replaced by manual steps

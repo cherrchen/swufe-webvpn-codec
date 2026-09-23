@@ -70,7 +70,7 @@ SWUFE_RENDERER_URL=http://127.0.0.1:5173 pnpm start       # 另开一个终端�
 | 卸载本机 CA | 同样提权执行 `security delete-certificate -Z <sha1>`（只删钥匙串；管理域信任项无法经 CLI 清除，残留观察见 `KI-010`） |
 | 进程捕获（「指定应用」） | macOS 首次启用时 mitmproxy 会安装并激活网络扩展，需在授权提示内**在 5 秒内确认**；超时即失败，界面给出引导与「重试」。Windows 侧需要 UAC 提权（见 [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)） |
 
-> Windows 的 CA 安装写入**当前用户**根存储（`certutil -user -addstore Root <caCert>`），不弹管理员密码框；卸载为 `certutil -user -delstore Root mitmproxy`。
+> Windows 的 CA 安装写入**当前用户**根存储（`certutil -user -addstore Root <caCert>`），不弹管理员密码框，但会弹系统「安全警告」对话框（需点「是(Y)」）；卸载为 `certutil -user -delstore Root <指纹>`，同样会弹「根证书存储」确认框。两处都是等人点击的步骤，应用侧按 120s 的超时等待（`KI-021`）。
 
 ## 5. 验证与自检
 
@@ -111,7 +111,7 @@ pnpm run diagnose:upstream --user-data-dir <profile> --rounds 40 --scheme http
 | `swufe-error CONFIG_INVALID` | 运行时配置非法（如 `capture.processes` 含逗号） | 修正 `<userData>/config.json` 的对应设置后重新开桥 |
 | sidecar 起不来 / 提示找不到 python | `bridges/python` 未执行过 `uv sync`，或 `SWUFE_PYTHON` 指向不存在的解释器 | 在仓库根执行 `uv sync --directory bridges/python`，或修正 `SWUFE_PYTHON` |
 | 关闭应用后系统代理仍指向本桥 | 上次以 `kill -TERM` / `kill -9` 结束，未触发 JS 清理（已记入已知问题） | 下次启动时 `recoverOnLaunch()` 会依据「由本 App 设置」标记自动清除；也可手动 `networksetup -setwebproxystate <服务> off`（Windows：把 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyEnable` 置 0） |
-| 点「安装本机 CA」后界面报「命令超时（10000ms）：certutil」（Windows） | Windows 在把根证书写入当前用户存储前会弹出系统「安全警告」对话框（列出证书指纹，等待点「是(Y)」/「否(N)」），`certutil` 子进程在此期间阻塞；应用侧该步骤的超时为 10s（`KI-021`） | 在对话框出现后 10s 内点「是(Y)」；若已超时，可手动执行同一条命令：`certutil -user -addstore Root <userData>\mitmproxy\mitmproxy-ca-cert.cer`（同样会弹对话框；无管理员权限需求），随后界面刷新为「已安装并被系统信任」 |
+| 点「安装/卸载本机 CA」后界面报「命令超时（120000ms）：certutil」（Windows） | 该系统对话框本身在等人点击：安装前是「安全警告」（列出证书指纹，点「是(Y)」/「否(N)」），删除前是「根证书存储」确认框；`certutil` 在此期间阻塞，应用按 120s 超时等待（`KI-021`，2026-09-23 修复：此前该处用默认 10s，人手还没点完进程就被杀） | 出现对话框时点「是(Y)」即可（2 分钟内都有效）；若确已超时，手动执行同一命令：安装 `certutil -user -addstore Root <userData>\mitmproxy\mitmproxy-ca-cert.cer`、卸载 `certutil -user -delstore Root <指纹>`（同样弹对话框；不需要管理员权限），随后界面刷新 |
 | 浏览器首次打开教务页长时间无响应（数十秒无内容） | 经桥请求偶发挂起（`KI-019`）：桥已把上游各阶段的耗时与对端地址写入 `<userData>/bridge-upstream.log`（`swufe-upstream` 记录），可用于区分「桥内建连」「网关已连但不响应」与「本机网络/解析」 | 先重载页面（历史上重载即恢复）。再按日志判因：出现 `connect_timeout` / `connect_retry` / `connect_failed` ⇒ 建连有界化已生效（客户端在 8s 内拿到 `502`，不再空等）；只有连接阶段记录而缺 `response`、`error` 为 `client disconnected` ⇒ 网关已连不响应（该阶段无法被中断，见 `docs/api/bridge-control-protocol.md`），重载/重开即可；仍复现则跑 `pnpm run diagnose:upstream` 取得同轮直连对照后再下结论 |
 | 「指定应用」捕获下浏览器打不开教务（`ERR_NAME_NOT_RESOLVED`） | 进程捕获不做 DNS 拦截：浏览器必须先自行解析主机名，而 `jwxt.swufe.edu.cn` 无公网解析记录 | 教务走默认的「系统代理（全部流量）」模式（浏览器把主机名交给桥，桥再映射到网关）；捕获模式适合能本地解析的主机 |
 | 界面显示「进程捕获：启用失败」 | 系统扩展未授权 / 授权超时（macOS） | 按界面引导在「系统设置 → 通用 → 登录项与扩展」中允许，然后点「重试」。捕获失败不影响系统代理路径（桥仍为「桥接中」） |
