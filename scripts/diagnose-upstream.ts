@@ -8,6 +8,11 @@
  *   5..6  the probes again right after the bridged request, plus the same WRD path direct;
  *   7     when the round was abnormal, the bridge's own `bridge-upstream.log` tail.
  *
+ * The direct control deliberately carries no cookie, so the gateway answers it with a fast
+ * `302 → /login` (and a fresh ticket) whenever the path is healthy: it measures the path,
+ * not the session. Session expiry is therefore read from the **bridged** response, which
+ * carries the cookies the bridge injects.
+ *
  * The verdict is what separates a local from an external cause:
  *   `bridge-side`           the bridge was abnormal while the same-round direct path was healthy;
  *   `network-or-resolver`   the direct path was also unhealthy (or DNS was slow) in that round;
@@ -85,6 +90,7 @@ interface RoundFacts {
   direct_exit: number
   direct_status: string
   direct_ms: number
+  direct_to_login: boolean
 }
 
 interface Round extends RoundFacts {
@@ -306,8 +312,16 @@ function bridgedRequest(
   }
 }
 
-/** The same WRD path, straight from this process (no bridge, no cookies). */
-function directControl(url: string): { exit: number; status: string; ms: number; redirect: string } {
+/** The gateway's own login page — not a proxied site path that merely contains "login". */
+function isGatewayLogin(url: string, webvpnHost: string): boolean {
+  return url.includes(`//${webvpnHost}/login`)
+}
+
+/** The same WRD path, straight from this process (no bridge, no cookie). */
+function directControl(
+  url: string,
+  webvpnHost: string,
+): { exit: number; status: string; ms: number; toLogin: boolean } {
   const result = run(
     'curl',
     [
@@ -329,7 +343,8 @@ function directControl(url: string): { exit: number; status: string; ms: number;
     exit: result.code,
     status: status || '(空)',
     ms: Math.round(Number.parseFloat(seconds || '0') * 1000),
-    redirect,
+    // Only the classification is kept: the redirect target is a URL and never persisted.
+    toLogin: isGatewayLogin(redirect, webvpnHost),
   }
 }
 
@@ -389,7 +404,7 @@ function formatRound(round: Round): string {
     `dns=${String(round.dns_ms)}ms tcp=${String(round.pre_tcp.ms)}ms/${round.pre_tcp.ok ? 'ok' : 'fail'}`,
     `tls=${String(round.pre_tls.ms)}ms/${round.pre_tls.ok ? (round.pre_tls.alpn ?? 'ok') : 'fail'}`,
     `post-tcp=${round.post_tcp.ok ? 'ok' : 'fail'} post-tls=${round.post_tls.ok ? 'ok' : 'fail'}`,
-    `direct=exit ${String(round.direct_exit)} / ${String(round.direct_ms)}ms / ${round.direct_status}`,
+    `direct=exit ${String(round.direct_exit)} / ${String(round.direct_ms)}ms / ${round.direct_status}${round.direct_to_login ? '（→ 登录页，未带 Cookie）' : ''}`,
   ].join('  ')
 }
 
@@ -503,15 +518,22 @@ async function main(): Promise<number> {
     rmSync(headerFile, { force: true })
     const post = await probeControls(address, webvpnHost, options)
 
-    let direct = { exit: 0, status: '(跳过)', ms: 0, redirect: '' }
+    let direct = { exit: 0, status: '(跳过)', ms: 0, toLogin: false }
     if (bridged.location !== null) {
-      direct = directControl(bridged.location)
+      direct = directControl(bridged.location, webvpnHost)
     } else {
-      console.log('# 提示: 本轮响应没有 location 头，无法构造同路径直连对照（跳过第 6 步）')
+      // No response headers at all means the upstream answered nothing: that is the stall
+      // shape itself, and the same-path control can only be built from a real Location.
+      console.log('# 提示: 本轮响应没有 location 头（上游未返回响应头），跳过第 6 步同路径直连对照')
     }
 
-    if (direct.redirect.includes('/login')) {
-      console.log(`会话已过期（直连对照 302 → ${direct.redirect}）：请在应用内重新登录后重跑。`)
+    // The session signal has to come from the *bridged* response, which carries the cookies
+    // the bridge injects, and only the gateway's own login page counts (a proxied site path
+    // may legitimately contain "login"). The direct control deliberately sends no cookie, so
+    // the gateway bounces it to that page whenever the path is healthy — a fast round trip,
+    // not an expiry, and it must never abort the run.
+    if (bridged.status.startsWith('302') && bridged.location !== null && isGatewayLogin(bridged.location, webvpnHost)) {
+      console.log('会话已过期（经桥响应 302 → 网关登录页）：请在应用内重新登录后重跑。')
       evidence.push({ kind: 'aborted', reason: 'session-expired' })
       writeFileSync(evidencePath, `${evidence.map((entry) => JSON.stringify(entry)).join('\n')}\n`, 'utf8')
       return 2
@@ -532,6 +554,7 @@ async function main(): Promise<number> {
       direct_exit: direct.exit,
       direct_status: direct.status,
       direct_ms: direct.ms,
+      direct_to_login: direct.toLogin,
     }
     const verdict = verdictOf(partial)
     const abnormal = verdict !== 'no-stall'

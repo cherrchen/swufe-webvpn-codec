@@ -93,7 +93,8 @@ pnpm run diagnose:upstream --user-data-dir <profile> --rounds 40 --scheme http
 ```
 
 - 每轮固定节奏：DNS → TCP → TLS → 经桥请求 → 再测 DNS/TCP/TLS → 同路径直连对照；输出逐轮判定 `no-stall` / `bridge-side` / `network-or-resolver`，异常轮次额外打印 `<userData>/bridge-upstream.log` 中该轮的阶段记录与 `Get-NetRoute` 实测。证据写到 `--out`（默认系统临时目录；**不得**指向仓库内）的 `diagnose-upstream-<platform>-<时间戳>.jsonl`。
-- 桥未运行（端口连续 3 轮不可连）、会话已过期（同路径直连 `302 → /login`）或 `--user-data-dir` 内缺 `bridge-config.json` / CA 时，脚本明确报错并终止，不产生结论。
+- 直连对照**不带 Cookie**：网关对无 Cookie 的 WRD 请求一律回 `302 → https://<网关>/login`（并下发新 ticket），因此该对照只用于度量**路径健康度**（DNS/TCP/TLS/首字节），本身不代表会话失效。会话是否过期由**经桥响应**判定（经桥拿到 `302 → 网关登录页` 才判定过期并终止）；经桥无响应头（`(无状态行)`）属于挂起样本，不触发终止。
+- 桥未运行（端口连续 3 轮不可连）、会话已过期（经桥响应 `302 → 网关登录页`）或 `--user-data-dir` 内缺 `bridge-config.json` / CA 时，脚本明确报错并终止，不产生结论。
 - 复测环境必须与历史失败轮同形：默认路由直连、无 TUN 路由（`Get-NetRoute -AddressFamily IPv4` 的 `0.0.0.0/0` 行）。
 - 判据：`bridge-side` = 该轮桥请求异常而同轮直连对照（DNS/TCP/TLS）健康；`network-or-resolver` = 同轮直连对照也不健康或 DNS ≥ 2s。据此区分本地与外部原因，再更新 `KI-019`。
 
@@ -110,6 +111,7 @@ pnpm run diagnose:upstream --user-data-dir <profile> --rounds 40 --scheme http
 | `swufe-error CONFIG_INVALID` | 运行时配置非法（如 `capture.processes` 含逗号） | 修正 `<userData>/config.json` 的对应设置后重新开桥 |
 | sidecar 起不来 / 提示找不到 python | `bridges/python` 未执行过 `uv sync`，或 `SWUFE_PYTHON` 指向不存在的解释器 | 在仓库根执行 `uv sync --directory bridges/python`，或修正 `SWUFE_PYTHON` |
 | 关闭应用后系统代理仍指向本桥 | 上次以 `kill -TERM` / `kill -9` 结束，未触发 JS 清理（已记入已知问题） | 下次启动时 `recoverOnLaunch()` 会依据「由本 App 设置」标记自动清除；也可手动 `networksetup -setwebproxystate <服务> off`（Windows：把 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyEnable` 置 0） |
+| 点「安装本机 CA」后界面报「命令超时（10000ms）：certutil」（Windows） | Windows 在把根证书写入当前用户存储前会弹出系统「安全警告」对话框（列出证书指纹，等待点「是(Y)」/「否(N)」），`certutil` 子进程在此期间阻塞；应用侧该步骤的超时为 10s（`KI-021`） | 在对话框出现后 10s 内点「是(Y)」；若已超时，可手动执行同一条命令：`certutil -user -addstore Root <userData>\mitmproxy\mitmproxy-ca-cert.cer`（同样会弹对话框；无管理员权限需求），随后界面刷新为「已安装并被系统信任」 |
 | 浏览器首次打开教务页长时间无响应（数十秒无内容） | 经桥请求偶发挂起（`KI-019`）：桥已把上游各阶段的耗时与对端地址写入 `<userData>/bridge-upstream.log`（`swufe-upstream` 记录），可用于区分「桥内建连」「网关已连但不响应」与「本机网络/解析」 | 先重载页面（历史上重载即恢复）。再按日志判因：出现 `connect_timeout` / `connect_retry` / `connect_failed` ⇒ 建连有界化已生效（客户端在 8s 内拿到 `502`，不再空等）；只有连接阶段记录而缺 `response`、`error` 为 `client disconnected` ⇒ 网关已连不响应（该阶段无法被中断，见 `docs/api/bridge-control-protocol.md`），重载/重开即可；仍复现则跑 `pnpm run diagnose:upstream` 取得同轮直连对照后再下结论 |
 | 「指定应用」捕获下浏览器打不开教务（`ERR_NAME_NOT_RESOLVED`） | 进程捕获不做 DNS 拦截：浏览器必须先自行解析主机名，而 `jwxt.swufe.edu.cn` 无公网解析记录 | 教务走默认的「系统代理（全部流量）」模式（浏览器把主机名交给桥，桥再映射到网关）；捕获模式适合能本地解析的主机 |
 | 界面显示「进程捕获：启用失败」 | 系统扩展未授权 / 授权超时（macOS） | 按界面引导在「系统设置 → 通用 → 登录项与扩展」中允许，然后点「重试」。捕获失败不影响系统代理路径（桥仍为「桥接中」） |
