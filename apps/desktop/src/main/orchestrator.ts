@@ -214,9 +214,11 @@ export class ProxyOrchestrator {
     }
   }
 
-  /** A fresh session clears a stale SESSION_EXPIRED notice (its cause is gone). */
-  clearSessionExpiredNotice(): void {
-    if (this.machine.error?.code !== 'SESSION_EXPIRED') return
+  /** A fresh session clears the notice it invalidated (its cause is gone): `SESSION_EXPIRED`
+   * (the session had expired) and `NOT_LOGGED_IN` (there was no session yet). */
+  clearStaleSessionNotice(): void {
+    const code = this.machine.error?.code
+    if (code !== 'SESSION_EXPIRED' && code !== 'NOT_LOGGED_IN') return
     this.machine.reset()
     this.emitStatus()
   }

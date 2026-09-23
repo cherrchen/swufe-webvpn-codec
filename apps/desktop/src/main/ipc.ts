@@ -146,7 +146,7 @@ export function registerIpc(ctx: IpcContext): void {
   ctx.session.onChange(() => {
     // A fresh capture must reach a running sidecar without a restart.
     ctx.orchestrator.refreshRuntimeConfig()
-    if (ctx.session.loggedIn) ctx.orchestrator.clearSessionExpiredNotice()
+    if (ctx.session.loggedIn) ctx.orchestrator.clearStaleSessionNotice()
     void ctx.orchestrator
       .status()
       .then((status) => ctx.windows.broadcast(CHANNEL_STATUS, status))

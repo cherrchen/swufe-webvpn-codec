@@ -62,7 +62,9 @@ export function parseWinInetValue(stdout: string): { enable: boolean | null; ser
   let enable: boolean | null = null
   let server: string | null = null
   for (const rawLine of stdout.split('\n')) {
-    const match = rawLine.match(/^\s*(\S+)\s+REG_(DWORD|SZ)\s+(.*)$/)
+    // `reg query` writes CRLF on Windows and `.` never matches `\r`, so anchoring works
+    // only on the trimmed line (measured: the untrimmed form parsed every value as null).
+    const match = rawLine.trim().match(/^(\S+)\s+REG_(DWORD|SZ)\s+(.*)$/)
     if (!match) continue
     const [, name, type, rawValue] = match
     const value = (rawValue ?? '').trim()
@@ -175,11 +177,4 @@ export function groupCaptureCandidates(rows: ProcessRow[]): CaptureCandidate[] {
 export function parseFindCertificateHashes(stdout: string): string[] {
   return [...stdout.matchAll(/SHA-1 hash:\s*([0-9A-Fa-f]{40})/gi)]
     .map((match) => (match[1] ?? '').toUpperCase())
-}
-
-/** `certutil -store Root <CertId>` must still prove that the returned hash is ours. */
-export function parseCertutilHashes(stdout: string): string[] {
-  return [...stdout.matchAll(/Cert Hash\(sha1\):\s*([0-9A-Fa-f ]{40,})/gi)]
-    .map((match) => (match[1] ?? '').replaceAll(' ', '').toUpperCase())
-    .filter((hash) => /^[0-9A-F]{40}$/.test(hash))
 }

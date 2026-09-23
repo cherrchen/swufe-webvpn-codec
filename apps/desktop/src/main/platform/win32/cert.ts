@@ -3,9 +3,11 @@
 import { existsSync } from 'node:fs'
 
 import { run } from '../../exec'
-import { parseCertutilHashes } from '../parse'
 import type { CertManager } from '../types'
 import { caFingerprint, caPaths, ensureCaFiles } from '../ca-files'
+
+/** Per-user Root store backing; one key per certificate thumbprint (uppercase, no separators). */
+const USER_ROOT_CERTIFICATES = 'HKCU\\Software\\Microsoft\\SystemCertificates\\Root\\Certificates'
 
 export class Win32CertManager implements CertManager {
   constructor(
@@ -18,8 +20,12 @@ export class Win32CertManager implements CertManager {
     const { caCert } = caPaths(this.confdir)
     if (!existsSync(caCert)) return { installed: false, trusted: false }
     const fingerprint = caFingerprint(caCert)
-    const result = await this.execute('certutil', ['-user', '-store', 'Root', fingerprint])
-    const installed = result.code === 0 && parseCertutilHashes(result.stdout).includes(fingerprint)
+    // `certutil -user -store Root <id>` ignores the id, prints every certificate and exits 0
+    // even when the id matches nothing, and its hash label is localized (`证书哈希(sha1):` on
+    // Chinese Windows) — so identity is read from the store's own registry backing instead,
+    // which holds exactly one key per thumbprint (KI-016).
+    const result = await this.execute('reg', ['query', `${USER_ROOT_CERTIFICATES}\\${fingerprint}`])
+    const installed = result.code === 0
     // The per-user Root store is itself the trust decision on Windows.
     return { installed, trusted: installed }
   }

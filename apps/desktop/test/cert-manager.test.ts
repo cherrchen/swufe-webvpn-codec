@@ -59,21 +59,30 @@ test('macOS ignores a same-name CA when this app certificate is absent', async (
   assert.equal(privileged, false)
 })
 
-test('Windows queries and deletes the exact CA fingerprint', async () => {
+test('Windows reads CA status from the Root store and deletes the exact fingerprint', async () => {
   const { dir, fingerprint } = localCa()
-  let installed = true
-  const calls: string[][] = []
-  const manager = new Win32CertManager(dir, '', async (_command, args) => {
-    calls.push(args)
-    if (args[1] === '-store') {
-      return ok(`Cert Hash(sha1): ${other}\n${installed ? `Cert Hash(sha1): ${fingerprint}\n` : ''}`)
+  let stored = false
+  const calls: string[] = []
+  const manager = new Win32CertManager(dir, '', async (command, args) => {
+    calls.push([command, ...args].join(' '))
+    if (args.includes('-delstore')) {
+      stored = false
+      return ok()
     }
-    if (args[1] === '-delstore') installed = false
-    return ok()
+    // Store lookup by thumbprint: the key is either there or the command fails.
+    return stored
+      ? ok('HKEY_CURRENT_USER\\Software\\Microsoft\\SystemCertificates\\Root\\Certificates')
+      : { code: 1, stdout: '', stderr: '错误: 系统找不到指定的注册表项。' }
   })
 
+  assert.deepEqual(await manager.getStatus(), { installed: false, trusted: false })
+
+  stored = true // what `certutil -user -addstore` leaves behind
   assert.deepEqual(await manager.getStatus(), { installed: true, trusted: true })
+
   assert.deepEqual(await manager.uninstall(), { ok: true })
-  assert.equal(calls.every((args) => args[3] === fingerprint), true)
-  assert.equal((await manager.getStatus()).installed, false)
+
+  assert.deepEqual(await manager.getStatus(), { installed: false, trusted: false })
+  // Identity, not a shared subject name: every lookup and the delete name this CA's fingerprint.
+  assert.equal(calls.every((call) => call.includes(fingerprint)), true)
 })

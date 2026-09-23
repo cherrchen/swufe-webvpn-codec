@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { test } from 'node:test'
 
-import { parseCertutilHashes, parseFindCertificateHashes } from '../src/main/platform/parse'
+import { parseFindCertificateHashes } from '../src/main/platform/parse'
 import { caFingerprint, caPaths } from '../src/main/platform/ca-files'
 
 const caCert = join(process.cwd(), 'test', 'fixtures', 'ca-cert.pem')
@@ -45,25 +45,14 @@ attributes:
   assert.deepEqual(parseFindCertificateHashes(stdout), [])
 })
 
-test('certutil output proves the exact certificate identity on Windows', () => {
-  const ours = caFingerprint(caCert)
-  assert.deepEqual(
-    parseCertutilHashes(`
-================ Certificate 0 ================
-Serial Number: 1234
-Cert Hash(sha1): ${'B'.repeat(40)}
-================ Certificate 1 ================
-Cert Hash(sha1): ${ours.toLowerCase()}
-`),
-    ['B'.repeat(40), ours],
-  )
-  assert.deepEqual(parseCertutilHashes('Root "Certificates"\nCertUtil: -store command completed successfully.\n'), [])
-})
-
 test('CA files follow the mitmproxy basename inside the confdir', () => {
-  const paths = caPaths('/tmp/conf')
+  const confdir = join('tmp', 'conf')
+  const paths = caPaths(confdir)
 
-  assert.equal(paths.caPem, '/tmp/conf/mitmproxy-ca.pem')
-  assert.equal(paths.caCert, '/tmp/conf/mitmproxy-ca-cert.pem')
-  assert.equal(paths.caCer, '/tmp/conf/mitmproxy-ca-cert.cer')
+  assert.equal(basename(paths.caPem), 'mitmproxy-ca.pem')
+  assert.equal(basename(paths.caCert), 'mitmproxy-ca-cert.pem')
+  assert.equal(basename(paths.caCer), 'mitmproxy-ca-cert.cer')
+  assert.equal(dirname(paths.caPem), confdir)
+  assert.equal(dirname(paths.caCert), confdir)
+  assert.equal(dirname(paths.caCer), confdir)
 })

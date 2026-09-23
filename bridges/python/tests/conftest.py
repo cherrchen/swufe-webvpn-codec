@@ -6,12 +6,19 @@ the proxy stack (and so collection failures in L1 cannot mask L0 results).
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 
 from swufe_bridge.config import BridgeRuntimeConfig, parse_runtime_config, write_runtime_config
 from swufe_bridge.wrd_codec import WrdCodec
+
+# Windows synthesizes POSIX mode bits (a regular file always reads back 0o666), so the
+# 0600 contract of `bridge-config.json` and of the CA private key can only be asserted on
+# POSIX. Windows keeps the same guarantee through the per-user profile ACL of
+# `%APPDATA%\swufe-webvpn-bridge` instead of mode bits (docs/operations/README.md § 2).
+POSIX_FILE_MODES = sys.platform != "win32"
 
 DEFAULT_PAYLOAD: dict[str, object] = {
     "allowlist": {"hosts": ["jwxt.swufe.edu.cn"], "includeSwufeWildcard": False},

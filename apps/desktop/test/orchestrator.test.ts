@@ -124,7 +124,11 @@ test('a successful start writes the runtime config, enables the proxy and report
     { name: 'wrdvpn_session', value: 'STUB-SESSION', domain: 'webvpn.swufe.edu.cn', path: '/' },
   ])
   // NFR-003: the file carries session cookies, so it must stay owner-only.
-  assert.equal(statSync(runtimeConfigPath).mode & 0o777, 0o600)
+  // Windows synthesizes POSIX mode bits (a regular file reads back 0o666) and keeps the
+  // guarantee through the per-user %APPDATA% profile ACL, so only POSIX is asserted here.
+  if (process.platform !== 'win32') {
+    assert.equal(statSync(runtimeConfigPath).mode & 0o777, 0o600)
+  }
 })
 
 test('starting twice is idempotent', async () => {
@@ -339,11 +343,36 @@ test('an expired session re-login clears the stale notice', async () => {
   await h.orchestrator.handleSessionExpired()
   assert.equal((await h.orchestrator.status()).error?.code, 'SESSION_EXPIRED')
 
-  h.orchestrator.clearSessionExpiredNotice()
+  h.orchestrator.clearStaleSessionNotice()
 
   const status = await h.orchestrator.status()
   assert.equal(status.state, 'idle')
   assert.equal(status.error, undefined)
+})
+
+test('a successful login clears the stale NOT_LOGGED_IN notice', async () => {
+  const h = harness()
+  h.session.loggedIn = false
+  assert.equal((await h.orchestrator.start()).error?.code, 'NOT_LOGGED_IN')
+
+  h.session.loggedIn = true
+  h.orchestrator.clearStaleSessionNotice()
+
+  const status = await h.orchestrator.status()
+  assert.equal(status.state, 'idle')
+  assert.equal(status.error, undefined)
+  assert.equal(status.loggedIn, true)
+})
+
+test('a stale notice of another cause survives a fresh session', async () => {
+  const h = harness()
+  h.certManager.status = { installed: false, trusted: false }
+  assert.equal((await h.orchestrator.start()).error?.code, 'CA_MISSING')
+
+  h.session.loggedIn = true
+  h.orchestrator.clearStaleSessionNotice()
+
+  assert.equal((await h.orchestrator.status()).error?.code, 'CA_MISSING')
 })
 
 test('launch recovery clears a leftover marker from a previous crash', async () => {

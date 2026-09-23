@@ -108,6 +108,15 @@ HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settin
   assert.equal(shouldClear(winInetState(true, '127.0.0.1:8080'), 8080), true)
 })
 
+test('reg query output captured on Windows (CRLF) still yields both values', () => {
+  // Captured on Windows 11 24H2 (2026-09-23); `reg query` writes CRLF.
+  const dword = '\r\nHKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\r\n    ProxyEnable    REG_DWORD    0x1\r\n\r\n'
+  const string = '\r\nHKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\r\n    ProxyServer    REG_SZ    127.0.0.1:7890\r\n\r\n'
+
+  assert.deepEqual(parseWinInetValue(`${dword}\n${string}`), { enable: true, server: '127.0.0.1:7890' })
+  assert.equal(isConflict(winInetState(true, '127.0.0.1:7890'), 8080), true)
+})
+
 test('windows per-protocol proxy values conflict unless every entry is ours', () => {
   const ours = winInetState(true, 'http=127.0.0.1:8080;https=127.0.0.1:8080')
   const mixed = winInetState(true, 'http=127.0.0.1:8080;https=127.0.0.1:7890')

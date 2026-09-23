@@ -193,8 +193,12 @@ def wait_for_ca(confdir: Path) -> Path:
 
 
 def curl(*args: str) -> subprocess.CompletedProcess[str]:
+    # Windows' curl uses Schannel, which refuses the freshly generated MITM leaf with
+    # exit 60 ("the revocation status is unknown"); the flag is Schannel-only, so it is
+    # passed on Windows only. See the Windows acceptance run in specs/001/verification.md.
+    schannel = ["--ssl-no-revoke"] if sys.platform == "win32" else []
     return subprocess.run(
-        ["curl", "--silent", "--show-error", *args],
+        ["curl", "--silent", "--show-error", *schannel, *args],
         capture_output=True,
         text=True,
         timeout=CURL_TIMEOUT,
@@ -290,9 +294,10 @@ def test_tc_f01_allowlisted_request_is_rewritten_end_to_end(bridge, webvpn) -> N
     assert path == expected_path
     assert cookie is not None
     assert f"wrdvpn_session={SESSION_VALUE}" in cookie
-    # HTTP/2 against the client lowercases header names.
+    # Header names are case-insensitive: HTTP/2 lowercases them, while Windows' Schannel
+    # curl speaks HTTP/1.1 and echoes upstream's original case.
     assert "location: https://jwxt.swufe.edu.cn/next" in result.stdout.lower()
-    assert "set-cookie: UPSTREAM=1; Domain=.swufe.edu.cn; Path=/" in result.stdout
+    assert "set-cookie: upstream=1; domain=.swufe.edu.cn; path=/" in result.stdout.lower()
 
 
 def test_gateway_owned_path_and_promotion_end_to_end(bridge, webvpn) -> None:
@@ -361,15 +366,29 @@ def test_listener_is_loopback_only(bridge) -> None:
 
 
 def _non_loopback_ipv4_addresses() -> list[str]:
-    try:
-        out = subprocess.run(["ifconfig"], capture_output=True, text=True, timeout=10).stdout
-    except (OSError, subprocess.SubprocessError):
-        return []
+    """Local IPv4 addresses, without shelling out to a per-OS tool (`ifconfig` is absent
+    on Windows, which used to skip this security assertion there)."""
     addresses: list[str] = []
-    for match in re.finditer(r"inet (?:addr:)?(\d+\.\d+\.\d+\.\d+)", out):
-        address = match.group(1)
-        if not address.startswith("127.") and address not in addresses:
-            addresses.append(address)
+    try:
+        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+    except OSError:
+        infos = []
+    for info in infos:
+        candidate = info[4][0]
+        if not candidate.startswith("127.") and candidate not in addresses:
+            addresses.append(candidate)
+    # A hostname may resolve to loopback only; ask the routing table which local address
+    # would carry outbound traffic instead (no packet is sent for a connected UDP socket).
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("192.0.2.1", 9))  # TEST-NET-1
+        candidate = probe.getsockname()[0]
+        if not candidate.startswith("127.") and candidate not in addresses:
+            addresses.append(candidate)
+    except OSError:
+        pass
+    finally:
+        probe.close()
     return addresses
 
 

@@ -20,6 +20,8 @@ from swufe_bridge.config import (
     write_runtime_config,
 )
 
+from tests.conftest import POSIX_FILE_MODES
+
 
 @pytest.fixture
 def store(tmp_path: Path) -> AllowlistStore:
@@ -212,7 +214,8 @@ def test_write_runtime_config_is_owner_only_and_round_trips(tmp_path: Path) -> N
 
     write_runtime_config(path, cfg)
 
-    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+    if POSIX_FILE_MODES:
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
     reloaded = load_runtime_config(path)
     assert reloaded.cookies == cfg.cookies
     assert reloaded.debug is True

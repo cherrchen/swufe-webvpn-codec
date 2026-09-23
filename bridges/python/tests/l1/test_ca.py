@@ -10,6 +10,8 @@ import pytest
 
 from swufe_bridge.ca import ca_paths, ensure_ca, main
 
+from tests.conftest import POSIX_FILE_MODES
+
 
 def test_ensure_ca_creates_reusable_store_unmodified_on_second_call(tmp_path: Path) -> None:
     first = ensure_ca(tmp_path)
@@ -27,7 +29,8 @@ def test_ensure_ca_creates_reusable_store_unmodified_on_second_call(tmp_path: Pa
 def test_ca_private_key_is_owner_only(tmp_path: Path) -> None:
     paths = ensure_ca(tmp_path)
 
-    assert stat.S_IMODE(paths["ca_pem"].stat().st_mode) == 0o600
+    if POSIX_FILE_MODES:
+        assert stat.S_IMODE(paths["ca_pem"].stat().st_mode) == 0o600
 
 
 def test_main_reports_created_ca_on_stdout(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:

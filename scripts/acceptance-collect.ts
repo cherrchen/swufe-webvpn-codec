@@ -252,6 +252,13 @@ function curlBin(): string {
   return 'curl'
 }
 
+/** Windows' curl speaks Schannel, which rejects the freshly generated MITM leaf with
+ * exit 60 ("the revocation status is unknown"); the flag is Schannel-only, so it is
+ * passed on Windows and left out elsewhere. */
+const CURL_TLS_ARGS: readonly string[] = process.platform === 'win32' ? ['--ssl-no-revoke'] : []
+/** The same flag pre-spaced for the human-readable command labels of the report. */
+const CURL_TLS_LABEL = CURL_TLS_ARGS.length > 0 ? ` ${CURL_TLS_ARGS.join(' ')}` : ''
+
 function collectEnv(options: Options, startedAt: Date): void {
   const commit = run('git', ['rev-parse', '--short', 'HEAD'])
   const node = run(process.execPath, ['-v'])
@@ -344,6 +351,18 @@ function collectRuntimeConfig(options: Options): void {
     cookieCount: cookies.length,
   }
   const detail = `文件：${runtimePath}（mode ${String(mode)}）\n白名单字段（cookie 值 / wrdKey / wrdIv 不写入报告）：\n${JSON.stringify(whitelisted, null, 2)}`
+  // Windows synthesizes POSIX mode bits (a regular file always reads back 0o666); the
+  // owner-only guarantee there is the per-user `%APPDATA%` profile ACL, not mode bits.
+  if (process.platform === 'win32') {
+    record(
+      'runtime-config',
+      'INFO',
+      `权限位不适用（Windows 合成 ${String(mode)}）cookieCount=${String(cookies.length)}`,
+      command,
+      `${detail}\n（Windows：POSIX 权限位由系统合成、不代表 ACL；等价保护来自 %APPDATA% 的每用户 profile ACL）`,
+    )
+    return
+  }
   if (mode !== '0o600') {
     record('runtime-config', 'FAIL', `权限为 ${String(mode)}（期望 0o600）`, command, detail)
     return
@@ -362,7 +381,9 @@ function collectCaFiles(options: Options): void {
   ].join('\n')
   const command = `stat ${confdir}/mitmproxy-ca*.pem`
   const pemMode = fileMode(caPem)
-  if (isFile(caPem) && pemMode !== '0o600') {
+  // Same Windows caveat as `collectRuntimeConfig`: synthesized mode bits carry no ACL
+  // meaning, so only POSIX can be judged here.
+  if (process.platform !== 'win32' && isFile(caPem) && pemMode !== '0o600') {
     record('ca-files', 'FAIL', `CA 私钥权限为 ${String(pemMode)}（期望 0o600）`, command, lines)
     return
   }
@@ -504,6 +525,7 @@ async function collectBridgeSmoke(
   const url = `${options.scheme}://${options.host}/`
   const args = [
     '-sS',
+    ...CURL_TLS_ARGS,
     '-x',
     `http://127.0.0.1:${String(options.port)}`,
     '--cacert',
@@ -530,7 +552,7 @@ async function collectBridgeSmoke(
   const location = /^location:\s*(.*)$/im.exec(headers)?.[1]?.trim() ?? '(无)'
   const contentType = /^content-type:\s*(.*)$/im.exec(headers)?.[1]?.trim() ?? '(无)'
   const body = [
-    show(`curl -sS -x http://127.0.0.1:${String(options.port)} --cacert <caCert> -m 20 -o ${bodyPath ?? os.devNull} -D - ${url}`, result),
+    show(`curl -sS${CURL_TLS_LABEL} -x http://127.0.0.1:${String(options.port)} --cacert <caCert> -m 20 -o ${bodyPath ?? os.devNull} -D - ${url}`, result),
     `status:       ${status}`,
     `location:     ${location}`,
     `content-type: ${contentType}`,
@@ -540,10 +562,10 @@ async function collectBridgeSmoke(
   ].join('\n')
 
   if (result.code !== 0) {
-    record('bridge-smoke', 'FAIL', `curl 退出码 ${String(result.code)}`, `curl -x http://127.0.0.1:${String(options.port)} ${url}`, body)
+    record('bridge-smoke', 'FAIL', `curl 退出码 ${String(result.code)}`, `curl${CURL_TLS_LABEL} -x http://127.0.0.1:${String(options.port)} ${url}`, body)
     return
   }
-  record('bridge-smoke', 'PASS', status, `curl -x http://127.0.0.1:${String(options.port)} ${url}`, body)
+  record('bridge-smoke', 'PASS', status, `curl${CURL_TLS_LABEL} -x http://127.0.0.1:${String(options.port)} ${url}`, body)
 
   const direct = curlRequest(['-sS', '-m', '20', '-o', os.devNull, '-w', '%{http_code}', url], 30_000)
   record(
@@ -563,7 +585,7 @@ function collectBypassControl(options: Options, portOpen: boolean, caCert: strin
   }
   const headerFile = path.join(os.tmpdir(), `swufe-acceptance-bypass-${String(Date.now())}.txt`)
   const result = curlRequest(
-    ['-sS', '-x', `http://127.0.0.1:${String(options.port)}`, '--cacert', caCert, '-m', '20', '-o', os.devNull, '-D', headerFile, url],
+    ['-sS', ...CURL_TLS_ARGS, '-x', `http://127.0.0.1:${String(options.port)}`, '--cacert', caCert, '-m', '20', '-o', os.devNull, '-D', headerFile, url],
     30_000,
   )
   let headers = ''
@@ -578,8 +600,8 @@ function collectBypassControl(options: Options, portOpen: boolean, caCert: strin
     'bypass-control',
     'INFO',
     status,
-    `curl -x http://127.0.0.1:${String(options.port)} ${url}`,
-    `${show(`curl -x http://127.0.0.1:${String(options.port)} -D - ${url}`, result)}\nstatus: ${status}\n响应头（已脱敏）：\n${headers.trimEnd() === '' ? '(空)' : headers.trimEnd()}\n（防环对照：桥运行期间该主机的请求不应被二次包装，与 addon 的硬编码排除一致）`,
+    `curl${CURL_TLS_LABEL} -x http://127.0.0.1:${String(options.port)} ${url}`,
+    `${show(`curl${CURL_TLS_LABEL} -x http://127.0.0.1:${String(options.port)} -D - ${url}`, result)}\nstatus: ${status}\n响应头（已脱敏）：\n${headers.trimEnd() === '' ? '(空)' : headers.trimEnd()}\n（防环对照：桥运行期间该主机的请求不应被二次包装，与 addon 的硬编码排除一致）`,
   )
 }
 
