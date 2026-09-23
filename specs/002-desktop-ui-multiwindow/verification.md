@@ -152,9 +152,9 @@ Status 取值：`Pending` / `Passed` / `Failed` / `N/A`（`N/A` 必须写明理�
 
 | 项 | 原因 | 已尝试 | 需要谁决策 |
 | -- | ---- | ------ | ---------- |
-| Windows 侧界面行为（二级窗口、CJK 字体下的零滚动、AntD 在 Windows 的对话框习惯） | 沿用 001 的延期结论（`KI-001`），本 Spec 的实机验证在 macOS 执行 | 无（未在 Windows 真机执行） | cherrchen（是否随 001 的 Windows 验收一并执行） |
-| 真实校内会话下的教务页面操作（TC-J13 的「教务首页可打开并可操作」） | 需要 CAS/MFA 凭据与已安装并被信任的本机 CA；本会话以假上游（`portal-stub.mjs`）+ 假会话验证了同一路径（登录 → 开桥 → 浏览器经系统代理访问 allowlist 主机 → 关桥 → 退出） | 已执行：假上游会话 + 真实浏览器（Chrome headless 经系统代理）访问 `http://jwxt.swufe.edu.cn/` 成功、退出后无残留代理 | cherrchen（用真实会话复跑 TC-G01 口径；001 已通过同类用例） |
-| 进程捕获「只对所选应用生效」（TC-G04）与主窗口 `进程捕获：已启用（N 个应用）` 的真实呈现 | 需要 macOS 网络扩展授权（管理员密码 + 系统设置手动允许），且会接管所选进程流量 | 已执行：勾选/取消即时落盘与回读、四态状态行的组件测试、`bridge-config.json` 的互斥语义核对 | cherrchen（在真实授权下复跑 001 的 TC-G04） |
+| Windows 侧界面行为（二级窗口、CJK 字体下的零滚动、AntD 在 Windows 的对话框习惯） | 沿用 001 的延期结论（`KI-001`）；本 Spec 的实机验证在 macOS 执行 | **2026-09-23 部分执行**：随 001 的 Windows 验收在同一台 Windows 11 24H2 真机上使用了四窗口结构——主窗口（720×560）、日志窗（`logs.html`，表头「时间/域名/结果」+ 真实桥流量行）、Allowlist 窗（增删/通配/持久化）、捕获窗口的应用列表（136 行）均正常；**未复测** Windows 下的零滚动 zoom 四档与 AntD 对话框习惯（TC-J01/J08/J09 判据仍在 macOS 上取得） | cherrchen（是否需要在 Windows 上补齐 002 自身的判据） |
+| 真实校内会话下的教务页面操作（TC-J13 的「教务首页可打开并可操作」） | 需要 CAS/MFA 凭据与已安装并被信任的本机 CA；本会话以假上游（`portal-stub.mjs`）+ 假会话验证了同一路径（登录 → 开桥 → 浏览器经系统代理访问 allowlist 主机 → 关桥 → 退出） | **2026-09-23 已在 Windows 真机执行等价路径**：真实 CAS/MFA 会话 + 已装 CA，真实 Chrome 经系统代理打开 `http://jwxt.swufe.edu.cn/`（入口被升级到网关原生 URL，桥日志 `detail=promoted`），cherrchen 确认可打开并可操作；记录见 [001 的 verification.md](../001-phase1-local-bridge/verification.md) 的「M4 Windows 验收执行记录」 | cherrchen（是否需要在本 Spec 口径下于 macOS 复跑同一判据） |
+| 进程捕获「只对所选应用生效」（TC-G04）与主窗口 `进程捕获：已启用（N 个应用）` 的真实呈现 | 需要 macOS 网络扩展授权（管理员密码 + 系统设置手动允许），且会接管所选进程流量 | **2026-09-23 已在 Windows 真机执行**（应用以管理员启动）：主窗口 `进程捕获：已启用（1 个应用）` + 状态条「桥接中（进程捕获）」；所选 `chrome.exe` 的请求经桥、未选中的 `curl` 直连不经桥、捕获态下系统代理为 `0x0`；macOS 扩展授权下的本 Spec 判据仍需按原口径复跑 | cherrchen（在真实授权下复跑 001 的 TC-G04 以补齐 macOS 侧） |
 
 ## 结论
 
@@ -163,4 +163,4 @@ Status 取值：`Pending` / `Passed` / `Failed` / `N/A`（`N/A` 必须写明理�
 - [x] 文档影响已处理
 - [ ] Spec 状态可推进到 `Verified`
 
-当前状态：`Implemented`。实现、组件测试、全量回归与 macOS 上的可机器执行验收全部通过；推进到 `Verified` 仍受三项未验证项（Windows 真机、真实会话下的教务页面操作、进程捕获真实范围）约束，与 001 的既有遗留一致。
+当前状态：`Implemented`。实现、组件测试、全量回归与 macOS 上的可机器执行验收全部通过。2026-09-23 随 001 的 Windows 验收在同一台真机上补齐了三项未验证项中的两项（真实会话下的教务页面操作、进程捕获真实范围），并在 Windows 上实际使用了四窗口结构；本 Spec 自身的 Windows 判据（零滚动 zoom 四档、AntD 对话框习惯）与 macOS 上真实扩展授权下的 TC-G04 仍需按原口径复跑；与 001 的既有遗留（`KI-014`/`KI-019` 等）一致。

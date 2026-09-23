@@ -80,8 +80,9 @@ pnpm run acceptance:check --out <dir> --user-data-dir <profile>
 
 - 该脚本采集一份脱敏的验收证据报告（`<dir>/acceptance-<platform>-<时间戳>.md`）：OS/版本、`config.json` 与 `bridge-config.json` 的关键字段、CA 文件与系统信任库、每个网络服务的系统代理状态、桥端口是否在监听、经桥与直连的 curl 对照、sidecar 残留进程。
 - 报告**不含** Cookie 值、`wrdKey` / `wrdIv` 值或任何 `Set-Cookie` / `Cookie` / `Authorization` 头的值（NFR-003 / INV-001）；脚本末尾的 `redaction-self-check` 项若发现泄漏会以 `FAIL` 结束（退出码 1）。
-- 开关：`--port`（默认 8080）、`--host`（默认 `jwxt.swufe.edu.cn`）、`--user-data-dir`（默认 macOS `~/Library/Application Support/swufe-webvpn-bridge`、Windows `%APPDATA%\swufe-webvpn-bridge`）、`--save-body`（默认关闭；保存的正文可能含个人信息，**不要入库**）。
-- 验收的完整步骤（含教务浏览器验收与结果表）见 [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 双平台验收执行手册」。
+- 开关：`--port`（默认 8080）、`--host`（默认 `jwxt.swufe.edu.cn`）、`--scheme`（默认 `https`；**教务 `jwxt.swufe.edu.cn` 经本网关只能以 `http` 形态代理，验收该主机须加 `--scheme http`**）、`--user-data-dir`（默认 macOS `~/Library/Application Support/swufe-webvpn-bridge`、Windows `%APPDATA%\swufe-webvpn-bridge`）、`--save-body`（默认关闭；保存的正文可能含个人信息，**不要入库**）。
+- 平台差异：脚本在 Windows 上给 curl 自动追加 `--ssl-no-revoke`（Windows 自带 curl 使用 Schannel，校验刚生成的本机 CA 时会以「未知吊销状态」失败，退出码 60）；Windows 的 `runtime-config` / `ca-files` 段以 `INFO` 报告权限位（POSIX 模式位在 Windows 由系统合成、不代表 ACL，等价保护来自 `%APPDATA%` 的每用户 profile ACL）。
+- 验收的完整步骤（含教务浏览器验收与结果表）见 [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 双平台验收执行手册」；Windows 侧实测记录见同文件的「M4 Windows 验收执行记录（2026-09-23）」。若报告只出现 `FAIL bridge-smoke curl 退出码 28`，先重跑一次（上游偶发挂起，见 `KI-019`），不要据此判定桥故障。
 
 ## 6. 常见故障
 
@@ -96,6 +97,8 @@ pnpm run acceptance:check --out <dir> --user-data-dir <profile>
 | `swufe-error CONFIG_INVALID` | 运行时配置非法（如 `capture.processes` 含逗号） | 修正 `<userData>/config.json` 的对应设置后重新开桥 |
 | sidecar 起不来 / 提示找不到 python | `bridges/python` 未执行过 `uv sync`，或 `SWUFE_PYTHON` 指向不存在的解释器 | 在仓库根执行 `uv sync --directory bridges/python`，或修正 `SWUFE_PYTHON` |
 | 关闭应用后系统代理仍指向本桥 | 上次以 `kill -TERM` / `kill -9` 结束，未触发 JS 清理（已记入已知问题） | 下次启动时 `recoverOnLaunch()` 会依据「由本 App 设置」标记自动清除；也可手动 `networksetup -setwebproxystate <服务> off`（Windows：把 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyEnable` 置 0） |
+| 浏览器首次打开教务页长时间无响应（数十秒无内容） | 上游偶发挂起（`KI-019`）：桥侧已记录请求，但网关侧响应未到；直连网关根正常 | 重载页面（或关闭后重开）。同一现象在验收期的自动化 smoke 里表现为 `curl 退出码 28`，重跑即可；已登记的复现数据见 `KI-019` |
+| 「指定应用」捕获下浏览器打不开教务（`ERR_NAME_NOT_RESOLVED`） | 进程捕获不做 DNS 拦截：浏览器必须先自行解析主机名，而 `jwxt.swufe.edu.cn` 无公网解析记录 | 教务走默认的「系统代理（全部流量）」模式（浏览器把主机名交给桥，桥再映射到网关）；捕获模式适合能本地解析的主机 |
 | 界面显示「进程捕获：启用失败」 | 系统扩展未授权 / 授权超时（macOS） | 按界面引导在「系统设置 → 通用 → 登录项与扩展」中允许，然后点「重试」。捕获失败不影响系统代理路径（桥仍为「桥接中」） |
 
 ## 7. Windows 差异
@@ -105,9 +108,13 @@ pnpm run acceptance:check --out <dir> --user-data-dir <profile>
 | 系统代理 | 通过 WinINET 注册表（`HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyEnable` / `ProxyServer`）读写，不动其它设置 |
 | 生效时机 | **不广播 `WM_SETTINGCHANGE`**：已经在运行的浏览器可能继续使用旧代理，需要重启浏览器才感知 |
 | CA | 写入当前用户根存储（`certutil -user`），不需要管理员；macOS 走系统钥匙串，安装时先提权写钥匙串、再由应用进程写入信任设置（见 [ADR-0008](../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)） |
-| 进程捕获 | 需要 UAC 提权；「指定应用」的真实范围验证随 Windows 真机项一并延期 |
+| 进程捕获 | 需要以管理员身份启动应用（UAC；`local:` 模式在 Windows 用 pydivert 重定向所选进程）。已验证：互斥（捕获态下不动系统代理）、正向（所选 `chrome.exe` 的请求经桥）、反向（未选中的 `curl` 直连不经桥）——见 [verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 Windows 验收执行记录」 |
+| 捕获模式的 DNS | 捕获不做 DNS 拦截，所选进程必须能自行解析主机名：`jwxt.swufe.edu.cn` 无公网解析（`ERR_NAME_NOT_RESOLVED`）→ 教务用默认的「系统代理」模式 |
+| 浏览器 https 升级 | Chrome / Edge 会把 `http://jwxt.swufe.edu.cn/` 自动升级为 `https://`，而该网关不支持以 https 代理教务（返回 `/wengine-vpn/failed`）；验收时用 `--disable-features=HttpsUpgrades` 或关闭「始终使用安全连接」 |
+| curl 校验本机 CA | Windows 自带 curl 使用 Schannel，`--cacert <本机 CA>` 会以「未知吊销状态」失败（退出码 60）：手动命令需加 `--ssl-no-revoke`（`pnpm run acceptance:check` 已自动附加） |
+| 文件权限 | 无 POSIX 模式位语义（`stat` 由系统合成 `0o666`）；会话文件与 CA 私钥的「仅本机用户」由 `%APPDATA%` 每用户 profile ACL 提供（NFR-003 的 Windows 实现方式） |
 
-> Windows 真机验证（TC-C02..C04、TC-E01/E02、TC-G03/G04）尚未执行，原因与解除条件见 [verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「未验证 / 无法验证项」与 [known-issues.md](../../specs/001-phase1-local-bridge/known-issues.md) 的 `KI-001`。
+> Windows 真机验证（TC-C02..C04、TC-D01..D04、TC-E01/E02/E03、TC-F01/F04、TC-G03/G04、TC-H01/H02、TC-B05）已于 **2026-09-23** 在 Windows 11 24H2 上执行并通过，期间修复 `KI-015`..`KI-018` 与 `KI-020`（见 [known-issues.md](../../specs/001-phase1-local-bridge/known-issues.md)）；执行记录与命令结果见 [verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 Windows 验收执行记录（2026-09-23）」。仍 Open 的 `KI-019`（上游偶发挂起）与本文件 §6 的处置一致。
 
 ## 8. 停止与重置
 

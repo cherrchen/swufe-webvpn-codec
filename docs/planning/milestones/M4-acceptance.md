@@ -1,6 +1,6 @@
 # M4: 验收（Acceptance）
 
-> Status: In Progress
+> Status: In Progress（2026-09-23：Windows 侧全部真机项已执行并通过，`KI-001` 置 `Fixed`，`KI-019` 决策接受；剩余出口条件仅 `KI-014` 待决策）
 > Owner: cherrchen
 > Target: TBD（原包未定义日期）
 
@@ -16,24 +16,24 @@
 
 | Spec | 状态 | 依赖 |
 | ---- | ---- | ---- |
-| [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Implemented（M5 后；`Verified` 待 Windows 侧 `KI-001`） | M3 |
+| [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Implemented（两侧桌面 OS 的 P0 用例与教务浏览器验收均已通过；`Verified` 仅待 `KI-014` 的决策） | M3 |
 
 ## 退出条件
 
 - [x] macOS：应用可启动并完成登录/开桥/关桥/退出全链路（TC-D01/D02/D03/D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05 通过）
 - [x] macOS：浏览器可打开教务首页（TC-G01，P0）——**M5（2026-09-21）通过**：`KI-011` 修复（网关自有命名空间直通 + bootstrap 文档升级，[ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）后，入口 `http://jwxt.swufe.edu.cn/` 被升级到 WebVPN 原生 URL 形态并正常打开（桥日志 `detail=promoted`）
 - [x] macOS：教务站内导航可用，不因绝对 URL 跳飞到不可达地址（TC-G02，P0）——**M5（2026-09-21）通过**：网关原生空间下首页菜单与站内「学生成绩查询」均可交互、无错误页（同一 [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）
-- [ ] Windows：重复 TC-G01 通过（TC-G03，P0）——**延期**：机器不在本轮可访问环境（`KI-001`）
-- [ ] 所有 P0 用例通过（TC-A01/A02/A03、TC-B01..TC-B03、TC-C01..TC-C04、TC-D01..TC-D04、TC-E01/E02、TC-F01/F02、TC-G01..TC-G03）——**macOS 侧已全部通过**（M5 后 TC-G01/TC-G02 转通过）；**未满足的只有 TC-G03**（Windows 真机项延期，`KI-001`）
-- [ ] P1 用例无未决阻断缺陷——**未满足**：`KI-011` 已 `Fixed`（M5），`KI-007` 已 `Fixed`（2026-09-21，[ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)），`KI-013` 已 `Fixed`（2026-09-21，开桥前 fake-ip 预检，[ADR-0011](../../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）；仍未决的是 `KI-014`（CAS 主题资源被服务端截断，需重载登录窗）
-- [x] 教务浏览器验收在至少一侧桌面 OS 通过（目标两侧都过）——**M5（2026-09-21）已满足**：macOS 侧 TC-G01/TC-G02 通过；Windows 侧仍待 `KI-001` 解除后按 [development-run.md](../../operations/development-run.md) 复跑
-- [x] 已知问题列表已记录（`id/title/severity/status/linked_case/owner/note`，含验收期新增 `KI-007`..`KI-014`；M5 后 `KI-011` 置 `Fixed`）
+- [x] Windows：重复 TC-G01 通过（TC-G03，P0）——**2026-09-23 通过**（Windows 11 24H2 真机）：入口 `http://jwxt.swufe.edu.cn/` 经桥被升级到 `https://webvpn.swufe.edu.cn/http/<token>/`（桥日志 `detail=promoted`），cherrchen 确认页面可打开并可操作；`/xtgl/index_initMenu.html` 经桥 `200` 且响应体被反向改写
+- [x] 所有 P0 用例通过（TC-A01/A02/A03、TC-B01..TC-B03、TC-C01..TC-C04、TC-D01..TC-D04、TC-E01/E02、TC-F01/F02、TC-G01..TC-G03）——**macOS 侧（M5 后）与 Windows 侧（2026-09-23）均已全部通过**：Windows 复跑结果为 TC-D01..D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G03、TC-G04、TC-H01/H02、TC-B05 通过
+- [ ] P1 用例无未决阻断缺陷——**仅剩 `KI-014`**：CAS 主题资源被服务端截断（重载可恢复；2026-09-21 决策仅文档化，保持 `Open` 待 cherrchen 决策）；`KI-019`（经桥访问教务偶发挂起）已于 2026-09-23 **接受**（`Accepted`：上游成因 + 重载规避，复测手段已随条目记录）；`KI-011`/`KI-007`/`KI-013`/`KI-015`..`KI-018` 均已 `Fixed`
+- [x] 教务浏览器验收在至少一侧桌面 OS 通过（目标两侧都过）——**2026-09-23 两侧均通过**：macOS 侧 TC-G01/TC-G02（M5）与 Windows 侧 TC-G03（M4 Windows 轮）
+- [x] 已知问题列表已记录（`id/title/severity/status/linked_case/owner/note`，含验收期新增 `KI-007`..`KI-020`；`KI-001` 于 2026-09-23 置 `Fixed`）
 - [x] 相关文档已同步（含双语配对：`development-run.md`、milestone/roadmap/testing-strategy 与 Spec 五文件）
 
-> 出口口径：macOS 侧（含教务浏览器验收）已全部通过；Windows 侧显式延期。**「至少一侧桌面 OS 通过」这一下限已在 M5（2026-09-21）达成**，但「所有 P0 通过」仍差 TC-G03（Windows，`KI-001`）、「P1 无未决阻断缺陷」仍有 `KI-014`，故本里程碑保持 `In Progress`，Spec 001 推进到 `Implemented`（未到 `Verified`）。
+> 出口口径：macOS 侧（含教务浏览器验收）在 M5 全部通过；**Windows 侧于 2026-09-23 在真机全部通过（`KI-001` 置 `Fixed`）**，本轮另修复 4 个 Windows 专属缺陷（`KI-015`..`KI-018`）与 4 处工具平台假设（`KI-020`）。因此「所有 P0 用例通过」与「教务浏览器验收通过」两项均已满足；`KI-019`（上游偶发挂起）已由 cherrchen 决策接受。本里程碑与 Spec 001 距离 `Done`/`Verified` 只剩 `KI-014`（校方服务端行为，已文档化规避）一项决策。
 
 验收环境：macOS 与 Windows 各一台测试机、Chrome/Edge、mitmproxy 与 curl；测试账号为测试者自有西财账号（不写入仓库），仅在授权设备上使用。
-本轮实测补充：**验收前必须关闭其它代理工具的 TUN / 虚拟网卡模式**（Clash/mihomo fake-ip 会让经桥的上游连接挂起，见 `KI-013`；2026-09-21 起 fake-ip 形态已由开桥前预检拒绝，`redir-host` 形态仍需手动关闭，见 [ADR-0011](../../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）；教务只能以 `http://jwxt.swufe.edu.cn/...` 形态经网关代理（`https` 形态网关返回 `/wengine-vpn/failed`）。
+本轮实测补充：**验收前必须关闭其它代理工具的 TUN / 虚拟网卡模式**（Clash/mihomo fake-ip 会让经桥的上游连接挂起，见 `KI-013`；2026-09-21 起 fake-ip 形态已由开桥前预检拒绝，`redir-host` 形态仍需手动关闭，见 [ADR-0011](../../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）；教务只能以 `http://jwxt.swufe.edu.cn/...` 形态经网关代理（`https` 形态网关返回 `/wengine-vpn/failed`）。**2026-09-23 Windows 侧补充**：① Chrome / Edge 会把入口自动升级为 `https://`，验收时需用 `--disable-features=HttpsUpgrades` 或关闭「始终使用安全连接」；② 「指定应用」捕获不做 DNS 拦截，教务（无公网解析）只能用默认的「系统代理」模式；③ Windows 自带 curl 校验本机 CA 需 `--ssl-no-revoke`；④ 经桥访问教务存在偶发挂起（`KI-019`），重载即恢复。
 
 ## 风险
 
@@ -53,7 +53,21 @@
 
 **本轮新增问题**：`KI-014`（CAS 主题静态资源被服务端截断 → 登录窗样式丢失，重载可恢复；与桥无关）。
 
-**仍未完成**：Windows 全部真机项（`KI-001`）；`KI-014`。（该轮记录的 `KI-007` 已于 2026-09-21 修复，见 [ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)；`KI-013` 已于 2026-09-21 修复，见 [ADR-0011](../../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）
+**仍未完成**：`KI-014`。（该轮记录的 `KI-007` 已于 2026-09-21 修复，见 [ADR-0008](../../architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)；`KI-013` 已于 2026-09-21 修复，见 [ADR-0011](../../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)；Windows 全部真机项已于 2026-09-23 补齐，见下节）
+
+### M4 Windows 侧执行记录（2026-09-23）
+
+**范围**：`KI-001`（Windows 真机项）的解除——按「M4 双平台验收执行手册」在 Windows 11 24H2 真机执行全部 Windows 项。
+
+**环境**：`win32 10.0.26200`（x64、中文界面）、Node v24.14.0、`uv` 0.11.17、Python 3.13.11、真实西财账号（CAS/MFA）、真实 Chrome 与 Windows 自带 curl（Schannel）；隔离 profile；`SWUFE_PROBE_INTERVAL_MS=8000`；TC-G04 以管理员身份启动应用（UAC）。
+
+**结果**：TC-G03（教务经桥可打开并可操作，入口 `detail=promoted`）、TC-D01..D04、TC-C01..C04、TC-E01/E02/E03、TC-F01、TC-F04、TC-G04（真实捕获：互斥 + 正向 + 反向）、TC-H01/H02、TC-B05 全部通过；命令侧 `pytest` `198 passed`、App 单测 `108 passed`、`typecheck` 无 error、`docs:check` 0 error/0 warning、`pnpm run acceptance:check --scheme http` 无 `FAIL`。
+
+**本轮新增/修复的缺陷**：`KI-015`（登录成功后残留「尚未登录」错误）、`KI-016`（中文 Windows 下 `certutil` 检测失效 → CA 已导入却报「查不到该证书」）、`KI-017`（`execFile` 的 stdin 管道使 `certutil` 挂起至 10s 超时 → CA 安装必失败）、`KI-018`（`reg query` 的 CRLF 使 WinINET 代理读写恒为空 → 漏报 `PROXY_CONFLICT` 且关桥/退出不清代理）、`KI-020`（测试与证据工具的平台假设：模式位、Schannel curl、`ifconfig` 缺失导致回环约束用例静默跳过、HTTP/2 头名大小写）；`KI-001` 置 `Fixed`。
+
+**新登记未决/已接受**：`KI-019`（经桥访问教务偶发挂起 12–45s：桥侧已记录请求但网关响应未到；重载即恢复；与 macOS 验收期的「自动化导航反复卡死」同类）——**2026-09-23 决策（cherrchen）：接受**（`Accepted`）；`KI-014` 保持 `Open` 待决策。
+
+**证据**：[specs/001-phase1-local-bridge/verification.md](../../../specs/001-phase1-local-bridge/verification.md) 的「M4 Windows 验收执行记录（2026-09-23）」（含结果表、逐条 REQ/NFR/AC 覆盖与命令结果）；脱敏快照 `specs/001-phase1-local-bridge/evidence/acceptance-windows/`（4 份）；缺陷台账 [known-issues.md](../../../specs/001-phase1-local-bridge/known-issues.md) 的「Windows 真机验收新增」。
 
 ## 完成记录
 
