@@ -7,11 +7,13 @@ import type { ProxyEntry, SystemProxy } from '../types'
 const NETWORKSETUP = '/usr/sbin/networksetup'
 
 export class DarwinSystemProxy implements SystemProxy {
+  constructor(private readonly execute: typeof run = run) {}
+
   async read(): Promise<ProxyEntry[]> {
     const entries: ProxyEntry[] = []
     for (const service of await this.enabledServices()) {
-      const web = await run(NETWORKSETUP, ['-getwebproxy', service])
-      const secure = await run(NETWORKSETUP, ['-getsecurewebproxy', service])
+      const web = await this.execute(NETWORKSETUP, ['-getwebproxy', service])
+      const secure = await this.execute(NETWORKSETUP, ['-getsecurewebproxy', service])
       entries.push({
         service,
         web: parseNetworksetupProxy(web.stdout),
@@ -39,7 +41,7 @@ export class DarwinSystemProxy implements SystemProxy {
 
   /** Enabled network services; a disabled service cannot carry a system proxy. */
   private async enabledServices(): Promise<string[]> {
-    const result = await run(NETWORKSETUP, ['-listallnetworkservices'])
+    const result = await this.execute(NETWORKSETUP, ['-listallnetworkservices'])
     if (result.code !== 0) {
       throw new Error(`无法枚举网络服务：${result.stderr.trim() || `退出码 ${result.code}`}`)
     }
@@ -49,7 +51,7 @@ export class DarwinSystemProxy implements SystemProxy {
   }
 
   private async must(...args: string[]): Promise<void> {
-    const result = await run(NETWORKSETUP, args)
+    const result = await this.execute(NETWORKSETUP, args)
     if (result.code !== 0) {
       throw new Error(
         `networksetup ${args.join(' ')} 失败：${result.stderr.trim() || `退出码 ${result.code}`}`,

@@ -230,6 +230,56 @@ test('a proxy failure rolls back the proxy and stops the sidecar', async () => {
   assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
 })
 
+test('a partially successful system command is rolled back before start fails', async () => {
+  const h = harness()
+  h.systemProxy.enableFailureAfterWeb = new Error('secure proxy write denied')
+
+  const status = await h.orchestrator.start()
+
+  assert.equal(status.state, 'error')
+  assert.match(status.error?.message ?? '', /secure proxy write denied/)
+  assert.equal(h.systemProxy.entries[0]?.web.enabled, false)
+  assert.equal(h.systemProxy.entries[0]?.secure.enabled, false)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+  assert.equal(h.calls.includes('sidecar.stop'), true)
+})
+
+test('a failed rollback retains proxy ownership until a later recovery succeeds', async () => {
+  const h = harness()
+  h.systemProxy.enableFailureAfterWeb = new Error('secure proxy write denied')
+  h.systemProxy.disableFailure = new Error('rollback denied')
+
+  const status = await h.orchestrator.start()
+
+  assert.match(status.error?.message ?? '', /代理回滚失败：rollback denied/)
+  assert.equal(h.systemProxy.entries[0]?.web.enabled, true)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+  await h.orchestrator.recoverOnLaunch()
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+
+  h.systemProxy.disableFailure = null
+  await h.orchestrator.recoverOnLaunch()
+  assert.equal(h.systemProxy.entries[0]?.web.enabled, false)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+})
+
+test('partial cleanup on stop keeps the recovery marker and retries the remaining proxy', async () => {
+  const h = harness()
+  await h.orchestrator.start()
+  h.systemProxy.disableFailureAfterWeb = new Error('secure proxy disable denied')
+
+  const status = await h.orchestrator.stop()
+
+  assert.equal(status.state, 'error')
+  assert.equal(h.systemProxy.entries[0]?.web.enabled, false)
+  assert.equal(h.systemProxy.entries[0]?.secure.enabled, true)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+  h.systemProxy.disableFailureAfterWeb = null
+  await h.orchestrator.recoverOnLaunch()
+  assert.equal(h.systemProxy.entries[0]?.secure.enabled, false)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+})
+
 test('session expiry cascades: proxy → sidecar → session → SESSION_EXPIRED', async () => {
   const h = harness()
   const events: string[] = []
@@ -250,6 +300,38 @@ test('session expiry cascades: proxy → sidecar → session → SESSION_EXPIRED
   assert.equal(status.error?.message, 'WebVPN 会话已失效。桥接已停止并已清除系统代理。')
   assert.equal(status.loggedIn, false)
   assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+})
+
+test('session expiry reports a cleanup failure and retains the recovery marker', async () => {
+  const h = harness()
+  await h.orchestrator.start()
+  h.systemProxy.disableFailure = new Error('permission denied')
+
+  await h.orchestrator.handleSessionExpired()
+
+  const status = await h.orchestrator.status()
+  assert.equal(status.error?.code, 'SESSION_EXPIRED')
+  assert.match(status.error?.message ?? '', /系统代理清理失败：permission denied/)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+  assert.equal(h.calls.includes('sidecar.stop'), true)
+  assert.equal(h.calls.includes('session.clear'), true)
+})
+
+test('overlapping expiry and stop requests share one cleanup', async () => {
+  const h = harness()
+  await h.orchestrator.start()
+  h.calls.length = 0
+
+  await Promise.all([
+    h.orchestrator.handleSessionExpired(),
+    h.orchestrator.handleSessionExpired(),
+    h.orchestrator.stop(),
+  ])
+
+  assert.equal(h.calls.filter((call) => call === 'proxy.disable').length, 1)
+  assert.equal(h.calls.filter((call) => call === 'sidecar.stop').length, 1)
+  assert.equal(h.calls.filter((call) => call === 'session.clear').length, 1)
+  assert.equal((await h.orchestrator.status()).error?.code, 'SESSION_EXPIRED')
 })
 
 test('an expired session re-login clears the stale notice', async () => {
@@ -433,6 +515,49 @@ test('switching back to system-proxy restores the proxy and the marker', async (
   assert.deepEqual(runtimeCapture(h.userDataDir), { processes: [] })
 })
 
+test('a failed switch to system-proxy leaves selected-apps persisted and active', async () => {
+  const h = harness()
+  h.store.updateSettings({ captureMode: 'selected-apps', captureProcesses: ['/usr/bin/curl'] })
+  await h.orchestrator.start()
+  h.systemProxy.enableFailureAfterWeb = new Error('secure proxy write denied')
+
+  await assert.rejects(h.orchestrator.setCaptureMode('system-proxy'), /secure proxy write denied/)
+
+  assert.equal(h.store.getSettings().captureMode, 'selected-apps')
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+  assert.deepEqual(runtimeCapture(h.userDataDir), { processes: ['/usr/bin/curl'] })
+  assert.equal(h.systemProxy.entries[0]?.web.enabled, false)
+  assert.equal((await h.orchestrator.status()).state, 'running')
+})
+
+test('failed proxy rollback stops local capture instead of running both modes', async () => {
+  const h = harness()
+  h.store.updateSettings({ captureMode: 'selected-apps', captureProcesses: ['/usr/bin/curl'] })
+  await h.orchestrator.start()
+  h.systemProxy.enableFailureAfterWeb = new Error('secure proxy write denied')
+  h.systemProxy.disableFailure = new Error('rollback denied')
+
+  await assert.rejects(h.orchestrator.setCaptureMode('system-proxy'), /代理回滚失败/)
+
+  assert.equal(h.store.getSettings().captureMode, 'selected-apps')
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+  assert.equal((await h.orchestrator.status()).state, 'error')
+  assert.equal(h.calls.includes('sidecar.stop'), true)
+})
+
+test('a failed switch to selected-apps preserves system-proxy mode and ownership', async () => {
+  const h = harness()
+  await h.orchestrator.start()
+  h.systemProxy.disableFailureAfterWeb = new Error('secure proxy disable denied')
+
+  await assert.rejects(h.orchestrator.setCaptureMode('selected-apps'), /secure proxy disable denied/)
+
+  assert.equal(h.store.getSettings().captureMode, 'system-proxy')
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+  assert.deepEqual(runtimeCapture(h.userDataDir), { processes: [] })
+  assert.equal(h.systemProxy.entries[0]?.secure.enabled, true)
+})
+
 test('selecting apps is refused while another tool owns the system proxy', async () => {
   const h = harness()
   await h.orchestrator.start()
@@ -465,6 +590,19 @@ test('a capture failure is reported as a status field, not a bridge error', asyn
   assert.equal(status.localCaptureEnabled, false)
   assert.equal(status.captureError, 'macOS 系统扩展未授权')
   assert.equal(status.error, undefined)
+})
+
+test('retrying the same capture mode still re-sends the runtime config', async () => {
+  const h = harness()
+  h.store.updateSettings({ captureMode: 'selected-apps', captureProcesses: ['/usr/bin/curl'] })
+  await h.orchestrator.start()
+  h.sidecars[0]?.reportCapture({ enabled: false, processes: [], error: 'capture failed' })
+  assert.equal((await h.orchestrator.status()).captureError, 'capture failed')
+
+  await h.orchestrator.setCaptureMode('selected-apps')
+
+  assert.equal((await h.orchestrator.status()).captureError, undefined)
+  assert.deepEqual(runtimeCapture(h.userDataDir), { processes: ['/usr/bin/curl'] })
 })
 
 test('a capture failure is cleared by the next stop', async () => {

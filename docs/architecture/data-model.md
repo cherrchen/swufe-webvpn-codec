@@ -87,8 +87,8 @@
   | wrdIv | string | 是 | 默认 `wrdvpnisthebest!`，可覆盖 | WRD 默认 IV（ADR-0005） |
   | systemProxyManagedByApp | boolean | 是 | 默认 `false`；运行时 | 「系统代理由本 App 设置」标记 |
 
-- 不变式：`systemProxyManagedByApp` 与实际代理状态强一致；仅在标记为真时清除系统代理（INV-002）。
-- 不变式（M3）：`captureMode` 与「本 App 是否设置系统代理」互斥——`selected-apps` 时 `systemProxyManagedByApp` 必须为 `false`；`captureProcesses` 仅在 `selected-apps` 时写入 `bridge-config.json` 的 `capture.processes`（`system-proxy` 下恒为空数组）。
+- 不变式：`systemProxyManagedByApp` 是保守的持久化归属标记：系统写入前置真，确认清理成功后置假；命令部分成功或清理失败时保持真，供下次启动重试（INV-002）。清理实现仍只关闭指向本桥地址和端口的代理。
+- 不变式（M3）：桥运行时 `captureMode` 与系统代理互斥；切换失败不保存目标模式，代理设置与回滚均失败时停桥；`captureProcesses` 仅在 `selected-apps` 时写入 `bridge-config.json` 的 `capture.processes`（`system-proxy` 下恒为空数组）。
 - 生命周期：创建于首次启动；更新于用户修改设置或桥启停；删除为重置设置。
 - 所有者：cherrchen。
 - 关联需求：REQ-001、REQ-003、REQ-004。

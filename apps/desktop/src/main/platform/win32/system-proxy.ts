@@ -12,17 +12,21 @@ import type { ProxyEntry, SystemProxy } from '../types'
 const INTERNET_SETTINGS = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings'
 
 export class Win32SystemProxy implements SystemProxy {
+  constructor(private readonly execute: typeof run = run) {}
+
   async read(): Promise<ProxyEntry[]> {
-    const enable = await run('reg', ['query', INTERNET_SETTINGS, '/v', 'ProxyEnable'])
-    const server = await run('reg', ['query', INTERNET_SETTINGS, '/v', 'ProxyServer'])
+    const enable = await this.execute('reg', ['query', INTERNET_SETTINGS, '/v', 'ProxyEnable'])
+    const server = await this.execute('reg', ['query', INTERNET_SETTINGS, '/v', 'ProxyServer'])
     const parsed = parseWinInetValue(`${enable.stdout}\n${server.stdout}`)
     const state = winInetState(parsed.enable, parsed.server)
     return [{ service: 'Internet Settings', web: state, secure: state }]
   }
 
   async enable(port: number): Promise<void> {
-    await this.write('ProxyEnable', 'REG_DWORD', '1')
+    // A disabled WinINET profile may retain another tool's old ProxyServer.
+    // Write our target first so a failure cannot briefly activate that stale target.
     await this.write('ProxyServer', 'REG_SZ', `127.0.0.1:${port}`)
+    await this.write('ProxyEnable', 'REG_DWORD', '1')
   }
 
   async disable(port: number): Promise<void> {
@@ -32,7 +36,7 @@ export class Win32SystemProxy implements SystemProxy {
   }
 
   private async write(name: string, type: string, value: string): Promise<void> {
-    const result = await run('reg', ['add', INTERNET_SETTINGS, '/v', name, '/t', type, '/d', value, '/f'])
+    const result = await this.execute('reg', ['add', INTERNET_SETTINGS, '/v', name, '/t', type, '/d', value, '/f'])
     if (result.code !== 0) {
       throw new Error(`reg add ${name} 失败：${result.stderr.trim() || `退出码 ${result.code}`}`)
     }

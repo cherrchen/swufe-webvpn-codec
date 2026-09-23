@@ -1,30 +1,36 @@
 import assert from 'node:assert/strict'
+import { join } from 'node:path'
 import { test } from 'node:test'
 
-import { certutilHasCert, parseFindCertificate } from '../src/main/platform/parse'
-import { caPaths } from '../src/main/platform/ca-files'
+import { parseCertutilHashes, parseFindCertificateHashes } from '../src/main/platform/parse'
+import { caFingerprint, caPaths } from '../src/main/platform/ca-files'
+
+const caCert = join(process.cwd(), 'test', 'fixtures', 'ca-cert.pem')
 
 test('find-certificate with no match prints nothing and must not be read as installed', () => {
   // Measured on macOS 15.8: exit code 0 with zero bytes of output.
-  assert.deepEqual(parseFindCertificate(''), { found: false, sha1: null })
-  assert.deepEqual(parseFindCertificate('\n'), { found: false, sha1: null })
+  assert.deepEqual(parseFindCertificateHashes(''), [])
+  assert.deepEqual(parseFindCertificateHashes('\n'), [])
 })
 
-test('find-certificate output yields the SHA-1 fingerprint', () => {
+test('find-certificate lists every same-name certificate so only our fingerprint matches', () => {
   // Measured on macOS 15.6 with `-Z`: the hash lines precede the attributes dump.
-  const stdout = `SHA-256 hash: B85643D1C7F3328FBA9BE128A19C68A8B334045CD156427FC2ADD3B142BE858A
-SHA-1 hash: 09C58DE3212EC3B26CC1CA355B66D813044A447B
+  const ours = caFingerprint(caCert)
+  const other = 'A'.repeat(40)
+  const stdout = `SHA-1 hash: ${other}
 keychain: "/Library/Keychains/System.keychain"
 version: 256
 class: 0x80001000
 attributes:
     "labl"<blob>="mitmproxy"
+SHA-1 hash: ${ours.toLowerCase()}
+keychain: "/Library/Keychains/System.keychain"
+attributes:
+    "labl"<blob>="mitmproxy"
 `
 
-  assert.deepEqual(parseFindCertificate(stdout), {
-    found: true,
-    sha1: '09C58DE3212EC3B26CC1CA355B66D813044A447B',
-  })
+  assert.deepEqual(parseFindCertificateHashes(stdout), [other, ours])
+  assert.notEqual(parseFindCertificateHashes(stdout)[0], ours)
 })
 
 test('find-certificate without -Z prints no hash line, so no fingerprint is available', () => {
@@ -36,19 +42,22 @@ attributes:
     "labl"<blob>="mitmproxy"
 `
 
-  assert.deepEqual(parseFindCertificate(stdout), { found: true, sha1: null })
+  assert.deepEqual(parseFindCertificateHashes(stdout), [])
 })
 
-test('certutil store listing decides presence on Windows', () => {
-  assert.equal(
-    certutilHasCert(`
+test('certutil output proves the exact certificate identity on Windows', () => {
+  const ours = caFingerprint(caCert)
+  assert.deepEqual(
+    parseCertutilHashes(`
 ================ Certificate 0 ================
 Serial Number: 1234
-Cert Hash(sha1): 1a2b3c
+Cert Hash(sha1): ${'B'.repeat(40)}
+================ Certificate 1 ================
+Cert Hash(sha1): ${ours.toLowerCase()}
 `),
-    true,
+    ['B'.repeat(40), ours],
   )
-  assert.equal(certutilHasCert('Root "Certificates"\n----------------\nCertUtil: -store command completed successfully.\n'), false)
+  assert.deepEqual(parseCertutilHashes('Root "Certificates"\nCertUtil: -store command completed successfully.\n'), [])
 })
 
 test('CA files follow the mitmproxy basename inside the confdir', () => {

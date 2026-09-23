@@ -86,7 +86,7 @@ flowchart TD
 - 输出：`SessionState`（Cookie 集合）、登录/过期状态；供 Proxy Orchestrator 推送 sidecar。
 - 依赖：Login WebView 的 session。
 - 被谁依赖：App Shell、Proxy Orchestrator。
-- 关键不变式：Cookie 的唯一读取点；Cookie 不得进入日志（见 INV-001）。
+- 关键不变式：Cookie 的唯一读取点；Cookie 不得进入日志（见 INV-001）；登录采集须经门户探测确认有效，停止监测或开始新会话后忽略旧探测结果。
 - 相关测试：TC-D01、TC-D02、TC-D03、TC-D04。
 - 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)。
 
@@ -98,8 +98,8 @@ flowchart TD
 - 输出：`BridgeStatus`（含 `localCaptureEnabled` 与 `captureError`）；系统代理指向；推送给 sidecar 的 `{allowlist, cookies, debug, capture}` 配置。
 - 依赖：Allowlist Store、OS 代理 API（IF-004）、mitm sidecar 控制口（IF-002）。
 - 被谁依赖：App Shell。
-- 关键不变式：仅在「由本 App 设置」标记存在时清除系统代理（INV-002）；桥状态机固定为 `idle → starting → running`，`running → stopping → idle`，`starting → error → idle`。
-- 捕获方式互斥（ADR-0006）：`system-proxy` 与 `selected-apps` 不同时生效——`selected-apps` 时本 App 不设置系统代理，并撤销此前由自己设置过的（清 `systemProxyManagedByApp` 标记），改由 local 模式接管所选应用的流量；`system-proxy` 时不启用 local 捕获（运行时配置里 `capture.processes` 恒为空），由系统代理覆盖全部流量。切换方式按目标方式撤销 / 恢复；桥端口（regular 监听）在两种方式下始终可用。
+- 关键不变式：设置系统代理前先持久化 `systemProxyManagedByApp`；仅在系统代理清理成功后清除标记，失败时保留以便下次启动重试（INV-002）；桥状态机固定为 `idle → starting → running`，`running → stopping → idle`，`starting → error → idle`。
+- 捕获方式互斥（ADR-0006）：`system-proxy` 与 `selected-apps` 不同时生效——`selected-apps` 时本 App 不设置系统代理，并撤销此前由自己设置过的（清 `systemProxyManagedByApp` 标记），改由 local 模式接管所选应用的流量；`system-proxy` 时不启用 local 捕获（运行时配置里 `capture.processes` 恒为空），由系统代理覆盖全部流量。切换方式在 OS 操作成功后才保存目标设置；若代理写入及回滚均失败，停桥以终止 local 捕获。桥端口（regular 监听）在两种方式下始终可用。
 - 切换前检查：切到 `selected-apps` 之前先检查系统代理，被其它软件占用（非指向本桥）则拒绝并返回 `PROXY_CONFLICT`，设置不落盘（与 ADR-0004 的「拒绝而不是半工作」一致）。
 - 开桥前 fake-ip 预检：系统代理冲突检查之后、端口探测之前，解析当前配置的网关主机（`settings.webvpnBase`，默认 `webvpn.swufe.edu.cn`）；任一地址落在 `198.18.0.0/15`（Clash / mihomo / sing-box 的 fake-ip）时以 `PROXY_CONFLICT` 拒绝启动，避免开桥后上游静默挂起；解析失败或超时不阻断（fail open）——判据与后果见 [ADR-0011](adr/ADR-0011-refuse-start-on-fake-ip-dns.md)。
 - 候选应用枚举：macOS 用 `ps -Ao pid=,comm=`、Windows 用 `tasklist /fo csv /nh`；应用按 `.app` 包路径归并为一行（主进程与 Helper 合并为同一 pattern），非应用用可执行文件全路径，作为 mitmproxy intercept pattern。
@@ -142,7 +142,7 @@ flowchart TD
 - 输出：`{ok, message}`、CA 状态（installed / trusted）。
 - 依赖：OS 信任库（IF-005）。
 - 被谁依赖：App Shell、Proxy Orchestrator（开桥前检查 CA 可用性）。
-- 关键不变式：CA 私钥仅本机、不上传（REQ-010、NFR-003）。
+- 关键不变式：CA 私钥仅本机、不上传；信任状态与卸载目标按本地 CA 证书指纹精确识别，不按通用名称匹配（REQ-010、NFR-003）。
 - 相关测试：TC-E01、TC-E02、TC-E03。
 - 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
 

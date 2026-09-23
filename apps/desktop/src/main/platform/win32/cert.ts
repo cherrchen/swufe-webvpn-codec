@@ -2,25 +2,24 @@
 
 import { existsSync } from 'node:fs'
 
-import { CA_BASENAME } from '../../constants'
 import { run } from '../../exec'
-import { certutilHasCert } from '../parse'
+import { parseCertutilHashes } from '../parse'
 import type { CertManager } from '../types'
-import { caPaths, ensureCaFiles } from '../ca-files'
-
-const STORE = ['-user', '-store', 'Root', CA_BASENAME]
+import { caFingerprint, caPaths, ensureCaFiles } from '../ca-files'
 
 export class Win32CertManager implements CertManager {
   constructor(
     private readonly confdir: string,
     private readonly bridgeRoot: string,
+    private readonly execute: typeof run = run,
   ) {}
 
   async getStatus(): Promise<{ installed: boolean; trusted: boolean }> {
     const { caCert } = caPaths(this.confdir)
     if (!existsSync(caCert)) return { installed: false, trusted: false }
-    const result = await run('certutil', STORE)
-    const installed = certutilHasCert(result.stdout)
+    const fingerprint = caFingerprint(caCert)
+    const result = await this.execute('certutil', ['-user', '-store', 'Root', fingerprint])
+    const installed = result.code === 0 && parseCertutilHashes(result.stdout).includes(fingerprint)
     // The per-user Root store is itself the trust decision on Windows.
     return { installed, trusted: installed }
   }
@@ -32,7 +31,7 @@ export class Win32CertManager implements CertManager {
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
-    const result = await run('certutil', ['-user', '-addstore', 'Root', caCert])
+    const result = await this.execute('certutil', ['-user', '-addstore', 'Root', caCert])
     if (result.code !== 0) {
       const reason = result.stderr.trim().split('\n').filter(Boolean).at(-1) ?? `退出码 ${result.code}`
       return { ok: false, message: `${reason}。可手动执行：certutil -user -addstore Root "${caCert}"` }
@@ -45,10 +44,12 @@ export class Win32CertManager implements CertManager {
 
   async uninstall(): Promise<{ ok: boolean; message?: string }> {
     if (!(await this.getStatus()).installed) return { ok: true }
-    const result = await run('certutil', ['-user', '-delstore', 'Root', CA_BASENAME])
+    const { caCert } = caPaths(this.confdir)
+    const fingerprint = caFingerprint(caCert)
+    const result = await this.execute('certutil', ['-user', '-delstore', 'Root', fingerprint])
     if (result.code !== 0) {
       const reason = result.stderr.trim().split('\n').filter(Boolean).at(-1) ?? `退出码 ${result.code}`
-      return { ok: false, message: `${reason}。可手动执行：certutil -user -delstore Root ${CA_BASENAME}` }
+      return { ok: false, message: `${reason}。可手动执行：certutil -user -delstore Root ${fingerprint}` }
     }
     if ((await this.getStatus()).installed) {
       return { ok: false, message: '证书仍在当前用户根存储中，请手动确认。' }

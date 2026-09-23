@@ -171,16 +171,15 @@ export function groupCaptureCandidates(rows: ProcessRow[]): CaptureCandidate[] {
   return [...groups.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 }
 
-/**
- * `security find-certificate` prints nothing and exits 0 when there is no match,
- * so presence must be judged by output, not by exit code.
- */
-export function parseFindCertificate(stdout: string): { found: boolean; sha1: string | null } {
-  const match = stdout.match(/SHA-1 hash:\s*([0-9A-Fa-f]+)/)
-  return { found: stdout.trim().length > 0, sha1: match?.[1]?.toUpperCase() ?? null }
+/** `security find-certificate -a -Z` may return several CAs with the same name. */
+export function parseFindCertificateHashes(stdout: string): string[] {
+  return [...stdout.matchAll(/SHA-1 hash:\s*([0-9A-Fa-f]{40})/gi)]
+    .map((match) => (match[1] ?? '').toUpperCase())
 }
 
-/** `certutil -store Root <name>` prints one "Cert Hash(sha1)" block per match. */
-export function certutilHasCert(stdout: string): boolean {
-  return /Cert Hash\(sha1\)/i.test(stdout)
+/** `certutil -store Root <CertId>` must still prove that the returned hash is ours. */
+export function parseCertutilHashes(stdout: string): string[] {
+  return [...stdout.matchAll(/Cert Hash\(sha1\):\s*([0-9A-Fa-f ]{40,})/gi)]
+    .map((match) => (match[1] ?? '').replaceAll(' ', '').toUpperCase())
+    .filter((hash) => /^[0-9A-F]{40}$/.test(hash))
 }

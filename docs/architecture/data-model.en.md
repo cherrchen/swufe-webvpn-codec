@@ -89,8 +89,8 @@ The entities are mutually independent and have no relationship diagram: `Allowli
   | wrdIv | string | yes | default `wrdvpnisthebest!`, overridable | default WRD IV (ADR-0005) |
   | systemProxyManagedByApp | boolean | yes | default `false`; runtime | "system proxy set by this app" marker |
 
-- Invariants: `systemProxyManagedByApp` stays strongly consistent with the actual proxy state; the system proxy is cleared only when the marker is true (INV-002).
-- Invariant (M3): `captureMode` and "this app set a system proxy" exclude each other — in `selected-apps` mode `systemProxyManagedByApp` must be `false`; `captureProcesses` is written into `bridge-config.json` as `capture.processes` only in `selected-apps` mode (always an empty array under `system-proxy`).
+- Invariants: `systemProxyManagedByApp` is a conservative, durable ownership marker: set it before the OS write and clear it only after confirmed cleanup. A partially successful command or failed cleanup leaves it set for launch recovery (INV-002). Cleanup still touches only proxies pointing at this bridge's address and port.
+- Invariant (M3): while the bridge runs, `captureMode` and the system proxy are mutually exclusive; a failed switch does not persist its target mode, and a failed proxy setup plus rollback stops the bridge. `captureProcesses` is written into `bridge-config.json` as `capture.processes` only in `selected-apps` mode (always an empty array under `system-proxy`).
 - Lifecycle: created on first launch; updated on user setting changes or bridge start/stop; deleted by resetting settings.
 - Owner: cherrchen.
 - Related requirements: REQ-001, REQ-003, REQ-004.

@@ -60,7 +60,9 @@ export class FakeSession implements SessionLike {
 export class FakeSystemProxy implements SystemProxy {
   entries: ProxyEntry[] = [permissiveEntry()]
   enableFailure: Error | null = null
+  enableFailureAfterWeb: Error | null = null
   disableFailure: Error | null = null
+  disableFailureAfterWeb: Error | null = null
   enabledPort: number | null = null
 
   constructor(private readonly calls: string[]) {}
@@ -73,6 +75,13 @@ export class FakeSystemProxy implements SystemProxy {
   async enable(port: number): Promise<void> {
     this.calls.push('proxy.enable')
     if (this.enableFailure) throw this.enableFailure
+    if (this.enableFailureAfterWeb) {
+      this.entries = this.entries.map((entry) => ({
+        ...entry,
+        web: { enabled: true, server: '127.0.0.1', port },
+      }))
+      throw this.enableFailureAfterWeb
+    }
     this.enabledPort = port
     this.entries = this.entries.map((entry) => ({
       ...entry,
@@ -84,6 +93,13 @@ export class FakeSystemProxy implements SystemProxy {
   async disable(port: number): Promise<void> {
     this.calls.push('proxy.disable')
     if (this.disableFailure) throw this.disableFailure
+    if (this.disableFailureAfterWeb) {
+      this.entries = this.entries.map((entry) => ({
+        ...entry,
+        web: { ...entry.web, enabled: false },
+      }))
+      throw this.disableFailureAfterWeb
+    }
     this.enabledPort = null
     // macOS keeps Server/Port populated when a proxy is switched off.
     this.entries = this.entries.map((entry) => ({

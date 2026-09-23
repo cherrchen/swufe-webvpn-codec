@@ -11,6 +11,7 @@ import { BrowserWindow, net, session, type Session } from 'electron'
 import type { SessionInfo } from '../shared/types'
 import { LOGIN_PARTITION, SESSION_PROBE_INTERVAL_MS, SESSION_PROBE_TIMEOUT_MS } from './constants'
 import { classifyProbe } from './session-probe'
+import { SessionProbeGuard, validateCapturedSession } from './session-guard'
 import type { ProbeResult, SessionCookie } from './session-types'
 
 /** Chromium's "navigation was superseded/cancelled" error (`net::ERR_ABORTED`). */
@@ -29,6 +30,7 @@ export class SessionBroker {
   private loginWindow: BrowserWindow | null = null
   private closedAfterLogin = false
   private monitor: NodeJS.Timeout | null = null
+  private readonly probeGuard = new SessionProbeGuard()
   private readonly changeListeners: Array<() => void> = []
 
   constructor(private readonly webvpnBase: string) {
@@ -92,7 +94,7 @@ export class SessionBroker {
     win.on('closed', () => {
       this.loginWindow = null
       // The user may have finished while the final navigation was not observed.
-      void this.capture()
+      if (!this.closedAfterLogin) void this.capture()
     })
     win.webContents.on('did-navigate', (_event, url) => void this.handleNavigation(url))
     win.webContents.on('did-redirect-navigation', (_event, url) => void this.handleNavigation(url))
@@ -110,7 +112,8 @@ export class SessionBroker {
     }
   }
 
-  async capture(): Promise<void> {
+  async capture(): Promise<boolean> {
+    const revision = this.probeGuard.changeSession()
     const cookies = await this.requirePartition().cookies.get({ url: this.webvpnBase })
     const captured: SessionCookie[] = []
     const expiries: number[] = []
@@ -124,10 +127,15 @@ export class SessionBroker {
       })
       if (typeof cookie.expirationDate === 'number') expiries.push(cookie.expirationDate)
     }
+    const valid = await validateCapturedSession(captured.length, () => this.probe())
+    if (!this.probeGuard.isCurrentSession(revision)) return false
+    if (!valid) return false
     this.capturedCookies = captured
     this.capturedAt = new Date().toISOString()
     this.expiresAtIso = expiries.length > 0 ? new Date(Math.min(...expiries) * 1000).toISOString() : null
-    this.setLoggedIn(captured.length > 0)
+    this.lastValidatedAt = new Date().toISOString()
+    this.setLoggedIn(true)
+    return true
   }
 
   async probe(): Promise<ProbeResult> {
@@ -181,14 +189,12 @@ export class SessionBroker {
       finish('unknown', `失败 ${String(error)}`)
     })
     request.end()
-    const result = await promise
-    if (result === 'valid') this.lastValidatedAt = new Date().toISOString()
-    if (result === 'expired') this.setLoggedIn(false)
-    return result
+    return promise
   }
 
   startMonitor(onExpired: () => void): void {
     if (this.monitor) return
+    this.probeGuard.startMonitor()
     const configured = Number.parseInt(process.env.SWUFE_PROBE_INTERVAL_MS ?? '', 10)
     const interval = Number.isFinite(configured) && configured > 0 ? configured : SESSION_PROBE_INTERVAL_MS
     this.monitor = setInterval(() => {
@@ -197,12 +203,14 @@ export class SessionBroker {
   }
 
   stopMonitor(): void {
+    this.probeGuard.stopMonitor()
     if (!this.monitor) return
     clearInterval(this.monitor)
     this.monitor = null
   }
 
   async clear(): Promise<void> {
+    this.probeGuard.changeSession()
     this.stopMonitor()
     this.capturedCookies = []
     this.capturedAt = null
@@ -213,13 +221,20 @@ export class SessionBroker {
 
   private async tick(onExpired: () => void): Promise<void> {
     if (!this.capturedLoggedIn) return
-    if ((await this.probe()) === 'expired') onExpired()
+    await this.probeGuard.runMonitorProbe(
+      () => this.probe(),
+      () => { this.lastValidatedAt = new Date().toISOString() },
+      () => {
+        this.setLoggedIn(false)
+        onExpired()
+      },
+    )
   }
 
   private async handleNavigation(url: string): Promise<void> {
     const target = new URL(url)
     if (target.hostname !== this.webvpnHost || target.pathname.startsWith('/login')) return
-    await this.capture()
+    if (!(await this.capture())) return
     this.closedAfterLogin = true
     this.loginWindow?.close()
   }

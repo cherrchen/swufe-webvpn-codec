@@ -448,6 +448,19 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 | [docs/planning/](../../docs/planning/roadmap.md) | 是 | M5 已同步：M4 里程碑的 TC-G01/TC-G02 退出条件按复验结果勾选并写明「Windows 延期」，roadmap 与 milestones/README 状态行同步（教育浏览器验收已在 macOS 侧达成）；M1 已同步：[M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md) 置 `Done`；M2 已同步：[M2 里程碑](../../docs/planning/milestones/M2-desktop-orchestration.md) 置 `Done` 并记录证据与遗留项；M3 已同步：[M3 里程碑](../../docs/planning/milestones/M3-experience-polish.md) 置 `Done`（退出条件勾选 + 完成记录 + 实现期偏差）、[roadmap](../../docs/planning/roadmap.md) 与 [milestones/README](../../docs/planning/milestones/README.md) 状态行同步；M4 已同步：[M4 里程碑](../../docs/planning/milestones/M4-acceptance.md) 由 `Planned` 改为 `In Progress` 并写入完成记录与遗留问题、[roadmap](../../docs/planning/roadmap.md) 与 [milestones/README](../../docs/planning/milestones/README.md) 状态行同步为 `In Progress` |
 | `.en.md` 配对 | 是 | 已同步：`docs/**` 改动均成对更新（含 M5 新增的 ADR-0007 中英与受影响的 planning/development/architecture 文档；`pnpm run docs:check` 的 i18n 检查 0 error / 0 warning）；Spec 目录不属双语强制范围；2026-09-21（`KI-013` 修复）：ADR-0011 与 requirements/architecture/api/operations/development/security/ui-ux 的改动均成对更新（`pnpm run docs:check` 178 文件，0 error / 0 warning） |
 
+## 2026-09-23 Code Review 缺陷修复复验
+
+本次按既有 REQ-002/003/010、NFR-004 与 TC-D01/D03、TC-C03/C04、TC-E02 的判据修复异常路径；不改变已记录的 M4/M5 历史实机结果。
+
+| 修复路径 | 自动化证据 | 结果 |
+| -------- | ---------- | ---- |
+| 系统代理命令部分成功、回滚或清理失败；持久归属标记保留并于后续启动重试 | `apps/desktop/test/system-proxy-writes.test.ts`、`orchestrator.test.ts`：macOS/Windows 命令序列、部分写入、停止/过期/启动恢复 | Passed（注入式 App 单测；Windows 真机仍待 `KI-001`） |
+| 捕获方式切换失败时不保存目标模式；代理写入与回滚均失败时停桥，避免两种捕获同时运行 | `apps/desktop/test/orchestrator.test.ts`：两个切换方向及双重失败路径 | Passed（注入式 App 单测） |
+| 登录页已有 Cookie 但会话无效时不判定为已登录；停监测、重登或并发探测后忽略旧结果 | `apps/desktop/test/session-guard.test.ts`、`orchestrator.test.ts`：探测分类、代次与重叠清理 | Passed（App 单测；真实 CAS/MFA 回归待后续实机会话验证） |
+| CA 状态与卸载目标按本地证书指纹匹配，保留其它同名 CA | `apps/desktop/test/cert-parse.test.ts`、`cert-manager.test.ts`：同名证书列表与 macOS/Windows 删除参数 | Passed（注入式 App 单测；Windows 真机仍待 `KI-001`） |
+
+回归命令：`pnpm --filter swufe-webvpn-bridge run build`、`test:unit`（103 passed）、`test:ui`（36 passed）、`UV_CACHE_DIR=/private/tmp/swufe-review-uv-cache uv run --directory bridges/python pytest -q`（198 passed）、`pnpm run docs:check`（0 error / 0 warning），均通过。Python 测试输出 42 条依赖弃用告警；UI 测试有 jsdom `getComputedStyle` 未实现提示，均未造成用例失败。Spec 仍为 `Implemented`；Windows 真机验收按 `KI-001` 留待后续执行。
+
 ## 未验证 / 无法验证项
 
 | 项 | 原因 | 已尝试 | 需要谁决策 |

@@ -68,6 +68,7 @@ export class ProxyOrchestrator {
   private proxyCache: { at: number; enabled: boolean } | null = null
   private captureReport: CaptureReport | null = null
   private inflightStart: Promise<BridgeStatus> | null = null
+  private inflightExpiry: Promise<void> | null = null
   private readonly statusListeners: Array<(status: BridgeStatus) => void> = []
   private readonly sessionExpiredListeners: Array<() => void> = []
   private readonly debugListeners: Array<(event: DebugLogEvent) => void> = []
@@ -98,11 +99,16 @@ export class ProxyOrchestrator {
   }
 
   async stop(): Promise<BridgeStatus> {
+    if (this.inflightExpiry) {
+      await this.inflightExpiry
+      return this.status()
+    }
     // A quit can arrive while `starting`; finishing that attempt first keeps the
     // state machine's documented transitions intact.
     if (this.inflightStart) await this.inflightStart.catch(() => undefined)
     const from = this.machine.state
     if (from === 'idle') return this.status()
+    this.deps.session.stopMonitor()
     // `running → stopping` is the documented path; `error` (the previous cleanup
     // failed) and `stopping` (a second call) go straight to the cleanup itself.
     if (from === 'running') this.machine.transition('stopping')
@@ -111,12 +117,10 @@ export class ProxyOrchestrator {
     const port = this.activePort ?? this.settings().bridgePort
     let cleanupFailure: string | null = null
     try {
-      await this.deps.systemProxy.disable(port)
+      await this.disableSystemProxy(port)
     } catch (error) {
       cleanupFailure = describe(error)
     }
-    this.deps.store.updateSettings({ systemProxyManagedByApp: false })
-    this.invalidateProxyCache()
     try {
       await this.sidecar?.stop()
     } catch (error) {
@@ -144,12 +148,10 @@ export class ProxyOrchestrator {
     this.captureReport = null
     this.deps.session.stopMonitor()
     try {
-      await this.deps.systemProxy.disable(this.activePort ?? this.settings().bridgePort)
+      await this.disableSystemProxy(this.activePort ?? this.settings().bridgePort)
     } catch (error) {
       console.warn(`swufe-proxy 桥接异常退出后清除代理失败：${describe(error)}`)
     }
-    this.deps.store.updateSettings({ systemProxyManagedByApp: false })
-    this.invalidateProxyCache()
     this.activePort = null
     this.machine.fail(mapSidecarError(null), ERROR_MESSAGES.BRIDGE_CRASH)
     this.emitStatus()
@@ -157,14 +159,27 @@ export class ProxyOrchestrator {
 
   /** Session expiry cascade: stop proxy → stop sidecar → drop session → notify (EC-007). */
   async handleSessionExpired(): Promise<void> {
+    if (this.inflightExpiry) return this.inflightExpiry
+    this.inflightExpiry = this.runSessionExpiry()
+    try {
+      await this.inflightExpiry
+    } finally {
+      this.inflightExpiry = null
+    }
+  }
+
+  private async runSessionExpiry(): Promise<void> {
     console.log('swufe-session WebVPN 会话已失效：停止桥接并清除系统代理')
+    this.deps.session.stopMonitor()
     const previous = this.machine.state
     if (previous === 'error') this.machine.reset()
-    if (this.machine.state !== 'idle') this.machine.transition('stopping')
+    if (this.machine.state === 'running') this.machine.transition('stopping')
 
+    let proxyFailure: string | null = null
     try {
-      await this.deps.systemProxy.disable(this.activePort ?? this.settings().bridgePort)
+      await this.disableSystemProxy(this.activePort ?? this.settings().bridgePort)
     } catch (error) {
+      proxyFailure = describe(error)
       console.warn(`swufe-proxy 会话过期后清除代理失败：${describe(error)}`)
     }
     try {
@@ -176,11 +191,14 @@ export class ProxyOrchestrator {
     this.captureReport = null
     this.activePort = null
     this.deps.session.stopMonitor()
-    this.deps.store.updateSettings({ systemProxyManagedByApp: false })
-    this.invalidateProxyCache()
     await this.deps.session.clear()
     if (this.machine.state === 'stopping') this.machine.transition('idle')
-    this.machine.fail('SESSION_EXPIRED', ERROR_MESSAGES.SESSION_EXPIRED)
+    this.machine.fail(
+      'SESSION_EXPIRED',
+      proxyFailure
+        ? `WebVPN 会话已失效，桥接已停止，但系统代理清理失败：${proxyFailure}`
+        : ERROR_MESSAGES.SESSION_EXPIRED,
+    )
     this.emitStatus()
     for (const listener of this.sessionExpiredListeners) listener()
   }
@@ -190,12 +208,10 @@ export class ProxyOrchestrator {
     if (!this.settings().systemProxyManagedByApp) return
     console.warn('swufe-proxy 检测到上次运行残留的代理标记：清除本桥代理设置')
     try {
-      await this.deps.systemProxy.disable(this.settings().bridgePort)
+      await this.disableSystemProxy(this.settings().bridgePort)
     } catch (error) {
       console.warn(`swufe-proxy 启动自愈清除代理失败：${describe(error)}`)
     }
-    this.deps.store.updateSettings({ systemProxyManagedByApp: false })
-    this.invalidateProxyCache()
   }
 
   /** A fresh session clears a stale SESSION_EXPIRED notice (its cause is gone). */
@@ -206,7 +222,7 @@ export class ProxyOrchestrator {
   }
 
   async logout(): Promise<void> {
-    if (this.machine.state === 'running' || this.machine.state === 'starting') await this.stop()
+    if (this.machine.state !== 'idle') await this.stop()
     await this.deps.session.clear()
     this.emitStatus()
   }
@@ -228,15 +244,38 @@ export class ProxyOrchestrator {
    */
   async setCaptureMode(mode: CaptureMode): Promise<void> {
     if (mode === 'selected-apps') await this.assertNoForeignProxy()
+    if (mode === this.settings().captureMode) {
+      // The UI's retry action re-sends the same mode after a capture failure.
+      this.captureReport = null
+      this.refreshRuntimeConfig()
+      this.emitStatus()
+      return
+    }
+    if (this.machine.state === 'running' || this.machine.state === 'starting') {
+      const port = this.activePort ?? this.settings().bridgePort
+      if (mode === 'selected-apps') await this.disableSystemProxyIfManaged(port)
+      else if (!this.settings().systemProxyManagedByApp) {
+        try {
+          await this.enableSystemProxy(port)
+        } catch (error) {
+          // If rollback also failed, stop local capture before a residual system
+          // proxy can route the same process through both capture mechanisms.
+          if (this.settings().systemProxyManagedByApp) await this.stop()
+          throw error
+        }
+      }
+    }
     this.deps.store.updateSettings({ captureMode: mode })
     this.captureReport = null
-    await this.applyCaptureSettings()
+    this.refreshRuntimeConfig()
+    this.emitStatus()
   }
 
   async setCaptureProcesses(patterns: string[]): Promise<void> {
     this.deps.store.updateSettings({ captureProcesses: patterns })
     this.captureReport = null
-    await this.applyCaptureSettings()
+    this.refreshRuntimeConfig()
+    this.emitStatus()
   }
 
   async status(): Promise<BridgeStatus> {
@@ -259,6 +298,12 @@ export class ProxyOrchestrator {
 
   private async runStart(): Promise<BridgeStatus> {
     if (this.machine.state === 'error') this.machine.reset()
+    if (this.settings().systemProxyManagedByApp) {
+      await this.recoverOnLaunch()
+      if (this.settings().systemProxyManagedByApp) {
+        return this.fail('BRIDGE_CRASH', '上次运行残留的系统代理未能清理，请检查系统代理设置。')
+      }
+    }
     const settings = this.settings()
     const port = settings.bridgePort
 
@@ -357,20 +402,15 @@ export class ProxyOrchestrator {
 
     if (!captureSelected) {
       try {
-        await this.deps.systemProxy.enable(port)
+        await this.enableSystemProxy(port)
       } catch (error) {
-        await this.deps.systemProxy.disable(port).catch(() => undefined)
         await sidecar.stop().catch(() => undefined)
         this.sidecar = null
         this.activePort = null
-        this.deps.store.updateSettings({ systemProxyManagedByApp: false })
-        this.invalidateProxyCache()
         this.machine.fail('BRIDGE_CRASH', describe(error))
         this.emitStatus()
         return this.status()
       }
-      this.deps.store.updateSettings({ systemProxyManagedByApp: true })
-      this.invalidateProxyCache()
     }
 
     this.machine.transition('running')
@@ -387,34 +427,31 @@ export class ProxyOrchestrator {
     this.emitStatus()
   }
 
-  /** Apply the current capture settings to the OS side without restarting the bridge. */
-  private async applyCaptureSettings(): Promise<void> {
-    const settings = this.settings()
-    if (this.machine.state === 'running' || this.machine.state === 'starting') {
-      const port = this.activePort ?? settings.bridgePort
-      if (settings.captureMode === 'selected-apps') {
-        await this.disableSystemProxyIfManaged(port)
-      } else if (!settings.systemProxyManagedByApp) {
-        try {
-          await this.deps.systemProxy.enable(port)
-        } catch (error) {
-          await this.deps.systemProxy.disable(port).catch(() => undefined)
-          this.invalidateProxyCache()
-          throw error
-        }
-        this.deps.store.updateSettings({ systemProxyManagedByApp: true })
-        this.invalidateProxyCache()
-      }
-    }
-    // Capture only exists while the bridge runs: the config write below is a no-op
-    // when it does not, and `runStart` writes the config for the next start.
-    this.refreshRuntimeConfig()
-    this.emitStatus()
-  }
-
   /** Revoke the system proxy this app installed, if any (INV-002). */
   private async disableSystemProxyIfManaged(port: number): Promise<void> {
     if (!this.settings().systemProxyManagedByApp) return
+    await this.disableSystemProxy(port)
+  }
+
+  /** Persist ownership before the first OS write, including partially successful commands. */
+  private async enableSystemProxy(port: number): Promise<void> {
+    this.deps.store.updateSettings({ systemProxyManagedByApp: true })
+    this.invalidateProxyCache()
+    try {
+      await this.deps.systemProxy.enable(port)
+      this.invalidateProxyCache()
+    } catch (error) {
+      try {
+        await this.disableSystemProxy(port)
+      } catch (cleanupError) {
+        throw new Error(`${describe(error)}；代理回滚失败：${describe(cleanupError)}`)
+      }
+      throw error
+    }
+  }
+
+  /** A failed OS cleanup must leave the marker for a later retry. */
+  private async disableSystemProxy(port: number): Promise<void> {
     await this.deps.systemProxy.disable(port)
     this.deps.store.updateSettings({ systemProxyManagedByApp: false })
     this.invalidateProxyCache()

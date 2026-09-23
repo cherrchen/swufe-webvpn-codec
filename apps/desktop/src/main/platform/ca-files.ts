@@ -1,6 +1,7 @@
 /** mitmproxy CA file locations plus the "generate if missing" call into Python. */
 
-import { existsSync } from 'node:fs'
+import { X509Certificate } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { CA_BASENAME } from '../constants'
@@ -20,6 +21,11 @@ export function caPaths(confdir: string): CaFiles {
     caCert: `${base}-ca-cert.pem`,
     caCer: `${base}-ca-cert.cer`,
   }
+}
+
+/** Fingerprint of this app's CA, not a shared subject name such as "mitmproxy". */
+export function caFingerprint(caCert: string): string {
+  return new X509Certificate(readFileSync(caCert)).fingerprint.replaceAll(':', '').toUpperCase()
 }
 
 /** Idempotent: `python -m swufe_bridge.ca --confdir <dir>`; returns the PEM cert path. */

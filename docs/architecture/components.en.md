@@ -87,7 +87,7 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 - Output: `SessionState` (Cookie set), login/expiry state; consumed by Proxy Orchestrator when pushing to the sidecar.
 - Dependencies: the Login WebView session.
 - Depended on by: App Shell, Proxy Orchestrator.
-- Key invariants: the only Cookie reader; Cookies must never enter logs (see INV-001).
+- Key invariants: the only Cookie reader; Cookies must never enter logs (see INV-001); a captured login is accepted only after a valid portal probe, and stale probe results are ignored after monitoring stops or a new session begins.
 - Related tests: TC-D01, TC-D02, TC-D03, TC-D04.
 - Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md).
 
@@ -99,8 +99,8 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 - Output: `BridgeStatus` (including `localCaptureEnabled` and `captureError`); the system proxy target; the `{allowlist, cookies, debug, capture}` config pushed to the sidecar.
 - Dependencies: Allowlist Store, OS proxy API (IF-004), mitm sidecar control port (IF-002).
 - Depended on by: App Shell.
-- Key invariants: clear the system proxy only when the "set by this app" marker exists (INV-002); the bridge state machine is fixed at `idle → starting → running`, `running → stopping → idle`, `starting → error → idle`.
-- Capture modes are mutually exclusive (ADR-0006): `system-proxy` and `selected-apps` are never in effect at the same time — in `selected-apps` this app sets no system proxy and revokes the one it previously set (clearing the `systemProxyManagedByApp` marker), letting local mode take over the selected applications only; in `system-proxy` local capture stays off (the runtime config's `capture.processes` is always empty) and the system proxy covers all traffic. Switching modes revokes/restores the proxy according to the target mode; the bridge port (the regular listener) stays available in both modes.
+- Key invariants: persist `systemProxyManagedByApp` before setting the OS proxy; clear that marker only after OS cleanup succeeds, retaining it for recovery on the next launch after failure (INV-002). The bridge state machine is fixed at `idle → starting → running`, `running → stopping → idle`, `starting → error → idle`.
+- Capture modes are mutually exclusive (ADR-0006): `system-proxy` and `selected-apps` are never in effect at the same time — in `selected-apps` this app sets no system proxy and revokes the one it previously set (clearing the `systemProxyManagedByApp` marker), letting local mode take over the selected applications only; in `system-proxy` local capture stays off (the runtime config's `capture.processes` is always empty) and the system proxy covers all traffic. A mode switch persists the target only after the OS operation succeeds; if both proxy setup and rollback fail, the bridge stops to end local capture. The bridge port (the regular listener) stays available in both modes.
 - Pre-switch check: before switching to `selected-apps` the system proxy is checked; if another application occupies it (it does not point at this bridge) the switch is refused with `PROXY_CONFLICT` and nothing is persisted (consistent with ADR-0004's "refuse rather than half-work").
 - Pre-start fake-ip check: after the system-proxy conflict check and before the port probe, the configured gateway host (`settings.webvpnBase`, default `webvpn.swufe.edu.cn`) is resolved; any address inside `198.18.0.0/15` (Clash / mihomo / sing-box fake-ip) refuses the start with `PROXY_CONFLICT`, so the bridge cannot come up into a silent upstream hang; a failed or timed-out lookup never blocks (fail open) — criterion and consequences in [ADR-0011](adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md).
 - Capture candidate enumeration: macOS uses `ps -Ao pid=,comm=`, Windows uses `tasklist /fo csv /nh`; applications are collapsed into one row per `.app` bundle path (main process and Helper share one pattern), while non-applications use the full executable path as the mitmproxy intercept pattern.
@@ -143,7 +143,7 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 - Output: `{ok, message}`, CA status (installed / trusted).
 - Dependencies: OS trust store (IF-005).
 - Depended on by: App Shell, Proxy Orchestrator (CA availability check before starting the bridge).
-- Key invariants: the CA private key stays local and is never uploaded (REQ-010, NFR-003).
+- Key invariants: the CA private key stays local and is never uploaded; trust-store status and removal match the local CA certificate fingerprint, never a shared subject name (REQ-010, NFR-003).
 - Related tests: TC-E01, TC-E02, TC-E03.
 - Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md), [ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md).
 

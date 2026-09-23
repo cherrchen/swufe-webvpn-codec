@@ -30,7 +30,7 @@
 ## 2. Coverage expectations
 
 ```text
-Coverage target: TBD (no numeric target; the current baseline is 198 green L0/L1/L2 cases (L0 97 + L1 93 + L2 8), 85 app unit cases (`test:unit`) and 36 renderer component cases (`test:ui`))
+Coverage target: TBD (no numeric target; the current baseline is 198 green L0/L1/L2 cases (L0 97 + L1 93 + L2 8), 103 app unit cases (`test:unit`) and 36 renderer component cases (`test:ui`))
 Coverage tool:   TBD (not adopted in M1; the layers and cases are the current regression evidence)
 Exceptions:      the L3 and manual layers are excluded from coverage and
                  replaced by manual steps
@@ -41,6 +41,7 @@ Coverage is a reference metric, not the goal. **Must be covered**:
 - WRD codec vectors (TC-A01..TC-A05: authserver and jwxt samples, port-carrying URLs, wrong key);
 - allowlist exact match / wildcard / apex boundaries (TC-B01..TC-B05);
 - proxy conflict and system proxy clearing (TC-C01..TC-C04);
+- partially successful OS proxy commands, failed rollback or cleanup and launch recovery of the durable ownership marker; failed capture-mode switches must not persist the target; CA status and removal must match the local certificate fingerprint; stale session probes must not affect a stopped bridge or a new login;
 - stopping the bridge, clearing the proxy and stopping capture on session expiry (TC-D03);
 - loop prevention: login traffic is never re-wrapped by WRD (TC-D04);
 - the critical redirects of response reverse rewriting (`Location` and in-registrar navigation, TC-F03 / TC-G02);

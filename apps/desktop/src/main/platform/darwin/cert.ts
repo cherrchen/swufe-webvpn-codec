@@ -8,9 +8,9 @@ import { existsSync } from 'node:fs'
 
 import { CA_BASENAME, PRIVILEGE_PROMPT_TIMEOUT_MS, SYSTEM_KEYCHAIN } from '../../constants'
 import { run, runPrivilegedDarwin, type RunResult } from '../../exec'
-import { parseFindCertificate } from '../parse'
+import { parseFindCertificateHashes } from '../parse'
 import type { CertManager } from '../types'
-import { caPaths, ensureCaFiles } from '../ca-files'
+import { caFingerprint, caPaths, ensureCaFiles } from '../ca-files'
 
 const SECURITY = '/usr/bin/security'
 
@@ -39,14 +39,20 @@ export class DarwinCertManager implements CertManager {
   constructor(
     private readonly confdir: string,
     private readonly bridgeRoot: string,
+    private readonly execute: typeof run = run,
+    private readonly executePrivileged: typeof runPrivilegedDarwin = runPrivilegedDarwin,
   ) {}
 
   async getStatus(): Promise<{ installed: boolean; trusted: boolean }> {
     const { caCert } = caPaths(this.confdir)
     if (!existsSync(caCert)) return { installed: false, trusted: false }
-    const found = parseFindCertificate((await run(SECURITY, CERT_SELECTOR)).stdout)
-    const verify = await run(SECURITY, ['verify-cert', '-c', caCert, '-p', 'ssl'])
-    return { installed: found.found, trusted: verify.code === 0 }
+    const fingerprint = caFingerprint(caCert)
+    const found = await this.execute(SECURITY, CERT_SELECTOR)
+    const verify = await this.execute(SECURITY, ['verify-cert', '-c', caCert, '-p', 'ssl'])
+    return {
+      installed: found.code === 0 && parseFindCertificateHashes(found.stdout).includes(fingerprint),
+      trusted: verify.code === 0,
+    }
   }
 
   async install(): Promise<{ ok: boolean; message?: string }> {
@@ -59,14 +65,14 @@ export class DarwinCertManager implements CertManager {
     // Step 1: only root can write the system keychain, so this goes through the administrator
     // dialog of `runPrivilegedDarwin`. Keychain-only: it never touches trust settings (ADR-0008).
     const addCommand = `${SECURITY} add-certificates -k ${SYSTEM_KEYCHAIN} "${caCert}"`
-    const added = await runPrivilegedDarwin(addCommand)
+    const added = await this.executePrivileged(addCommand)
     if (added.code !== 0 && !/already in/i.test(added.stderr)) {
       return { ok: false, message: describeFailure(addCommand, added) }
     }
     // Step 2: trust settings, written by this app's own process. An osascript-administered child
     // never runs in the GUI session macOS needs to raise that authorization (KI-007, ADR-0008).
     const args = [...CA_TRUST_FLAGS, caCert]
-    const result = await run(SECURITY, args, { timeoutMs: PRIVILEGE_PROMPT_TIMEOUT_MS })
+    const result = await this.execute(SECURITY, args, { timeoutMs: PRIVILEGE_PROMPT_TIMEOUT_MS })
     if (result.code !== 0) {
       return { ok: false, message: describeFailure(`${SECURITY} ${CA_TRUST_FLAGS.join(' ')} "${caCert}"`, result) }
     }
@@ -79,10 +85,9 @@ export class DarwinCertManager implements CertManager {
 
   async uninstall(): Promise<{ ok: boolean; message?: string }> {
     if (!(await this.getStatus()).installed) return { ok: true }
-    const found = parseFindCertificate((await run(SECURITY, CERT_SELECTOR)).stdout)
-    if (!found.sha1) return { ok: false, message: '未能取得系统信任库中的证书指纹。' }
-    const command = `${SECURITY} delete-certificate -Z "${found.sha1}" ${SYSTEM_KEYCHAIN}`
-    const result = await runPrivilegedDarwin(command)
+    const { caCert } = caPaths(this.confdir)
+    const command = `${SECURITY} delete-certificate -Z "${caFingerprint(caCert)}" ${SYSTEM_KEYCHAIN}`
+    const result = await this.executePrivileged(command)
     if (result.code !== 0) return { ok: false, message: describeFailure(command, result) }
     if ((await this.getStatus()).installed) {
       return { ok: false, message: '证书仍在系统信任库中，请手动确认。' }
