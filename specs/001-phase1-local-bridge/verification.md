@@ -540,6 +540,32 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 
 **证据落点**：逐轮 JSONL 与 stdout 在系统临时目录（`%TEMP%\ki019-retest\…`，不入库；不含 Cookie/token/正文）；本轮关键数据已摘录于上表与本文件。复测后系统代理已由应用清除（`ProxyEnable=0x0`），应用与 sidecar 已停止（无残留进程），CA 仍安装在当前用户根存储（复测前置，可由应用「卸载本机 CA」移除）。
 
+## KI-019 四臂配对复测（2026-09-23）
+
+> 目的：用**同轮交替的四臂对照**把「本地（本仓库代码 / mitmproxy）与外部（网关或链路）」分开。历史挂起是**分钟级爆发**（非均匀概率），只有同一轮/相邻轮里「一臂挂而另一臂不挂」才算证据，跨时窗比较无效（`--set http2=false` 那次即因此无判别力）。环境与自动化由执行者完成；CAS/MFA 登录由 cherrchen 本人完成。
+
+**环境（与历史失败轮、「KI-019 现场复测（2026-09-23）」同形）**：Windows 11；应用以隔离 profile `%TEMP%\m4-win` 启动（`pnpm start --user-data-dir=… --remote-debugging-port=9222`，`SWUFE_PROBE_INTERVAL_MS=8000`），捕获方式「系统代理（全部流量）」，allowlist 含 `jwxt.swufe.edu.cn`；`getSession() = {loggedIn:true, expiresAt:2026-09-30}`；本机 CA `{installed:true,trusted:true}`（安装时的系统「安全警告」对话框按 `KI-021` 用 UIAutomation 点「是(Y)」）；桥 `running`、系统代理 `127.0.0.1:8080`（`ProxyEnable=0x1`）；`Get-NetRoute` 默认路由 `ifIndex 8 → 192.168.0.1`（**无 TUN 路由**）、`webvpn.swufe.edu.cn → 202.115.115.140`（非 fake-ip）。预检：网关直连接受 TLS1.2（Python `maximum_version=TLSv1.2` 握手 `OK`、`curl --tls-max 1.2` 得 `302`），故 `M1`/`M2` 备选可行（本轮未用到）。
+
+**四臂**（同一份 Python 客户端代码，差异只在传输路径；每轮按轮转顺序各发一次、臂间隔 250ms）：
+
+| 臂 | 路径 | 目标 | 头 | 客户端 TLS |
+| -- | ---- | ---- | -- | ---------- |
+| `A` | 应用桥 `127.0.0.1:8080`（明文 HTTP 代理） | `http://jwxt.swufe.edu.cn/` | `User-Agent: curl/8.9.1`、`Accept: */*`、`Accept-Encoding: deflate, gzip, br, zstd` | 无（明文；会话 Cookie 由桥注入） |
+| `A-v` | 同 `A` | 同 `A` | `User-Agent: swufe-arms`、`Accept: */*`、`Accept-Encoding: identity` | 无（会话 Cookie 由桥注入） |
+| `B` | stock mitmdump `127.0.0.1:18081`（`regular@18081`、`connection_strategy=lazy`、独立 confdir，**无本仓库 addon**） | `https://webvpn.swufe.edu.cn/http/<token>/`（仓库 `wrd_codec` 构造） | 同 `A` + `Cookie:`（stock 臂无注入，客户端自带） | 校验 stock confdir 的 `mitmproxy-ca-cert.pem` |
+| `C` | 直连（无代理、无 mitmproxy） | 同 `B` | 同 `A` + `Cookie:` | 直连网关（只测路径，`check_hostname=False`/`CERT_NONE`） |
+
+**判定**：`stall` = 无响应头 / 超时（8s）/ 首部耗时 > 3000ms；`burst` 轮 = `A` 挂起，并在前 3 个 `A` 挂起轮紧跟一次 `A-long`（120s，记录 `status/ms/bytes`）。机械判定：`external-raw`（burst 轮内 `C` 挂起率 ≥ 0.5）/ `mitmproxy`（`B` ≥ 0.5）/ `addon-only`（`B`、`C`、`A-v` 在 burst 轮内均 0）/ `header-suspect`（`addon-only` 不成立且 `A-v` 为 0）/ `mixed` / `insufficient`（burst 轮 < 5）。
+
+| 命令 / 场景 | 结果 |
+| ---- | ---- |
+| 四臂配对复测（第 1 轮，`--rounds 40 --pause-ms 15000`） | **`A`/`A-v`/`B`/`C` 全部 0 挂起**（40 轮）：`A` 落 302、0.24–0.34s；`A-v` 0.23–0.33s；`B` 0.23–0.32s；`C` 0.12–0.42s；逐轮序列 `........................................`（`burst` 0/40） |
+| 四臂配对复测（第 2 轮，UI 关桥→开桥后立即复跑，取「桥刚启动即历史高频窗口」） | **全部 0 挂起**（40 轮）：`A` 0.24–0.35s；`A-v` 0.24–0.34s；`B` 0.23–0.31s；`C` 0.11–0.15s；`burst` 0/40 |
+| `A`/`A-v` 的桥内阶段记录（逐轮） | 每轮 `connect_start → connect_done(54–78ms) → tls_start → tls_done(57–76ms) → response(status=302, 244–307ms)`——证明取样确在本问题路径上（非旁路） |
+| `A-long` | **未触发**（无 `A` 挂起轮，故无「静默丢弃 vs 网关只是慢」样本） |
+
+**结论**：两轮共 80 轮四臂对照全部正常，**爆发窗口未出现**，判定 `insufficient`（可判定样本要求 burst 轮 ≥ 5）。按计划在样本不足时**不下任何归因结论**，`KI-019` **保持 `Open`**、Spec 001 仍为 `Implemented`，解除条件不变；保留 2026-09-23 现场 19/40 的 `bridge-side` 记录。本轮不可复现，环境与对照臂参数见证据 JSONL（`%TEMP%\ki019-arms\arms-win32-20260923-*.jsonl`，不入库；不含 Cookie/token/正文）；配对脚本为临时探针 `%TEMP%\ki019-arms.py`（不入库），判据与仓库工具 `pnpm run diagnose:upstream` 同源（读桥内阶段记录、`bridge>3000ms` 判定、证据写仓库外、不落 Cookie/token/正文）。
+
 ## 边界与异常场景
 
 | 场景 | 期望行为 | 实际结果 | Status |
@@ -602,7 +628,7 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 
 | 项 | 原因 | 已尝试 | 需要谁决策 |
 | -- | ---- | ------ | ---------- |
-| 经桥访问教务的偶发挂起（`KI-019`，`Open`） | 2026-09-23 Windows 真机验收 6 次 smoke 中 3 次 12–45s 零字节超时；旧对照访问网关根而非相同 WRD 路径，桥请求日志也早于上游连接，不能据此排除本地路径。桥侧当时既无上游超时也无阶段记录，继续采样无法产出区分证据 | 复核轮（未复现）与 2026-09-23 现场复测（`bridge-side` 19/40，见「KI-019 现场复测（2026-09-23）」）已执行：异常轮阶段记录恒为 `connect_start → connect_done(54–68ms) → tls_start → tls_done(57–72ms) → 无 response → error`，同轮 DNS/TCP/TLS 全绿；同路径 + 同会话 Cookie 直连 18/18 快速、网关自有路径 10/10 快速 → 已排除本机网络/解析原因；`--set http2=false` 试验对本路径不生效（已回滚） | cherrchen（在爆发窗口内取得报文级证据：捕获 mitmproxy 上游请求字节或按 TCP 分段重放同一请求，并核对网关是否按连接/源走不同后端；据此定位后修复或按外部风险接受。复测命令与判据见 [development-run.md](../../docs/operations/development-run.md)） |
+| 经桥访问教务的偶发挂起（`KI-019`，`Open`） | 2026-09-23 Windows 真机验收 6 次 smoke 中 3 次 12–45s 零字节超时；旧对照访问网关根而非相同 WRD 路径，桥请求日志也早于上游连接，不能据此排除本地路径。桥侧当时既无上游超时也无阶段记录，继续采样无法产出区分证据 | 复核轮（未复现）与 2026-09-23 现场复测（`bridge-side` 19/40，见「KI-019 现场复测（2026-09-23）」）已执行：异常轮阶段记录恒为 `connect_start → connect_done(54–68ms) → tls_start → tls_done(57–72ms) → 无 response → error`，同轮 DNS/TCP/TLS 全绿；同路径 + 同会话 Cookie 直连 18/18 快速、网关自有路径 10/10 快速 → 已排除本机网络/解析原因；`--set http2=false` 试验对本路径不生效（已回滚）；**四臂配对复测（2026-09-23）两轮 80 轮全部 0 挂起、爆发窗口未出现 → 未达可判定样本**（见「KI-019 四臂配对复测（2026-09-23）」） | cherrchen（在爆发窗口内取得报文级证据：捕获 mitmproxy 上游请求字节或按 TCP 分段重放同一请求，并核对网关是否按连接/源走不同后端；据此定位后修复或按外部风险接受。复测命令与判据见 [development-run.md](../../docs/operations/development-run.md)；**2026-09-23 四臂配对复测未复现（两轮 80 轮 0 挂起），需在可复现的爆发窗口内重测**） |
 | 会话 Cookie 名与另两个失效信号（Q-001 / DQ-001） | 另两个信号（`Set-Cookie` 清空、连续改写后 302 到 CAS）本轮未观测到（本轮用的是服务端使 ticket 失效 → 探测 `302 → /login`） | M4 已采集并只记名：`wengine_vpn_ticketwebvpn_swufe_edu_cn`、`route`、`show_vpn`、`heartbeat`、`show_faq`；已确认信号原文 `会话探测：status=302 location=https://webvpn.swufe.edu.cn/login → expired`；登记为 `KI-006`；**2026-09-21 决策（cherrchen）**：本轮不补实现，也不以现有信号正式收敛 Q-001（保持 `Open`，待真实会话环境再观测） | cherrchen（在真实会话环境下观测后再决定是否补实现/收敛） |
 
 > 已解除的旧条目：TC-E01/TC-E02（系统信任库写入，见 `KI-007`/`KI-010`）、TC-G04 的真实范围（`KI-002` 置 `Fixed`）、日志面板与真实桥联动（`KI-003` 置 `Fixed`）；**M5（2026-09-21）**：L3 教务浏览器验收（TC-G01、TC-G02）已从本表移除——`KI-011` 修复后 macOS 实机复验通过，见「M5（`KI-011` 修复）执行记录」。**2026-09-23（Windows 真机）**：Windows 全部真机项已从本表移除——按 M4 手册执行 TC-D01..D04 / TC-C01..C04 / TC-E01/E02/E03 / TC-F01 / TC-F04 / TC-G03 / TC-G04 / TC-H01/H02 / TC-B05 并通过，`KI-001` 置 `Fixed`，见「M4 Windows 验收执行记录（2026-09-23）」。**2026-09-21（`KI-007` 修复）**：CA **自动**安装已从本表移除——安装改为「提权写系统钥匙串 + 应用进程写管理域信任设置」（[ADR-0008](../../docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)），应用内一次点击即可完成，见「`KI-007` 修复复验执行记录（2026-09-21）」。**2026-09-21（`KI-013` 修复）**：TUN/fake-ip 干扰已在本轮消除（fake-ip 形态由开桥前预检拒绝，`KI-013` 置 `Fixed`，见「`KI-013` 修复执行记录（2026-09-21）」）；真实开启 TUN 的复现样本仍未采集，但判据由单测覆盖、真机侧已验证不误报。
@@ -617,3 +643,4 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 > 当前：macOS 与 Windows 的既定 P0 用例和教务浏览器验收均已通过（Windows 2026-09-23 实测，`KI-001` 已 `Fixed`）；本轮将 CAS 资源截断 `KI-014` 置 `Accepted`，重载登录窗为现有规避。教务请求偶发挂起 `KI-019` 曾在 Windows 验收中出现，本轮未复现且无法排除本地路径，重新置 `Open`。
 > 因此 Spec 001 保持 `Implemented`。推进 `Verified` 的本轮附加条件是定位 `KI-019` 并证实其非本地原因，或修复已确认的本地原因并复验；当前证据尚不满足。
 > **2026-09-23（`KI-019` 有界化 + 现场复测）**：挂起已不再表现为「无限等待」——桥对网关主机的上游建连限制为 4s × 2 次尝试，两次都超时后客户端得到 `502 Bad Gateway`，并新增 `swufe-upstream` 阶段记录、`<userData>/bridge-upstream.log` 与现场判因工具 `pnpm run diagnose:upstream`（同轮直连对照）。本机实测（不经校园网）：有界失败 8.1s 内返回 502、慢响应与「已连但不响应」三类路径均可在日志中区分（见「`KI-019` 有界化与阶段证据（2026-09-23）」）。**同日现场复测已执行**（真实会话，cherrchen 完成登录；默认路由直连、无 TUN）：40 轮中 `bridge-side` **19**、`no-stall` 21、`network-or-resolver` 0；异常轮阶段记录恒为「网关建连成功（54–68ms）→ TLS 握手成功（57–72ms）→ 上游不回任何字节 → 客户端断开」，而同轮 DNS/TCP/TLS 探针全绿、同路径 + 同会话 Cookie 直连 18/18 快速、网关自有路径 10/10 快速（见「KI-019 现场复测（2026-09-23）」）。据此**排除本机网络/解析原因**，把问题定位到「桥的上游请求/响应阶段」；`--set http2=false` 候选经代码与实测证明对本路径不生效（改动已回滚）。因尚未取得报文级证据以区分 mitmproxy 请求与网关侧处理，`KI-019` 保持 `Open`、Spec 001 仍为 `Implemented`；解除条件见 [known-issues.md](known-issues.md) 的 `KI-019`。另：复测前置的 CA 安装暴露 `KI-021`（Windows 的 CA 安装/卸载系统对话框阻塞 `certutil`），本轮已修复并真机复验（安装与卸载均按「等 15s 再点『是(Y)』」成功），条目置 `Fixed`。
+> **2026-09-23（`KI-019` 四臂配对复测）**：以同轮交替的四臂（`A` 应用桥 / `A-v` 同桥中性头 / `B` stock mitmdump（无本仓库 addon）/ `C` 直连网关）做本轮复测，两轮各 40 轮**全部 0 挂起**，爆发窗口未出现，机械判定 `insufficient` → **不下归因结论**，`KI-019` 保持 `Open`、Spec 001 仍为 `Implemented`（见「KI-019 四臂配对复测（2026-09-23）」）。
