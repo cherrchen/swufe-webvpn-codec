@@ -43,7 +43,7 @@ Linter:            TBD (not introduced in this phase)
 | Variables | snake_case in Python, camelCase in TS; contract constants shared across surfaces are gathered in UPPER_SNAKE at the top of the module (Python: `DEFAULT_HOSTS`; TS: `DEFAULT_BRIDGE_PORT`, `CHANNEL_STATUS` in `apps/desktop/src/main/constants.ts`) |
 | Constants | UPPER_SNAKE_CASE |
 | Config / interface fields | JSON fields use camelCase (`includeSwufeWildcard`, `webvpnBase`, `wrdKey`), consistent with the `docs/` contracts; Python-internal attributes use snake_case (`include_swufe_wildcard`, `webvpn_base`) |
-| stderr control lines / error codes | Machine-readable prefixes and error codes stay fixed English (`swufe-ready`, `swufe-error`, `swufe-debug`; `PROXY_CONFLICT`…); user-facing copy is Chinese |
+| stderr control lines / error codes | Machine-readable prefixes and error codes stay fixed English (`swufe-ready`, `swufe-error`, `swufe-debug`, `swufe-capture`, `swufe-upstream`; `PROXY_CONFLICT`…); user-facing copy is Chinese |
 | TS module format | Main / preload emit CommonJS (the only sound shape under Electron `sandbox: true`), the renderer emits ESM (loaded via `<script type="module">`); relative imports carry no extension |
 
 The table above records the conventions actually in place after M1/M2 landed. Cross-module constraints (independent of the implementation):

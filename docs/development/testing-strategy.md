@@ -28,7 +28,7 @@
 ## 2. 覆盖要求
 
 ```text
-Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 198 个用例（L0 97 + L1 93 + L2 8）、103 个 App 单测用例（`test:unit`）与 36 个渲染层组件用例（`test:ui`）全绿）
+Coverage target: TBD（未设定数值目标；当前基线为 L0/L1/L2 的 217 个用例（L0 103 + L1 103 + L2 11）、103 个 App 单测用例（`test:unit`）与 36 个渲染层组件用例（`test:ui`）全绿）
 Coverage tool:   TBD（M1 未引入；层与用例即当前的可回归证据）
 Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 ```
@@ -38,6 +38,7 @@ Exceptions:      L3 与手工验证层不计入覆盖率，以手工步骤代替
 - WRD codec 向量（TC-A01..TC-A05，含 authserver 与 jwxt 样本、带端口与错误 key）；
 - allowlist 精确命中 / 通配 / apex 边界（TC-B01..TC-B05）；
 - 代理冲突与系统代理清除（TC-C01..TC-C04）；
+- 上游有界化与阶段证据（`KI-019`）：网关主机建连超时/重试/全部失败的有界行为与记录（L0 `bridges/python/tests/l0/test_upstream_deadline.py`，注入式、不触网）、`swufe-upstream` 记录的键集合与脱敏/体积上限/轮转（L1 `tests/l1/test_upstream_log.py`）、不可达上游对客户端表现为有界失败（502）与慢响应/已连不响应两种情形的可观测性（L2 `tests/l2/test_upstream_stall.py`）；现场判因由 `pnpm run diagnose:upstream` 提供同轮直连对照（属 L3 现场步骤，需真实会话）；
 - 系统代理命令部分成功、回滚或清理失败后的持久标记与下次启动恢复；捕获方式切换失败时设置不落盘；CA 安装状态与卸载目标须按本地证书指纹识别；旧会话探测不得影响停桥或新登录；
 - 会话过期时的停桥、清代理、停捕获（TC-D03）；
 - 防环：登录流量不经 WRD 二次包装（TC-D04）；

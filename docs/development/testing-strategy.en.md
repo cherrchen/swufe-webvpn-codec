@@ -30,7 +30,7 @@
 ## 2. Coverage expectations
 
 ```text
-Coverage target: TBD (no numeric target; the current baseline is 198 green L0/L1/L2 cases (L0 97 + L1 93 + L2 8), 103 app unit cases (`test:unit`) and 36 renderer component cases (`test:ui`))
+Coverage target: TBD (no numeric target; the current baseline is 217 green L0/L1/L2 cases (L0 103 + L1 103 + L2 11), 103 app unit cases (`test:unit`) and 36 renderer component cases (`test:ui`))
 Coverage tool:   TBD (not adopted in M1; the layers and cases are the current regression evidence)
 Exceptions:      the L3 and manual layers are excluded from coverage and
                  replaced by manual steps
@@ -41,6 +41,7 @@ Coverage is a reference metric, not the goal. **Must be covered**:
 - WRD codec vectors (TC-A01..TC-A05: authserver and jwxt samples, port-carrying URLs, wrong key);
 - allowlist exact match / wildcard / apex boundaries (TC-B01..TC-B05);
 - proxy conflict and system proxy clearing (TC-C01..TC-C04);
+- upstream bounding and stage evidence (`KI-019`): the bounded behaviour and records for connect timeout / retry / exhausted attempts to the gateway host (L0 `bridges/python/tests/l0/test_upstream_deadline.py`, injected, no network), the key set, redaction, size cap and rotation of `swufe-upstream` records (L1 `tests/l1/test_upstream_log.py`), and both an unreachable upstream reaching the client as a bounded failure (502) and the observability of a slow and of a connected-but-silent upstream (L2 `tests/l2/test_upstream_stall.py`); on-site attribution comes from the same-round direct control of `pnpm run diagnose:upstream` (an L3 on-site step that needs a real session);
 - partially successful OS proxy commands, failed rollback or cleanup and launch recovery of the durable ownership marker; failed capture-mode switches must not persist the target; CA status and removal must match the local certificate fingerprint; stale session probes must not affect a stopped bridge or a new login;
 - stopping the bridge, clearing the proxy and stopping capture on session expiry (TC-D03);
 - loop prevention: login traffic is never re-wrapped by WRD (TC-D04);

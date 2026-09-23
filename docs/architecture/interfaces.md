@@ -57,11 +57,11 @@ flowchart LR
 - 消费方：Proxy Orchestrator（Main）。
 - 稳定性：Internal / Evolving（仅供本 App 内部消费；第一期已采用方案 A「子进程生命周期 + 配置文件热加载」，不再承诺其它控制面形态）。
 - 输入：子进程生命周期（spawn / 结束）；启动参数 `--mode regular@<port>`（**不传** `--listen-port`：全局 `listen_port` 会让运行时新增的 `local:<spec>` 与 `regular` 被判为同一监听地址而报错）；配置文件整体覆盖写入（`allowlist` / `cookies` / `debug` / `webvpnBase` / `wrdKey` / `wrdIv` / `capture`，路径与字段见 [api/bridge-control-protocol.md](../api/bridge-control-protocol.md)）。`capture` 为 `{"processes": string[]}`，缺省即空数组；`system-proxy` 捕获方式下恒为 `[]`，非法（非列表 / 空串 / 含逗号 / 非字符串）⇒ `CONFIG_INVALID`。
-- 输出：stderr 上的就绪与诊断行（`swufe-ready` / `swufe-error <CODE> <message>` / `swufe-capture {"enabled":bool,"processes":string[],"error":string|null}`）、进程退出码（正常 `0`，启动校验失败 `2`）；配置生效结果（热加载，失败保留上次可用配置）。
+- 输出：stderr 上的就绪与诊断行（`swufe-ready` / `swufe-error <CODE> <message>` / `swufe-capture {"enabled":bool,"processes":string[],"error":string|null}` / `swufe-upstream {"ts":…,"stage":…,"host":…,"addr":…,"ms":…,"detail":…}`）、进程退出码（正常 `0`，启动校验失败 `2`）；配置生效结果（热加载，失败保留上次可用配置）。`swufe-upstream`（`KI-019`）只承载上游阶段证据（键与阶段词表见 [api/bridge-control-protocol.md](../api/bridge-control-protocol.md)），Electron 侧不解析、不参与就绪判定；同一行同时追加到 `<userData>/bridge-upstream.log`。
 - 错误模型：sidecar 级诊断 `swufe-error <CODE> <message>` + 退出码 `2`（`CONFIG_INVALID`、`ALLOWLIST_EMPTY`、`LISTEN_NOT_LOOPBACK`）；运行期配置重载失败不退出，保留上次可用配置并重复上报同一消息前只打印一次；M2 将 sidecar 非预期退出映射为 `BRIDGE_CRASH`。`swufe-capture` 只报告进程捕获状态（键固定 `enabled` / `processes` / `error`），不参与就绪判定，捕获失败不改变桥状态，也不自动重试（直到运行时配置被重写才重新尝试）。
 - 幂等性：配置文件为整体覆盖式写入，以「最后一次生效」为幂等语义；结束进程重复调用收敛到已停止状态。
 - 版本策略：sidecar 与 App 同发布；控制面能力变更（如启用方案 B）视为实现变更而非契约变更。
-- 兼容性承诺：Cookie 禁止进日志与诊断行（INV-001）；`swufe-ready` / `swufe-error` / `swufe-capture` 行格式与退出码语义稳定；`swufe-capture` 的键集合固定为 `enabled` / `processes` / `error`；监听地址恒为 `127.0.0.1`。
+- 兼容性承诺：Cookie 禁止进日志与诊断行（INV-001）；`swufe-ready` / `swufe-error` / `swufe-capture` / `swufe-upstream` 行格式与退出码语义稳定；`swufe-capture` 的键集合固定为 `enabled` / `processes` / `error`，`swufe-upstream` 固定为 `ts` / `stage` / `host` / `addr` / `ms` / `detail`（且脱敏后不含 URL/token/Cookie/正文）；监听地址恒为 `127.0.0.1`。
 - 关联 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md)、[ADR-0002](adr/ADR-0002-reuse-mitmproxy-for-tls.md)。
 
 ### IF-003 Bridge Addon ↔ WRD Codec 库

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from swufe_bridge import upstream
 from swufe_bridge.addon import report_error
 from swufe_bridge.config import (
     DEFAULT_CONFIG_DIR,
@@ -86,6 +87,11 @@ def main(argv: list[str] | None = None) -> int:
     ]
 
     from mitmproxy.tools.main import mitmdump
+
+    # Bound the upstream connect for the WebVPN gateway hosts (KI-019). The policy set
+    # is filled in by the addon once the runtime config is known; the patch itself has
+    # to be in place before mitmproxy starts dialling.
+    upstream.install_connect_deadline()
 
     try:
         mitmdump(mitmdump_argv)

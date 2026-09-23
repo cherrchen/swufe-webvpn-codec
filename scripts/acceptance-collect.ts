@@ -565,6 +565,12 @@ async function collectBridgeSmoke(
     record('bridge-smoke', 'FAIL', `curl 退出码 ${String(result.code)}`, `curl${CURL_TLS_LABEL} -x http://127.0.0.1:${String(options.port)} ${url}`, body)
     return
   }
+  if (status.includes('502')) {
+    // The bridge now fails bounded instead of hanging (KI-019): an upstream 502 is a
+    // diagnosis, not a working bridge, so it must not be recorded as PASS.
+    record('bridge-smoke', 'FAIL', `上游 502（KI-019 有界失败）：${status}`, `curl${CURL_TLS_LABEL} -x http://127.0.0.1:${String(options.port)} ${url}`, body)
+    return
+  }
   record('bridge-smoke', 'PASS', status, `curl${CURL_TLS_LABEL} -x http://127.0.0.1:${String(options.port)} ${url}`, body)
 
   const direct = curlRequest(['-sS', '-m', '20', '-o', os.devNull, '-w', '%{http_code}', url], 30_000)

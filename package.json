@@ -15,6 +15,7 @@
     "start": "pnpm --filter swufe-webvpn-bridge run start",
     "docs:check": "tsx scripts/docs-check.ts",
     "acceptance:check": "tsx scripts/acceptance-collect.ts",
+    "diagnose:upstream": "tsx scripts/diagnose-upstream.ts",
     "docs:links": "tsx scripts/docs-links-check.ts",
     "docs:i18n": "tsx scripts/docs-i18n-check.ts",
     "spec:check": "tsx scripts/spec-check.ts",

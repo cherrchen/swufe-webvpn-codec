@@ -41,7 +41,7 @@ Linter:            TBD（本期未引入）
 | 变量 | Python snake_case、TS camelCase；跨面契约常量用 UPPER_SNAKE 集中在模块顶部（Python：`DEFAULT_HOSTS`；TS：`apps/desktop/src/main/constants.ts` 的 `DEFAULT_BRIDGE_PORT`、`CHANNEL_STATUS`） |
 | 常量 | UPPER_SNAKE_CASE |
 | 配置 / 接口字段 | JSON 字段用 camelCase（`includeSwufeWildcard`、`webvpnBase`、`wrdKey`），与 `docs/` 契约保持一致；Python 内部属性用 snake_case（`include_swufe_wildcard`、`webvpn_base`） |
-| stderr 控制行 / 错误码 | 机器可读前缀与错误码保持固定英文（`swufe-ready`、`swufe-error`、`swufe-debug`；`PROXY_CONFLICT`…）；用户可见文案中文 |
+| stderr 控制行 / 错误码 | 机器可读前缀与错误码保持固定英文（`swufe-ready`、`swufe-error`、`swufe-debug`、`swufe-capture`、`swufe-upstream`；`PROXY_CONFLICT`…）；用户可见文案中文 |
 | TS 模块格式 | Main / preload 输出 CommonJS（Electron `sandbox: true` 下唯一稳妥形态），Renderer 输出 ESM（`<script type="module">` 加载）；相对导入不带扩展名 |
 
 上表为 M1/M2 落地后的实际约定。跨模块约束（不随实现变化）：

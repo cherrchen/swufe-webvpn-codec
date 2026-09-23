@@ -20,10 +20,12 @@ from urllib.parse import urlsplit
 
 from mitmproxy import ctx, http
 from mitmproxy.net.http.cookies import format_cookie_header, parse_cookie_headers
-from mitmproxy.proxy import mode_specs
+from mitmproxy.proxy import mode_specs, server_hooks
+from mitmproxy.tls import TlsData
 from mitmproxy.utils import asyncio_utils
 from mitmproxy_rs.local import LocalRedirector
 
+from swufe_bridge import upstream
 from swufe_bridge.allowlist import match as allowlist_match, now_iso
 from swufe_bridge.capture import POLL_INTERVAL_SECONDS, LocalCapture
 from swufe_bridge.config import BridgeRuntimeConfig, ConfigWatcher
@@ -99,6 +101,23 @@ def report_error(code: str, message: str) -> None:
     print(f"swufe-error {code} {message}", file=sys.stderr, flush=True)
 
 
+def _format_address(address: Sequence[object] | None) -> str | None:
+    """`("1.2.3.4", 443)` → `"1.2.3.4:443"`; `None` when the peer is unknown."""
+    if not address:
+        return None
+    return f"{address[0]}:{address[1]}"
+
+
+def _elapsed_ms(start: float | None, end: float | None) -> int | None:
+    if start is None or end is None or end < start:
+        return None
+    return int((end - start) * 1000)
+
+
+def _alpn(alpn: bytes | None) -> str | None:
+    return alpn.decode("utf-8", errors="replace") or None if alpn else None
+
+
 def report_capture(enabled: bool, processes: Sequence[str], error: str | None) -> None:
     """Report the process-capture state to the Electron host.
 
@@ -134,6 +153,9 @@ class BridgeAddon:
         self._reported_error: str | None = None
         self._capture: LocalCapture | None = None
         self._reported_capture_error: str | None = None
+        # Last values pushed to `swufe_bridge.upstream` (change-guarded, see `_apply_upstream`).
+        self._policy_host: str | None = None
+        self._upstream_debug: bool | None = None
 
     # --- mitmproxy lifecycle -------------------------------------------------
 
@@ -157,6 +179,7 @@ class BridgeAddon:
             ctx.master.shutdown()
             return
         cfg = self._config()
+        self._apply_upstream(cfg)
         summary = {
             "listen_host": listen_host,
             "listen_port": regular_listen_port(ctx.options.mode) or ctx.options.listen_port,
@@ -165,6 +188,9 @@ class BridgeAddon:
             "includeSwufeWildcard": cfg.allowlist.include_swufe_wildcard if cfg else False,
             "cookies": len(cfg.cookies) if cfg else 0,
             "debug": cfg.debug if cfg else False,
+            "upstream_connect_timeout_ms": int(upstream.CONNECT_TIMEOUT_SECONDS * 1000),
+            "upstream_connect_attempts": upstream.CONNECT_ATTEMPTS,
+            "upstream_log": str(self._upstream_log_path() or ""),
         }
         print("swufe-ready " + json.dumps(summary, ensure_ascii=False), file=sys.stderr, flush=True)
 
@@ -304,7 +330,104 @@ class BridgeAddon:
                 original_host, False, body_detail or DETAIL_NO_WRD_MATCH
             )
 
+    # --- upstream stage evidence (KI-019) ------------------------------------
+
+    def server_connect(self, data: server_hooks.ServerConnectionHookData) -> None:
+        host, port = data.server.address or (None, None)
+        upstream.record(
+            "connect_start",
+            host=str(host) if host else None,
+            addr=f"{host}:{port}" if host else None,
+        )
+
+    def server_connected(self, data: server_hooks.ServerConnectionHookData) -> None:
+        conn = data.server
+        upstream.record(
+            "connect_done",
+            host=str(conn.address[0]) if conn.address else None,
+            addr=_format_address(conn.peername),
+            # DNS + TCP: `timestamp_start` is set before the lookup, `timestamp_tcp_setup` on ACK.
+            ms=_elapsed_ms(conn.timestamp_start, conn.timestamp_tcp_setup),
+        )
+
+    def server_connect_error(self, data: server_hooks.ServerConnectionHookData) -> None:
+        host, port = data.server.address or (None, None)
+        upstream.record(
+            "connect_failed",
+            host=str(host) if host else None,
+            addr=f"{host}:{port}" if host else None,
+            detail=data.server.error,
+        )
+
+    def tls_start_server(self, data: TlsData) -> None:
+        upstream.record("tls_start", addr=_format_address(data.conn.peername))
+
+    def tls_established_server(self, data: TlsData) -> None:
+        conn = data.conn
+        upstream.record(
+            "tls_done",
+            addr=_format_address(conn.peername),
+            # Handshake time of this connection, counted from the TCP setup.
+            ms=_elapsed_ms(conn.timestamp_tcp_setup, conn.timestamp_tls_setup),
+            detail=_alpn(conn.alpn),
+        )
+
+    def tls_failed_server(self, data: TlsData) -> None:
+        upstream.record(
+            "tls_failed",
+            addr=_format_address(data.conn.peername),
+            detail=data.conn.error,
+        )
+
+    def responseheaders(self, flow: http.HTTPFlow) -> None:
+        if flow.response is None:
+            return
+        original_url = flow.metadata.get(METADATA_ORIGINAL_URL)
+        host = (urlsplit(original_url).hostname or None) if original_url else flow.request.pretty_host
+        upstream.record(
+            "response",
+            host=host,
+            addr=_format_address(flow.server_conn.peername if flow.server_conn else None),
+            # Time to first upstream byte: from the request being fully sent.
+            ms=_elapsed_ms(
+                flow.request.timestamp_end or flow.request.timestamp_start,
+                flow.response.timestamp_start,
+            ),
+            detail=f"status={flow.response.status_code}",
+        )
+
+    def error(self, flow: http.HTTPFlow) -> None:
+        original_url = flow.metadata.get(METADATA_ORIGINAL_URL)
+        host = (urlsplit(original_url).hostname or None) if original_url else flow.request.pretty_host
+        upstream.record(
+            "error",
+            host=host,
+            addr=_format_address(flow.server_conn.peername if flow.server_conn else None),
+            detail=flow.error.msg if flow.error else None,
+        )
+
     # --- internals -----------------------------------------------------------
+
+    def _upstream_log_path(self) -> Path | None:
+        if self._watcher is None:
+            return None
+        return Path(str(self._watcher.path)).parent / upstream.UPSTREAM_LOG_FILENAME
+
+    def _apply_upstream(self, cfg: BridgeRuntimeConfig | None) -> None:
+        """Push the config-derived upstream state.
+
+        Called on every request, so the work is skipped unless the config actually
+        changed (`webvpnBase` hot reload, debug toggle).
+        """
+        host = cfg.webvpn_host if cfg else None
+        debug = cfg.debug if cfg else False
+        if host == self._policy_host and debug == self._upstream_debug:
+            return
+        self._policy_host = host
+        self._upstream_debug = debug
+        upstream.configure_log(self._upstream_log_path(), debug)
+        if host:
+            upstream.set_policy_hosts({host})
 
     def _promote_to_gateway(
         self, flow: http.HTTPFlow, cfg: BridgeRuntimeConfig, logger: DebugLogger, original_host: str
@@ -396,6 +519,7 @@ class BridgeAddon:
             self._report_config_error(self._watcher.error)
         else:
             self._reported_error = None
+        self._apply_upstream(cfg)
         return cfg
 
     def _report_config_error(self, message: str) -> None:

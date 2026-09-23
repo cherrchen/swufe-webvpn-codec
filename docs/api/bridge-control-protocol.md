@@ -87,16 +87,24 @@ python -m swufe_bridge.ca --confdir <confdir>
 
 ```text
 swufe-debug {"ts":"2026-09-21T10:00:00+00:00","host":"jwxt.swufe.edu.cn","rewritten":true,"direction":"request","detail":null}
-swufe-ready {"listen_host":"127.0.0.1","listen_port":8080,"config":"/abs/path.json","allowlist":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false,"cookies":1,"debug":false}
+swufe-ready {"listen_host":"127.0.0.1","listen_port":8080,"config":"/abs/path.json","allowlist":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false,"cookies":1,"debug":false,"upstream_connect_timeout_ms":4000,"upstream_connect_attempts":2,"upstream_log":"/abs/path/bridge-upstream.log"}
 swufe-capture {"enabled":true,"processes":["/Applications/Google Chrome.app/"],"error":null}
+swufe-upstream {"ts":"2026-09-23T10:00:00+00:00","stage":"connect_timeout","host":"webvpn.swufe.edu.cn","addr":"202.115.115.140:443","ms":4013,"detail":"attempt=1"}
 swufe-error CONFIG_INVALID <message>
 swufe-error ALLOWLIST_EMPTY allowlist 为空：请添加主机或启用 *.swufe.edu.cn
 swufe-error LISTEN_NOT_LOOPBACK <message>
 ```
 
 - `swufe-debug` 键固定为 `ts` / `host` / `rewritten` / `direction` / `detail`；`detail` 仅取短标记（`not-allowlisted`、`encode-failed`、`location`、`set-cookie`、`body`、`body-skipped`、`no-wrd-match`），**禁止**出现 Cookie 值与请求/响应正文（INV-001）。
-- `swufe-ready` 在 addon `running()` 打印一次，报告生效的 `listen_host` / `listen_port`；`cookies` 只输出条数。`listen_port` 由 `--mode regular@<port>` 推导（sidecar 不传 `--listen-port`）。
+- `swufe-ready` 在 addon `running()` 打印一次，报告生效的 `listen_host` / `listen_port`；`cookies` 只输出条数。`listen_port` 由 `--mode regular@<port>` 推导（sidecar 不传 `--listen-port`）。三个 `upstream_*` 键报告生效的上游建连上限（毫秒）、尝试次数与证据文件路径（`KI-019`）。
 - `swufe-capture`（M3）键固定为 `enabled` / `processes` / `error` 三个：首次应用捕获配置与配置变更后各上报一次。它**不参与就绪判定**（进程捕获是可选能力），失败后不自动重试，直到运行时配置被重写（界面「重试」即再次下发配置）。失败只影响 `BridgeStatus.captureError`，桥保持 `running`。
+- `swufe-upstream`（`KI-019`，2026-09-23）是**上游阶段证据**：键固定为 `ts` / `stage` / `host` / `addr` / `ms` / `detail` 六个，Electron 侧**不解析**该行（`parseSidecarLine` 只认前四行与 `swufe-error`），不参与就绪判定。
+  - `stage` 词表：`connect_start`、`connect_done`、`connect_timeout`、`connect_retry`、`connect_failed`、`tls_start`、`tls_done`、`tls_failed`、`response`、`error`。
+  - `ms` 语义：`connect_done` = 含 DNS 解析在内的 TCP 建连耗时；`tls_done` = 自同一连接 TCP 建连起算的握手耗时；`response` = 上游首字节耗时；`connect_timeout` / `connect_retry` = 该次尝试的等待时长；其余为 `null`。
+  - 触发条件（三选一，其余情况不写任何记录）：`debug=true`；`stage` ∈ {`connect_timeout`、`connect_retry`、`connect_failed`、`tls_failed`、`error`}；`ms >= 3000`。正常路径零写入。
+  - 落盘：同一行同时写 stderr 与 `<userData>/bridge-upstream.log`（JSONL 追加，单文件上限 256 KiB，超出时保留最新约一半；POSIX 下 `0600`）。
+  - 脱敏（INV-001）：`detail` 先删除所有 `http(s)://` 起至空白/引号为止的片段（WRD token 只可能出现在 URL 中），再压平控制字符并截断到 160 字符；`host` / `addr` 只接受主机名或 `host:port` 形态，否则记 `null`。该行与日志**不含** Cookie 值、token 与正文。
+  - 建连有界化：桥对网关主机的上游建连上限为 4 秒 × 2 次尝试（`swufe_bridge/upstream.py` 的 `CONNECT_TIMEOUT_SECONDS` / `CONNECT_ATTEMPTS`，sidecar 在 `mitmdump()` 之前安装），两次都超时后走 mitmproxy 既有失败路径，客户端得到 `502 Bad Gateway` 而不是无限等待；通过上游地址不在网关主机集合内的请求（含其它站点）行为不变。**已知边界**：已建连但上游长时间不响应无法被中断（mitmproxy `flow.kill()` 不作用于在途 flow），只能由 `response` / `error` 记录看见。
 - 退出码：正常停止 `0`；启动校验失败（`CONFIG_INVALID`、`ALLOWLIST_EMPTY`）`2`。
 
 ### 开发运行
@@ -130,3 +138,4 @@ sidecar 不再向 mitmdump 传 `--listen-port`：全局 `listen_port` 会作用�
 | 2026-09-21 | 定稿方案 A：配置文件路径与字段表、mtime + size 轮询热加载与失败回退、`swufe-ready` / `swufe-error` 行与退出码、开发运行命令、回环由 sidecar 硬编码强制 | 兼容（首版未定稿，无既有消费方） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0002](../architecture/adr/ADR-0002-reuse-mitmproxy-for-tls.md) |
 | 2026-09-21 | M2 落地：新增 CA 生成入口 `python -m swufe_bridge.ca --confdir <dir>`（stdout JSON / `swufe-error CA_FAILED` / 退出码 2 / 幂等）；明确 M2 的 `--config` 与 `--confdir` 落点分别为 `<userData>/bridge-config.json` 与 `<userData>/mitmproxy/` | 兼容（新增入口，控制面未变） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) |
 | 2026-09-21 | M3 捕获：配置新增 `capture.processes`；新增 `swufe-capture {"enabled","processes","error"}` 诊断行；启动改为 `--mode regular@<port>`（不再传 `--listen-port`），`swufe-ready.listen_port` 由 regular 模式推导 | 兼容（新增键与行；启动参数变化对 Main 透明） | [spec 001](../../specs/001-phase1-local-bridge/spec.md) / [ADR-0006](../architecture/adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md) |
+| 2026-09-23 | `KI-019` 有界化：新增 `swufe-upstream` 诊断行（六键、十个阶段、`ms` 语义与触发条件）与 `<userData>/bridge-upstream.log`（JSONL，256 KiB 上限）；网关主机的上游建连改为 4s × 2 次尝试（超时对客户端表现为 502）；`swufe-ready` 新增 `upstream_connect_timeout_ms` / `upstream_connect_attempts` / `upstream_log` 三键 | 兼容（新增行与键；`swufe-debug` / `swufe-capture` / `swufe-ready` 既有键不变，Electron 侧忽略未知行） | [spec 001](../../specs/001-phase1-local-bridge/known-issues.md) |
