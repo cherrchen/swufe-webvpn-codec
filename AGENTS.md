@@ -19,7 +19,7 @@ Purpose:          在 macOS / Windows 上以 Electron 桌面应用提供本机�
 Status:           Phase 1 的 macOS 与 Windows 真机 P0 用例及教务浏览器验收已通过（Windows 见
                   specs/001-phase1-local-bridge/verification.md 的 2026-09-23 记录）；Spec 001 为
                   `Implemented`。KI-014（CAS 主题资源传输截断）已按应用/桥外部风险接受并文档化重载规避；
-                  KI-019（经桥访问教务偶发挂起）尚未区分本地与外部路径，重新 `Open`，故暂不到 `Verified`。
+                  KI-019（经桥访问教务偶发挂起）最新试验未在桥路或直连复现，暂按残余风险 `Accepted`；根因未定，复现时重开。
                   M6 界面重构（Spec 002）已交付并推进到 `Implemented`：渲染层为 React 19 + Ant Design 6
                   的四窗口结构（主窗口 720×560 严格零滚动，三类单实例非模态二级窗口）。Windows 真机
                   的真实会话教务操作与进程捕获范围已随 001 验证；002 其余未验证项见其 verification.md。

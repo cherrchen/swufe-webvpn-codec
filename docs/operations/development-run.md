@@ -129,7 +129,7 @@ pnpm run diagnose:upstream --user-data-dir <profile> --rounds 40 --scheme http
 | curl 校验本机 CA | Windows 自带 curl 使用 Schannel，`--cacert <本机 CA>` 会以「未知吊销状态」失败（退出码 60）：手动命令需加 `--ssl-no-revoke`（`pnpm run acceptance:check` 已自动附加） |
 | 文件权限 | 无 POSIX 模式位语义（`stat` 由系统合成 `0o666`）；会话文件与 CA 私钥的「仅本机用户」由 `%APPDATA%` 每用户 profile ACL 提供（NFR-003 的 Windows 实现方式） |
 
-> Windows 真机验证（TC-C02..C04、TC-D01..D04、TC-E01/E02/E03、TC-F01/F04、TC-G03/G04、TC-H01/H02、TC-B05）已于 **2026-09-23** 在 Windows 11 24H2 上执行并通过，期间修复 `KI-015`..`KI-018` 与 `KI-020`（见 [known-issues.md](../../specs/001-phase1-local-bridge/known-issues.md)）；执行记录与命令结果见 [verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 Windows 验收执行记录（2026-09-23）」。`KI-019` 已重新标记为 `Open`（原因待定位），临时规避方式见本文件 §6。
+> Windows 真机验证（TC-C02..C04、TC-D01..D04、TC-E01/E02/E03、TC-F01/F04、TC-G03/G04、TC-H01/H02、TC-B05）已于 **2026-09-23** 在 Windows 11 24H2 上执行并通过，期间修复 `KI-015`..`KI-018` 与 `KI-020`（见 [known-issues.md](../../specs/001-phase1-local-bridge/known-issues.md)）；执行记录与命令结果见 [verification.md](../../specs/001-phase1-local-bridge/verification.md) 的「M4 Windows 验收执行记录（2026-09-23）」。`KI-019` 暂列 `Accepted`，最新试验桥路与直连均未观察到不可达；根因仍未知，复现时重开。
 
 ## 8. 停止与重置
 

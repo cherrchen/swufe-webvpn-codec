@@ -21,8 +21,9 @@ Status:           Phase 1 P0 cases and academic-affairs browser acceptance pass 
                   real Windows hardware (see the 2026-09-23 record in spec 001 verification.md);
                   spec 001 remains `Implemented`. KI-014 (CAS theme asset truncation) is accepted
                   as a risk outside the app and bridge with a documented reload workaround.
-                  KI-019 (sporadic stall through the bridge) has been reopened because local and
-                  external causes remain undistinguished; spec 001 is not yet `Verified`.
+                  KI-019 (sporadic stall through the bridge) is provisionally `Accepted` as a
+                  residual risk after the latest test observed no failure through either the bridge
+                  or direct access; the cause remains unknown and the issue reopens on recurrence.
                   The M6 UI rework (spec 002) is delivered and `Implemented`: React 19 + Ant Design 6
                   renders a four-window layout (720×560 scroll-free main window and three single-instance
                   non-modal secondary windows). Real-session academic-affairs use and process-capture
