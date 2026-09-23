@@ -8,7 +8,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 阶段 | Phase 1：M1–M4 已交付，**macOS 侧验收全部通过（含教务浏览器验收）**——2026-09-21 `KI-011` 修复（[ADR-0007](docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）后复验 TC-G01/TC-G02 通过；Spec 001 状态 `Implemented`。未完成：Windows 侧真机项延期（`KI-001`）、`KI-014`（CAS 主题资源被服务端截断，2026-09-21 决策仅文档化规避）未决，故未到 `Verified`（`KI-007` 的 CA 自动安装已于 2026-09-21 修复，见 [ADR-0008](docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)；`KI-013` 的 TUN/fake-ip 干扰已于 2026-09-21 修复，见 [ADR-0011](docs/architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)；见 [verification.md](specs/001-phase1-local-bridge/verification.md)） |
+| 阶段 | Phase 1 的 macOS 与 Windows 真机验收已通过（含教务浏览器操作）；Spec 001 为 `Implemented`。`KI-014` 的应用外资源截断已接受并以重载登录窗规避；`KI-019` 的经桥偶发挂起尚未区分本地与外部成因，因此未到 `Verified`。详见 [verification.md](specs/001-phase1-local-bridge/verification.md)。 |
 | 仓库类型 | 文档优先（Documentation-first）：[docs/](docs/README.md) + [specs/](specs/README.md)；含桥实现（[bridges/python/](bridges/python/swufe_bridge/wrd_codec.py)、[tests](bridges/python/tests/l0/test_wrd_codec.py)）与桌面应用（[apps/desktop/](apps/desktop/README.md)） |
 | 第一期 Feature | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | 第二期 Feature（M6 界面重构） | [specs/002-desktop-ui-multiwindow/](specs/002-desktop-ui-multiwindow/spec.md)（`Implemented`：React 19 + Ant Design 6 的四窗口渲染层，主窗口 720×560 零滚动，捕获/日志/Allowlist 为二级窗口） |

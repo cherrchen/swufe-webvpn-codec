@@ -17,20 +17,16 @@ Purpose:          An Electron desktop app for macOS / Windows providing a local 
                   the user completes the official Wengine WebVPN (CAS/MFA) login, the local
                   browser reaches allowlisted hosts through the WebVPN automatically
                   (Phase 1 acceptance: the academic affairs site jwxt.swufe.edu.cn opens and works)
-Status:           Phase 1 delivered (M1 bridge core / M2 desktop orchestration / M3 experience polish /
-                  M4 acceptance): the macOS side passes everything, including the academic-affairs
-                  browser acceptance (TC-G01/G02 re-verified 2026-09-21 after the KI-011 fix, see
-                  ADR-0007); spec 001 is `Implemented`. Open: the Windows real-machine items are
-                  deferred (KI-001) and KI-014 (CAS theme assets truncated by the server; the
-                  2026-09-21 decision documents the workaround only) is unresolved, so it is not
-                  `Verified` yet (KI-007, the automatic CA install, is fixed — see ADR-0008;
-                  KI-013, the TUN / fake-ip interference, is fixed — see ADR-0011)
-                  M6 UI rework (spec 002) is delivered and advanced to `Implemented`: the renderer is a
-                  four-window React 19 + Ant Design 6 structure (720×560 strictly scroll-free main
-                  window; capture/log/allowlist as single-instance non-modal secondary windows; the
-                  200-entry debug-log ring buffer lives in Main); every machine-executable acceptance
-                  case passes. Unverified items carry over from 001: the Windows real machine, the
-                  campus page under a real session, and the real process-capture scope
+Status:           Phase 1 P0 cases and academic-affairs browser acceptance pass on both macOS and
+                  real Windows hardware (see the 2026-09-23 record in spec 001 verification.md);
+                  spec 001 remains `Implemented`. KI-014 (CAS theme asset truncation) is accepted
+                  as a risk outside the app and bridge with a documented reload workaround.
+                  KI-019 (sporadic stall through the bridge) has been reopened because local and
+                  external causes remain undistinguished; spec 001 is not yet `Verified`.
+                  The M6 UI rework (spec 002) is delivered and `Implemented`: React 19 + Ant Design 6
+                  renders a four-window layout (720×560 scroll-free main window and three single-instance
+                  non-modal secondary windows). Real-session academic-affairs use and process-capture
+                  scope were checked on Windows with spec 001; see spec 002 verification.md for what remains.
 Primary language: Python 3 (bridge sidecar/Addon, WRD codec, see `bridges/python/swufe_bridge/`) + TypeScript (Electron app, from M2);
                   Markdown docs (`docs/` + `specs/`) plus Node documentation-check scripts form the bulk
 Repository type:  Documentation-first (docs/ + specs/) + implementation (Python bridge `bridges/python/`,

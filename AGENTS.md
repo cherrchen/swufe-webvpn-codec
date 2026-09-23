@@ -16,14 +16,13 @@ Project:          SWUFE WebVPN Bridge（仓库 swufe-webvpn-codec）
 Purpose:          在 macOS / Windows 上以 Electron 桌面应用提供本机桥：用户完成官方网瑞达
                   WebVPN（CAS/MFA）登录后，本机浏览器对 allowlist 内主机自动经 WebVPN 访问
                   （第一期验收：教务 jwxt.swufe.edu.cn 可打开并操作）
-Status:           Phase 1 已交付（M1 桥核心 / M2 桌面编排 / M3 体验打磨 / M4 验收）：macOS 侧验收全部通过，含
-                  教务浏览器验收（2026-09-21 修复 KI-011 后复验 TC-G01/G02 通过，见 ADR-0007）；Spec 001 为
-                  `Implemented`。未完成：Windows 侧真机项延期（KI-001）、KI-014（CAS 主题资源被服务端
-                  截断，2026-09-21 决策仅文档化规避）未决，故未到 `Verified`（KI-007 的 CA 自动安装已修复，见
-                  ADR-0008；KI-013 的 TUN/fake-ip 干扰已修复，见 ADR-0011）
-                  M6 界面重构（Spec 002）已交付并推进到 `Implemented`：渲染层为 React 19 + Ant Design 6 的四窗口结构
-                  （主窗口 720×560 严格零滚动；捕获/日志/Allowlist 为单实例非模态二级窗口；调试日志 200 条环形缓冲在
-                  Main），可机器执行的验收全部通过；未验证项沿用 001：Windows 真机、真实会话下的教务页面操作、进程捕获真实范围
+Status:           Phase 1 的 macOS 与 Windows 真机 P0 用例及教务浏览器验收已通过（Windows 见
+                  specs/001-phase1-local-bridge/verification.md 的 2026-09-23 记录）；Spec 001 为
+                  `Implemented`。KI-014（CAS 主题资源传输截断）已按应用/桥外部风险接受并文档化重载规避；
+                  KI-019（经桥访问教务偶发挂起）尚未区分本地与外部路径，重新 `Open`，故暂不到 `Verified`。
+                  M6 界面重构（Spec 002）已交付并推进到 `Implemented`：渲染层为 React 19 + Ant Design 6
+                  的四窗口结构（主窗口 720×560 严格零滚动，三类单实例非模态二级窗口）。Windows 真机
+                  的真实会话教务操作与进程捕获范围已随 001 验证；002 其余未验证项见其 verification.md。
 Primary language: Python 3（bridge sidecar/Addon、WRD codec，见 `bridges/python/swufe_bridge/`）+ TypeScript（Electron 应用，M2 起）；
                   文档（`docs/` + `specs/`）与 Node 文档检查脚本是主体
 Repository type:  Documentation-first（docs/ + specs/）+ 实现（Python 桥 `bridges/python/`、Electron 应用 `apps/desktop/`）

@@ -1,7 +1,7 @@
 # Feature: Phase 1 本机桥（001-phase1-local-bridge）
 
 > Spec ID: 001
-> Status: In Progress
+> Status: Implemented
 > Owner: cherrchen
 > Created: 2026-09-20
 > Related: REQ-001..REQ-011 / NFR-001..NFR-007 / ADR-0001..ADR-0006
@@ -11,7 +11,7 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 `Implemented`（2026-09-21）：M1（桥核心）已实现并通过 L0/L1/L2——桥 sidecar、WRD codec、allowlist 匹配与持久化、请求改写与响应反向改写、配置热更新、L0 CI；M2（桌面编排）已实现并通过 App 单测与 macOS 实机端到端验证——Electron 壳、登录 WebView 与 Session Broker（防环）、Proxy Orchestrator（代理冲突检测、系统代理与 sidecar 生命周期）、Cert Manager（含独立 CA 生成入口与安装前风险提示）、会话过期级联（停桥 → 清代理 → 弹窗重登）、退出清代理与残留自愈。M3（体验打磨）已实现——可编辑 allowlist UI、一级「捕获方式」与进程捕获（mitmproxy local 模式）、调试日志面板、捕获态状态与授权引导文案，人工验证结果见 [verification.md](verification.md)；M4（验收）的 **macOS 侧已执行**（2026-09-21，真实应用 + CDP + 真实 CAS/MFA 会话）：登录/未登录拒绝、开桥与系统代理、代理冲突、会话失效级联、进程捕获真实范围、日志面板、退出清代理、CA 安装（经应用自带手动命令）与卸载均通过；M4 期间教务浏览器验收（TC-G01/TC-G02）因网关客户端 shim 与透明桥不兼容而失败（`KI-011`，P0）。**M5（2026-09-21，`KI-011` 修复后的复验）**：网关自有命名空间直通 + bootstrap 文档升级到网关原生 URL 空间（[ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）在 macOS 实机复验通过——教务首页可打开、站内导航可操作（TC-G01/TC-G02/AC-007），其它 allowlist 主机仍留在普通 URL 空间；`uv run --directory bridges/python pytest -q` = 198 passed、App 单测 71、`docs:check` 0 error/0 warning。仍有两类未完成：Windows 侧全部真机项延期（`KI-001`）、CA 的自动安装路径在 macOS 15.6 上失败（`KI-007`）与个别直连主机/环境干扰（`KI-012`/`KI-013`），因此本 Spec 为 `Implemented`，**不**推进到 `Verified`（`Verified` 需要 P0 全绿，仍差 Windows 侧）。证据见 [verification.md](verification.md) 的 M4/M5 记录、[M1 里程碑](../../docs/planning/milestones/M1-mitm-bridge.md)、[M2 里程碑](../../docs/planning/milestones/M2-desktop-orchestration.md)、[M3 里程碑](../../docs/planning/milestones/M3-experience-polish.md) 与 [M4 里程碑](../../docs/planning/milestones/M4-acceptance.md)。
+当前为 `Implemented`：M1 桥核心、M2 桌面编排、M3 体验打磨均已实现；2026-09-21 的 M5 macOS 复验使教务浏览器 TC-G01/G02 通过，2026-09-23 的 Windows 11 24H2 真机验收完成两侧既定 P0 用例与教务浏览器操作，`KI-001` 已 `Fixed`。本轮复核把应用/桥外部的 CAS 资源截断 `KI-014` 置 `Accepted`；教务请求偶发挂起 `KI-019` 在新会话下未复现，但历史证据未排除本机 TUN/mitmproxy 路径，故重新置 `Open`。本 Spec 暂不推进到 `Verified`；需先定位 `KI-019` 并证实非本地原因，或修复本地原因后复验。完整证据与限制见 [verification.md](verification.md) 的「M4 Windows 验收执行记录」及「KI-014 / KI-019 同日复核」。
 
 ## Background
 

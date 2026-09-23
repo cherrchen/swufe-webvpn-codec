@@ -3,13 +3,13 @@
 > Spec ID: 001
 > Status: In Progress
 > Owner: cherrchen
-> Last Updated: 2026-09-21
+> Last Updated: 2026-09-23
 > 界面结构提示（2026-09-23）：本文件中的界面结构相关记录（REQ-009 日志面板、REQ-005 allowlist 编辑界面、REQ-003 候选应用列表、AC-009 等）描述的是迁移前的单窗口实现；对应的界面结构事实已由 [spec 002](../002-desktop-ui-multiwindow/spec.md)（[REQ-012](../../docs/requirements/functional-requirements.md)）取代，002 将重新执行这些用例。本文件的历史证据与结论保留不变。
 
 > 本文件建立 **Requirement → Verification** 映射，是「Feature 是否完成」的判定依据。
 > 规则见 [verification-strategy.md](../../docs/verification/verification-strategy.md)。
 > Feature **不因为「代码写完了」被视为完成**；状态必须推进到 `Verified`。
-> 当前进度：M1（桥核心）、M2（桌面编排）、M3（体验打磨）已实现；M4 的 **macOS 交互式验收已执行完毕**（真实应用 + CDP + 真实 CAS/MFA 会话，2026-09-21）：登录、开桥、系统代理、会话失效级联、进程捕获、日志面板、CA 安装/卸载等用例通过，验收期修复了三个缺陷（`KI-008` 会话探测丢 Cookie、`KI-009` 登录窗 ERR_ABORTED、`KI-010` CA 卸载缺 `-Z`）；M4 期间教务浏览器验收（TC-G01/TC-G02）失败（根因 `KI-011`）。**M5（2026-09-21，`KI-011` 修复后复验）**：网关自有命名空间直通 + bootstrap 文档升级（[ADR-0007](../../docs/architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）在 macOS 实机复验通过——TC-G01/TC-G02 转为 `Passed`，macOS 侧出口条件（含「教务浏览器验收至少一侧通过」）**已满足**。**M4 Windows 侧（2026-09-23，Windows 11 24H2 真机）**：按「M4 双平台验收执行手册」在 Windows 执行全部真机项——TC-G03（教务经桥可打开并可操作）、TC-C01..C04、TC-D01..D04、TC-E01/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05 通过；过程中暴露并修复 4 个 Windows 专属缺陷（`KI-015`..`KI-018`）与 4 处工具平台假设（`KI-020`），`KI-001` 置 `Fixed`，见「M4 Windows 验收执行记录（2026-09-23）」。仍未决：`KI-014`（CAS 主题资源被服务端截断，需重载登录窗；保持 `Open` 待决策）；已接受：`KI-019`（经桥访问教务偶发挂起，上游侧，重载即恢复，2026-09-23 决策 `Accepted`）、`KI-012`（个别直连主机经 mitmproxy 无响应，不在验收路径）、`KI-006`（Q-001 的另两个失效信号）。故本 Feature 保持 `Implemented`，**不**推进到 `Verified`（`Verified` 需 P0/P1 用例均无未决阻断项；`KI-014` 仍为 P1 `Open`）。
+> 当前进度：M1/M2/M3 已交付；M5 后 macOS 教务浏览器验收通过，2026-09-23 Windows 真机项全部通过（`KI-001` 已 `Fixed`）。本轮复核确认 `KI-014` 在应用和桥之外的传输路径复现，按本轮决策置 `Accepted`；`KI-019` 的历史挂起当前未复现，原「上游侧」归因缺少同路径和上游连接阶段证据，故重新置 `Open`。Spec 001 保持 `Implemented`，待 `KI-019` 区分本地与外部原因后再评估 `Verified`。
 
 ## 映射表
 
@@ -481,9 +481,18 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 
 **本轮修复**：`KI-015`（登录后残留 `NOT_LOGGED_IN`）、`KI-016`（中文 Windows 下 certutil 检测失效 → CA 状态误判）、`KI-017`（`execFile` 的 stdin 管道使 certutil 挂起至超时）、`KI-018`（`reg query` 的 CRLF 使代理读写失效：漏报 `PROXY_CONFLICT` + 关桥不清代理）、`KI-020`（测试与证据工具的平台假设）；`KI-001` 置 `Fixed`。详见 [known-issues.md](known-issues.md)。
 
-**接受 / 未决**：`KI-019`（经桥访问教务偶发挂起 12–45s：本轮 6 次自动化 smoke 中 3 次命中；桥侧已记录请求但响应未到，判定为上游侧，重载即恢复）——**2026-09-23 决策（cherrchen）：接受**，登记为 `Accepted`，解除条件（稳定环境复测并区分网关与网络路径）保留；仍未决：`KI-014`（CAS 主题资源被服务端截断，Windows 同样以重载规避；保持 `Open` 待决策）；不在验收路径：`KI-012`（`www.swufe.edu.cn` 经桥无响应在 Windows 复现）、`KI-006`（Q-001 的另两个失效信号）。
+**当轮接受 / 未决（后续复核见下节）**：`KI-019`（经桥访问教务偶发挂起 12–45s：本轮 6 次自动化 smoke 中 3 次命中；桥侧已记录请求但响应未到，判定为上游侧，重载即恢复）——**2026-09-23 决策（cherrchen）：接受**，登记为 `Accepted`，解除条件（稳定环境复测并区分网关与网络路径）保留；仍未决：`KI-014`（CAS 主题资源被服务端截断，Windows 同样以重载规避；保持 `Open` 待决策）；不在验收路径：`KI-012`（`www.swufe.edu.cn` 经桥无响应在 Windows 复现）、`KI-006`（Q-001 的另两个失效信号）。
 
 **证据落点**：`specs/001-phase1-local-bridge/evidence/acceptance-windows/`（4 份脱敏报告；真实 Cookie、教务页面正文与截图留在临时 profile，未入库）。
+
+## KI-014 / KI-019 同日复核（2026-09-23）
+
+> 目的：核对 Windows 验收后两个问题的归因，不改变历史验收结果。所有请求只记录状态、长度与耗时；Cookie、WRD token、正文未写入仓库。
+
+- 环境：Windows 11 24H2；本机 TUN 仍开启，`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 分别解析到 `198.18.0.47` / `198.18.0.46`，默认路由指向 Meta Tunnel。固定真实 IP 分别为 `202.115.115.140` / `202.115.112.134`，部分请求绑定 Wi-Fi 源地址；绑定源地址不构成完全绕过 TUN 的证明。
+- `KI-014`：以 Python 标准库 TLS/HTTP 请求 CAS `bootstrap.min.css`，真实 IP、fake-ip、真实 IP + Wi-Fi 源地址各 6 次，共 18 次均 `200`、`Content-Length=121048`、实收 121048 B（约 0.43–0.53s）。本轮未复现截断；2026-09-21 macOS 不经应用/桥的 `curl` 11 次中 3 次截断及 CDP 的 `ERR_INCOMPLETE_CHUNKED_ENCODING` 仍证明故障不依赖本产品。不能仅据此锁定 Tengine，故按外部传输风险接受并保留重载规避，`KI-014` → `Accepted`。
+- `KI-019`：应用内重新完成 CAS/MFA 后，以相同 Cookie 和相同教务 WRD 路径对照。固定真实 IP、Wi-Fi 源地址的诊断桥 14 次；默认路由诊断桥 22 次；同路径直连及 20s 间隔、8 轮并发门户探测均快速返回教务 `302`，桥请求约 0.19–0.51s。诊断钩子在已观测请求中看到 `server_connect` → `server_connected` → `responseheaders`，无连接或流错误。历史验收的 3/6 次零字节超时未复现，无法定位当时停在本机 TUN/mitmproxy、传输网络还是网关；旧日志只证明请求改写钩子运行，旧直连对照访问的是不同路径。因此撤回「已证明上游成因」的归因，将 `KI-019` 从 `Accepted` 重开为 `Open`。
+- 收尾：两个仅监听回环的诊断桥已停止，临时会话配置已删除；未改系统代理或 TUN 设置。下次发生挂起时需在同一轮记录连接阶段与同路径直连结果，方能满足本轮的非本地原因判定。
 
 ## 边界与异常场景
 
@@ -547,7 +556,7 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 
 | 项 | 原因 | 已尝试 | 需要谁决策 |
 | -- | ---- | ------ | ---------- |
-| 经桥访问教务的偶发挂起（`KI-019`，**2026-09-23 决策：接受**） | 本轮 Windows 真机实测：同一目标部分轮次 12–45s 无字节返回，桥侧已记录请求但响应未到；直连网关根连续 6 次正常；挂起亦出现在刚重启的全新连接上 | 已执行：6 次自动化 smoke（3 次命中）、5 轮 20s 间隔对照、直连对照（6/6 正常）、`http2_ping_keepalive` 试验（结论不足已回滚）；登记为 `KI-019`（`Accepted`：成因在网关/网络侧、规避 = 重载） | 保留复测：在稳定环境复测并区分网关与网络路径（若转为本地可复现则改回 `Open`） |
+| 经桥访问教务的偶发挂起（`KI-019`，`Open`） | 2026-09-23 Windows 真机验收 6 次 smoke 中 3 次 12–45s 零字节超时；旧对照访问网关根而非相同 WRD 路径，桥请求日志也早于上游连接，不能据此排除本地路径 | 本轮重新登录后，同一 WRD 路径 14 次固定真实 IP / Wi-Fi 源地址桥请求、22 次默认路由桥请求均快速返回；另做同路径直连、20s 间隔与 8 轮并发门户探测，仍未复现。默认路由指向 Meta Tunnel，当前对照不能确定历史根因 | 下次挂起时同步采集 `server_connect` / `server_connected` / `responseheaders` / `error` 与同路径直连，并记录 TUN 状态；分清本地与外部原因后处理 |
 | 会话 Cookie 名与另两个失效信号（Q-001 / DQ-001） | 另两个信号（`Set-Cookie` 清空、连续改写后 302 到 CAS）本轮未观测到（本轮用的是服务端使 ticket 失效 → 探测 `302 → /login`） | M4 已采集并只记名：`wengine_vpn_ticketwebvpn_swufe_edu_cn`、`route`、`show_vpn`、`heartbeat`、`show_faq`；已确认信号原文 `会话探测：status=302 location=https://webvpn.swufe.edu.cn/login → expired`；登记为 `KI-006`；**2026-09-21 决策（cherrchen）**：本轮不补实现，也不以现有信号正式收敛 Q-001（保持 `Open`，待真实会话环境再观测） | cherrchen（在真实会话环境下观测后再决定是否补实现/收敛） |
 
 > 已解除的旧条目：TC-E01/TC-E02（系统信任库写入，见 `KI-007`/`KI-010`）、TC-G04 的真实范围（`KI-002` 置 `Fixed`）、日志面板与真实桥联动（`KI-003` 置 `Fixed`）；**M5（2026-09-21）**：L3 教务浏览器验收（TC-G01、TC-G02）已从本表移除——`KI-011` 修复后 macOS 实机复验通过，见「M5（`KI-011` 修复）执行记录」。**2026-09-23（Windows 真机）**：Windows 全部真机项已从本表移除——按 M4 手册执行 TC-D01..D04 / TC-C01..C04 / TC-E01/E02/E03 / TC-F01 / TC-F04 / TC-G03 / TC-G04 / TC-H01/H02 / TC-B05 并通过，`KI-001` 置 `Fixed`，见「M4 Windows 验收执行记录（2026-09-23）」。**2026-09-21（`KI-007` 修复）**：CA **自动**安装已从本表移除——安装改为「提权写系统钥匙串 + 应用进程写管理域信任设置」（[ADR-0008](../../docs/architecture/adr/ADR-0008-ca-trust-authorization-in-app-session.md)），应用内一次点击即可完成，见「`KI-007` 修复复验执行记录（2026-09-21）」。**2026-09-21（`KI-013` 修复）**：TUN/fake-ip 干扰已在本轮消除（fake-ip 形态由开桥前预检拒绝，`KI-013` 置 `Fixed`，见「`KI-013` 修复执行记录（2026-09-21）」）；真实开启 TUN 的复现样本仍未采集，但判据由单测覆盖、真机侧已验证不误报。
@@ -559,5 +568,5 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 - [x] 文档影响已处理
 - [ ] Spec 状态可推进到 `Verified`
 
-> 当前：M1/M2/M3 已交付；M4 的 macOS 交互式验收已执行完毕（2026-09-21），新增 `Passed`：REQ-002、REQ-003、REQ-008、REQ-009、REQ-010、NFR-003/NFR-004 的 M4 部分、AC-002、AC-005、AC-009、AC-010，以及 TC-D01/D02/D03/D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G04、TC-H01/H02、TC-B05；**M5（2026-09-21，`KI-011` 修复后复验）**：REQ-001、REQ-007、REQ-011、NFR-006、AC-001、AC-007 转为 `Passed`（macOS 侧的教务浏览器验收 TC-G01/TC-G02 通过），因此 macOS 侧出口条件全部满足；`Deferred` 仅剩 Windows 全部真机项（`KI-001`）。**M4 Windows 侧（2026-09-23，Windows 11 24H2 真机）**：同上清单在 Windows 全部复跑并通过（含 TC-G03 教务浏览器验收与 TC-G04 真实进程捕获），期间修复 `KI-015`..`KI-018` 四个 Windows 专属缺陷与 `KI-020`（工具平台假设），`KI-001` 置 `Fixed`；见「M4 Windows 验收执行记录（2026-09-23）」。未决问题：P1 `KI-014`（CAS 主题资源被服务端截断；2026-09-21 决策：不做产品侧改动、仅文档化规避；保持 `Open` 待决策）；已接受：P1 `KI-019`（经桥访问教务偶发挂起，上游侧，重载即恢复；2026-09-23 `Accepted`）；P2 `KI-006`/`KI-012`。
-> 因此两侧桌面 OS 的出口条件「所有 P0 用例通过」与「教务浏览器验收通过」**均已满足**，Feature 保持 `Implemented`；`Verified` 仅受 P1 `KI-014`（校方服务端行为，已文档化规避，保持 `Open` 待决策）一项约束——`KI-019`（上游偶发挂起）已于 2026-09-23 由 cherrchen 决策接受（`Accepted`）。`KI-014` 一旦被接受或修复，即可推进到 `Verified`（见 [docs/planning/milestones/M4-acceptance.md](../../docs/planning/milestones/M4-acceptance.md)）。
+> 当前：macOS 与 Windows 的既定 P0 用例和教务浏览器验收均已通过（Windows 2026-09-23 实测，`KI-001` 已 `Fixed`）；本轮将 CAS 资源截断 `KI-014` 置 `Accepted`，重载登录窗为现有规避。教务请求偶发挂起 `KI-019` 曾在 Windows 验收中出现，本轮未复现且无法排除本地路径，重新置 `Open`。
+> 因此 Spec 001 保持 `Implemented`。推进 `Verified` 的本轮附加条件是定位 `KI-019` 并证实其非本地原因，或修复已确认的本地原因并复验；当前证据尚不满足。
