@@ -17,11 +17,11 @@
 | [M1 bridge core](milestones/M1-mitm-bridge.md) | mitm WRD addon (request rewrite), cookie injection, response reverse rewrite, unit/integration tests | G-001 | TBD | Done |
 | [M2 desktop orchestration](milestones/M2-desktop-orchestration.md) | Electron shell, system proxy, CA, proxy conflict detection, stop-on-expiry | G-001 / G-002 / G-003 | TBD | Done (the trust-store write and Windows real-machine checks still need a human/M4) |
 | [M3 experience polish](milestones/M3-experience-polish.md) | Allowlist UI, debug logging, process capture, copy | G-002 / G-003 | TBD | Done (the real capture scope and the log panel against a live bridge still need a human to authorise the system extension; see the milestone's remaining issues) |
-| [M4 acceptance](milestones/M4-acceptance.md) | macOS + Windows academic-affairs browser acceptance, defect burn-down | G-001 / G-002 / G-003 | TBD | In Progress (P0 and browser acceptance pass on both OSes; `KI-014` is accepted as external transfer risk; `KI-019` is provisionally `Accepted` as a residual risk, with cause unknown and reopening on recurrence) |
-| M5 open-source preparation (optional) | Open-source cleanup, README, follow-up TUN design memo | G-004 | TBD | Candidate |
+| [M4 acceptance](milestones/M4-acceptance.md) | macOS + Windows academic-affairs browser acceptance, defect burn-down | G-001 / G-002 / G-003 | TBD | In Progress (P0 and browser acceptance pass on both OSes; `KI-014` is accepted as external transfer risk; `KI-019` is `Open`, with field evidence locating it in the bridge upstream request/response stage but no established root cause) |
+| [M5 open-source preparation (optional)](milestones/M5-open-source-preparation.en.md) | Open-source cleanup, user/developer README, follow-up TUN design memo | G-004 | TBD | Done (2026-09-23: documentation preparation complete; no installer or public release) |
 | [M6 UI rework](milestones/M6-ui-rework.md) | Migrate the renderer to React + Ant Design 6 (Vite multi-entry), fixed 720×560 zero-scroll main window, capture/log/allowlist in secondary windows | G-002 / G-004 | TBD | Done (2026-09-23: the implementation and every machine-executable acceptance case pass, spec 002 is `Implemented`; unverified items in 002's verification.md — the Windows real machine item was lifted the same day with `KI-001`, the rest stay constrained by 002's own entries) |
 
-> Every timeframe is `TBD`: the original package defines no calendar dates (it only gives milestone ordering and dependencies). Milestone completion definitions and exit criteria live in [milestones/](milestones/README.md); M5 is a candidate row only and has no milestone file yet.
+> Every timeframe is `TBD`: the original package defines no calendar dates (it only gives milestone ordering and dependencies). Milestone completion definitions and exit criteria live in [milestones/](milestones/README.en.md). M5 covers open-source documentation preparation and does not mean release artifacts are available.
 
 ## Spec index
 
@@ -29,7 +29,7 @@ Each feature spec is registered here with one row; details live in `specs/<id>-<
 
 | Spec | Title | Related REQ | Phase | Status | Link |
 | ---- | ----- | ----------- | ----- | ------ | ---- |
-| 001-phase1-local-bridge | Phase 1 local bridge and academic-affairs browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | M1–M4 | Implemented (real-machine acceptance passes on both OSes; `KI-014` and `KI-019` are provisionally `Accepted`; `KI-019` remains unattributed and reopens on recurrence) | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
+| 001-phase1-local-bridge | Phase 1 local bridge and academic-affairs browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | M1–M4 | Implemented (real-machine acceptance passes on both OSes; `KI-014` is `Accepted`, `KI-019` is `Open` with root cause not yet established) | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
 | 002-desktop-ui-multiwindow | Desktop UI rework (React + Ant Design, multiple windows) | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012, NFR-003 / NFR-005 / NFR-007 | M6 | Implemented (2026-09-23: four-window renderer, scroll-free main window, Main-side log ring buffer; every machine-executable case passes, `Verified` is constrained by three unverified items) | [spec.md](../../specs/002-desktop-ui-multiwindow/spec.md) |
 
 > Phase 1 is one spec; add another row here per [specs/README.md](../../specs/README.md) when a later spec is created. REQ/NFR are defined in [requirements/](../requirements/README.md); this table only references IDs.

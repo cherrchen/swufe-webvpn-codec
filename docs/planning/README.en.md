@@ -13,6 +13,7 @@
 | ---- | ------- |
 | [roadmap.md](roadmap.md) | Phased direction and the spec index |
 | [milestones/](milestones/README.md) | Concrete milestone definitions and exit criteria |
+| [tun-follow-up.en.md](tun-follow-up.en.md) | Follow-up TUN / transparent-gateway design questions (candidate memo, not an implementation design) |
 
 ## Rules
 

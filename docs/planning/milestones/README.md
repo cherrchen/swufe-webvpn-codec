@@ -27,11 +27,11 @@ docs/planning/milestones/<MILESTONE_ID>-<short-name>.md
 | M1 桥核心 | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon 请求改写 + Cookie 注入 + 单测/集成测 |
 | M2 桌面编排 | [M2-desktop-orchestration.md](M2-desktop-orchestration.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Electron 可登录、开桥、设置系统代理、安装 CA |
 | M3 体验打磨 | [M3-experience-polish.md](M3-experience-polish.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI、调试日志、进程捕获、文案可用 |
-| M4 验收 | [M4-acceptance.md](M4-acceptance.md) | In Progress | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | 两侧 P0 与教务浏览器验收已通过；`KI-014` 已接受，`KI-019` 待定位，故尚未完成 |
-| M5 开源准备（可选） | 未建文件 | Candidate | — | Candidate，首个开源准备工作确定后再建文件 |
+| M4 验收 | [M4-acceptance.md](M4-acceptance.md) | In Progress | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | 两侧 P0 与教务浏览器验收已通过；`KI-014` 已接受，`KI-019` 保持 `Open`，现场证据定位到桥上游阶段，根因未定 |
+| M5 开源准备（可选） | [M5-open-source-preparation.md](M5-open-source-preparation.md) | Done（2026-09-23） | —（文档准备里程碑） | 用户/开发者 README、开源边界说明与后续 TUN 设计备忘完成；不含安装包或公开发行 |
 | M6 界面重构 | [M6-ui-rework.md](M6-ui-rework.md) | Done（2026-09-23） | [002-desktop-ui-multiwindow](../../../specs/002-desktop-ui-multiwindow/spec.md)（`Implemented`） | 渲染层迁移到 React + Ant Design 6 并固定为四窗口结构（主窗口 720×560 零滚动，捕获/日志/Allowlist 进非模态二级窗口）；可机器执行的验收全部通过，未验证项 = Windows 真机、真实会话下的教务页面操作、进程捕获真实范围 |
 
-> 阶段划分、依赖与 Spec 索引见 [roadmap.md](../roadmap.md)；M5 只有 roadmap 中的候选行，尚未建文件。
+> 阶段划分、依赖与 Spec 索引见 [roadmap.md](../roadmap.md)。M5 的完成范围仅为开源前文档准备，不代表发行物已完成。
 
 ## 里程碑模板
 

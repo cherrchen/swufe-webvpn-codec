@@ -15,11 +15,11 @@
 | [M1 桥核心](milestones/M1-mitm-bridge.md) | mitm WRD addon（请求改写）、Cookie 注入、响应反向改写、单测/集成测 | G-001 | TBD | Done |
 | [M2 桌面编排](milestones/M2-desktop-orchestration.md) | Electron 壳、系统代理、CA、代理冲突检测、过期停桥 | G-001 / G-002 / G-003 | TBD | Done（CA 信任库写入与 Windows 真机验证待人工/M4） |
 | [M3 体验打磨](milestones/M3-experience-polish.md) | Allowlist UI、调试日志、进程捕获、文案 | G-002 / G-003 | TBD | Done（真实进程捕获范围与日志面板的桥联动需人工授权系统扩展后复验，见完成记录「遗留问题」） |
-| [M4 验收](milestones/M4-acceptance.md) | macOS + Windows 教务浏览器验收、缺陷收敛 | G-001 / G-002 / G-003 | TBD | In Progress（两侧既定 P0 与教务浏览器验收已通过；`KI-014` 已接受外部传输风险；`KI-019` 暂按残余风险 `Accepted`，根因未定、复现时重开） |
-| M5 开源准备（可选） | 开源清理、README、后续 TUN 设计备忘 | G-004 | TBD | Candidate |
+| [M4 验收](milestones/M4-acceptance.md) | macOS + Windows 教务浏览器验收、缺陷收敛 | G-001 / G-002 / G-003 | TBD | In Progress（两侧既定 P0 与教务浏览器验收已通过；`KI-014` 已接受外部传输风险；`KI-019` 为 `Open`，现场证据定位到桥上游请求/响应阶段，根因未定） |
+| [M5 开源准备（可选）](milestones/M5-open-source-preparation.md) | 开源清理、用户/开发者 README、后续 TUN 设计备忘 | G-004 | TBD | Done（2026-09-23：文档准备完成；不含安装包或公开发行） |
 | [M6 界面重构](milestones/M6-ui-rework.md) | 渲染层迁移到 React + Ant Design 6（Vite 多入口），主窗口 720×560 零滚动，捕获/日志/Allowlist 进二级窗口 | G-002 / G-004 | TBD | Done（2026-09-23：实现与可机器执行的验收全部通过，Spec 002 为 `Implemented`；未验证项见 002 的 verification.md——其中 Windows 真机一项于同日随 001 的 `KI-001` 解除，其余仍受 002 自身条目约束） |
 
-> 时间段一律为 `TBD`：原包未定义日历时间（原包只给出里程碑顺序与依赖，未给日期）。里程碑的完成定义与退出条件见 [milestones/](milestones/README.md)；M5 只保留候选行，尚未建立里程碑文件。
+> 时间段一律为 `TBD`：原包未定义日历时间（原包只给出里程碑顺序与依赖，未给日期）。里程碑的完成定义与退出条件见 [milestones/](milestones/README.md)。M5 的完成范围是开源前文档准备，不代表发布发行物。
 
 ## Spec 索引
 
@@ -27,7 +27,7 @@
 
 | Spec | 标题 | 关联 REQ | 阶段 | Status | 链接 |
 | ---- | ---- | -------- | ---- | ------ | ---- |
-| 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | M1–M4 | Implemented（两侧真机验收已通过；`KI-014`、`KI-019` 已暂列 `Accepted`，`KI-019` 根因未定、复现时重开） | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
+| 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | M1–M4 | Implemented（两侧真机验收已通过；`KI-014` 为 `Accepted`，`KI-019` 为 `Open`，根因未定） | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
 | 002-desktop-ui-multiwindow | 桌面界面重构（React + Ant Design 多窗口） | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012、NFR-003 / NFR-005 / NFR-007 | M6 | Implemented（2026-09-23：四窗口渲染层、主窗口零滚动、Main 侧日志环形缓冲；可机器执行的验收全部通过，`Verified` 受 002 的未验证项约束——其中 Windows 真机一项随 001 的 `KI-001` 于同日解除） | [spec.md](../../specs/002-desktop-ui-multiwindow/spec.md) |
 
 > Phase 1 归属一个 Spec；建立后续 Spec 时按 [specs/README.md](../../specs/README.md) 再补一行。REQ/NFR 的规范定义在 [requirements/](../requirements/README.md)，本表只引用 ID。

@@ -11,6 +11,7 @@
 | ---- | ---- |
 | [roadmap.md](roadmap.md) | 分阶段的长期方向与 Spec 索引 |
 | [milestones/](milestones/README.md) | 具体里程碑定义与退出条件 |
+| [tun-follow-up.md](tun-follow-up.md) | TUN / 透明网关的后续设计问题清单（候选备忘，不是实施方案） |
 
 ## 规则
 

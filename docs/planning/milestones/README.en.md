@@ -29,11 +29,11 @@ Examples: `M1-mitm-bridge.md` (numeric) or `2026-09-20-packaging.md` (date-based
 | M1 bridge core | [M1-mitm-bridge.md](M1-mitm-bridge.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | mitm WRD addon request rewrite + cookie injection + unit/integration tests |
 | M2 desktop orchestration | [M2-desktop-orchestration.md](M2-desktop-orchestration.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Electron can log in, start the bridge, set the system proxy, install the CA |
 | M3 experience polish | [M3-experience-polish.md](M3-experience-polish.md) | Done | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Allowlist UI, debug logging, process capture and copy usable |
-| M4 acceptance | [M4-acceptance.md](M4-acceptance.md) | In Progress | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | P0 and browser acceptance pass on both OSes; `KI-014` is accepted, but `KI-019` still needs diagnosis |
-| M5 open-source preparation (optional) | no file yet | Candidate | — | Candidate; create the file once the first open-source preparation task is decided |
+| M4 acceptance | [M4-acceptance.en.md](M4-acceptance.en.md) | In Progress | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | P0 and browser acceptance pass on both OSes; `KI-014` is accepted, `KI-019` remains `Open`; field evidence locates it in the bridge upstream stage, but the root cause is unknown |
+| M5 open-source preparation (optional) | [M5-open-source-preparation.en.md](M5-open-source-preparation.en.md) | Done (2026-09-23) | — (documentation-preparation milestone) | User/developer README, open-source boundary notes, and TUN follow-up design memo complete; no installer or public release |
 | M6 UI rework | [M6-ui-rework.md](M6-ui-rework.md) | Done (2026-09-23) | [002-desktop-ui-multiwindow](../../../specs/002-desktop-ui-multiwindow/spec.md) (`Implemented`) | Migrate the renderer to React + Ant Design 6 and fix it into a four-window layout (720×560 scroll-free main window; capture/log/allowlist in non-modal secondary windows); every machine-executable case passes, unverified = the Windows real machine, the campus page under a real session and the real process-capture scope |
 
-> Phase breakdown, dependencies and the spec index live in [roadmap.md](../roadmap.md); M5 is only a candidate row in the roadmap and has no file yet.
+> Phase breakdown, dependencies and the spec index live in [roadmap.en.md](../roadmap.en.md). M5 only covers open-source documentation preparation; it does not mean release artifacts are complete.
 
 ## Milestone template
 

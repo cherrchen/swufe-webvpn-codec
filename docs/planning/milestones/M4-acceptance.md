@@ -1,6 +1,6 @@
 # M4: 验收（Acceptance）
 
-> Status: In Progress（2026-09-23：Windows 真机验收已通过；`KI-014` 已接受，`KI-019` 因本地与外部成因未区分而重新 `Open`，仍阻止里程碑完成）
+> Status: In Progress（2026-09-23：Windows 真机验收已通过；`KI-014` 已接受；`KI-019` 保持 `Open`，现场证据定位到桥的上游请求/响应阶段，但根因未定，仍阻止里程碑完成）
 > Owner: cherrchen
 > Target: TBD（原包未定义日期）
 
@@ -16,7 +16,7 @@
 
 | Spec | 状态 | 依赖 |
 | ---- | ---- | ---- |
-| [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Implemented（两侧 P0 与教务浏览器验收已通过；`KI-019` 待定位后方可评估 `Verified`） | M3 |
+| [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Implemented（两侧 P0 与教务浏览器验收已通过；`KI-019` 根因未定，需满足已知问题解除条件后方可评估 `Verified`） | M3 |
 
 ## 退出条件
 
@@ -25,12 +25,12 @@
 - [x] macOS：教务站内导航可用，不因绝对 URL 跳飞到不可达地址（TC-G02，P0）——**M5（2026-09-21）通过**：网关原生空间下首页菜单与站内「学生成绩查询」均可交互、无错误页（同一 [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）
 - [x] Windows：重复 TC-G01 通过（TC-G03，P0）——**2026-09-23 通过**（Windows 11 24H2 真机）：入口 `http://jwxt.swufe.edu.cn/` 经桥被升级到 `https://webvpn.swufe.edu.cn/http/<token>/`（桥日志 `detail=promoted`），cherrchen 确认页面可打开并可操作；`/xtgl/index_initMenu.html` 经桥 `200` 且响应体被反向改写
 - [x] 所有 P0 用例通过（TC-A01/A02/A03、TC-B01..TC-B03、TC-C01..TC-C04、TC-D01..TC-D04、TC-E01/E02、TC-F01/F02、TC-G01..TC-G03）——**macOS 侧（M5 后）与 Windows 侧（2026-09-23）均已全部通过**：Windows 复跑结果为 TC-D01..D04、TC-C01..C04、TC-E01/E02/E03、TC-F01/F04、TC-G03、TC-G04、TC-H01/H02、TC-B05 通过
-- [ ] P1 用例无未决阻断缺陷——`KI-014`（CAS 资源截断）已按非应用/桥原因与重载规避置 `Accepted`；`KI-019`（经桥访问教务偶发挂起）原上游归因证据不足，2026-09-23 复核后重新 `Open`，需区分本机 TUN/mitmproxy 与外部路径
+- [ ] P1 用例无未决阻断缺陷——`KI-014`（CAS 资源截断）已按非应用/桥原因与重载规避置 `Accepted`；`KI-019`（经桥访问教务偶发挂起）2026-09-23 现场复测定位到桥的上游请求/响应阶段，根因仍未定，保持 `Open`
 - [x] 教务浏览器验收在至少一侧桌面 OS 通过（目标两侧都过）——**2026-09-23 两侧均通过**：macOS 侧 TC-G01/TC-G02（M5）与 Windows 侧 TC-G03（M4 Windows 轮）
 - [x] 已知问题列表已记录（`id/title/severity/status/linked_case/owner/note`，含验收期新增 `KI-007`..`KI-020`；`KI-001` 于 2026-09-23 置 `Fixed`）
 - [x] 相关文档已同步（含双语配对：`development-run.md`、milestone/roadmap/testing-strategy 与 Spec 五文件）
 
-> 出口口径：macOS 与 Windows 的 P0 用例及教务浏览器验收均已通过，`KI-001` 已 `Fixed`。`KI-014` 已接受外部传输风险；`KI-019` 的历史挂起虽在本轮同路径复核中未复现，但原「非本地」归因不成立，故 M4 与 Spec 001 暂不推进到 `Done` / `Verified`。复核方法与证据见 [verification.md](../../../specs/001-phase1-local-bridge/verification.md) 的「KI-014 / KI-019 同日复核」。
+> 出口口径：macOS 与 Windows 的 P0 用例及教务浏览器验收均已通过，`KI-001` 已 `Fixed`。`KI-014` 已接受外部传输风险；`KI-019` 的同日复核把异常阶段定位到桥的上游请求/响应，但尚无报文级根因证据，故 M4 与 Spec 001 暂不推进到 `Done` / `Verified`。方法与证据见 [verification.md](../../../specs/001-phase1-local-bridge/verification.md) 的 KI-019 复测记录。
 
 验收环境：macOS 与 Windows 各一台测试机、Chrome/Edge、mitmproxy 与 curl；测试账号为测试者自有西财账号（不写入仓库），仅在授权设备上使用。
 本轮实测补充：**验收前必须关闭其它代理工具的 TUN / 虚拟网卡模式**（Clash/mihomo fake-ip 会让经桥的上游连接挂起，见 `KI-013`；2026-09-21 起 fake-ip 形态已由开桥前预检拒绝，`redir-host` 形态仍需手动关闭，见 [ADR-0011](../../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.md)）；教务只能以 `http://jwxt.swufe.edu.cn/...` 形态经网关代理（`https` 形态网关返回 `/wengine-vpn/failed`）。**2026-09-23 Windows 侧补充**：① Chrome / Edge 会把入口自动升级为 `https://`，验收时需用 `--disable-features=HttpsUpgrades` 或关闭「始终使用安全连接」；② 「指定应用」捕获不做 DNS 拦截，教务（无公网解析）只能用默认的「系统代理」模式；③ Windows 自带 curl 校验本机 CA 需 `--ssl-no-revoke`；④ 经桥访问教务存在偶发挂起（`KI-019`），重载即恢复。

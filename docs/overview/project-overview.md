@@ -31,7 +31,7 @@
 
 **痛点**：只能在 WebVPN 形态的 URL 下使用资源；校内站点（尤其教务系统）页面中存在大量绝对 URL，离开 WebVPN 形态后点击会跳飞到不可达的公网直连，同时 Cookie 可能被写到错误域。
 
-**为何现在做**：Phase 1 预研（M0）已完成——WRD URL 编解码已由原型 `wrd_codec.py` 在实机 URL 上验证，需求规格已与产品方对齐（2026-09-20）；下一步进入 M1 桥核心实现。
+**当前阶段**：M1–M4 的桌面桥主路径已在 macOS 与 Windows 完成真机验收，M6 界面重构已实现；M5 开源前文档准备已完成。M5 不包含安装包或公开发行。验收状态与未解决问题以 [001 验证记录](../../specs/001-phase1-local-bridge/verification.md) 和 [roadmap](../planning/roadmap.md) 为准。
 
 ## 范围（Scope）
 
@@ -47,9 +47,9 @@ Out of scope: NG-001..NG-008，详见 goals-and-non-goals.md
 ## 交付形态
 
 ```text
-Repository type:  Documentation-first（docs/ + specs/）+ M1 桥实现（bridges/python/swufe_bridge/、bridges/python/tests/）
+Repository type:  Documentation-first（docs/ + specs/）+ Python bridge（bridges/python/）+ Electron desktop app（apps/desktop/）
 Primary language: Python 3（bridge sidecar / Addon、WRD codec 权威实现，见 bridges/python/swufe_bridge/）
-                  + TypeScript（Electron 应用，IPC 以 TS 声明；M2 起）
+                  + TypeScript / React（Electron 应用与渲染层）
                   文档为 Markdown + Node 文档检查脚本
 License:          MIT
 Owner:            cherrchen

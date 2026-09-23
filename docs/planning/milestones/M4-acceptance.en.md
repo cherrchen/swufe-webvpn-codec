@@ -1,6 +1,6 @@
 # M4: Acceptance
 
-> Status: In Progress (2026-09-23: Windows real-machine acceptance passed; `KI-014` is accepted, while `KI-019` is reopened because local and external causes remain undistinguished)
+> Status: In Progress (2026-09-23: Windows real-machine acceptance passed; `KI-014` is accepted; `KI-019` remains `Open`, with field evidence locating it in the bridge upstream request/response stage but no established root cause)
 > Owner: cherrchen
 > Target: TBD (the original package defines no date)
 >
@@ -18,7 +18,7 @@ Complete Phase 1 acceptance on real machines against the real WebVPN, reaching "
 
 | Spec | Status | Dependencies |
 | ---- | ------ | ------------ |
-| [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Implemented (P0 and browser acceptance pass on both desktop OSes; `KI-019` needs diagnosis before `Verified` can be assessed) | M3 |
+| [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | Implemented (P0 and browser acceptance pass on both desktop OSes; `KI-019` root cause is unknown and its known-issue exit criteria must be met before assessing `Verified`) | M3 |
 
 ## Exit criteria
 
@@ -27,12 +27,12 @@ Complete Phase 1 acceptance on real machines against the real WebVPN, reaching "
 - [x] macOS: in-site navigation works and does not jump to an unreachable address because of absolute URLs (TC-G02, P0) - **passed in M5 (2026-09-21)**: in the gateway-native space both the home-page menu and the in-site "Student Grade Query" are interactive with no error page (same [ADR-0007](../../architecture/adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md))
 - [x] Windows: TC-G01 repeated and passed (TC-G03, P0) - **passed on 2026-09-23** (real Windows 11 24H2): the entry `http://jwxt.swufe.edu.cn/` is promoted by the bridge to `https://webvpn.swufe.edu.cn/http/<token>/` (bridge log `detail=promoted`) and cherrchen confirmed the page opens and is operable; `/xtgl/index_initMenu.html` through the bridge is `200` with a reversed-rewritten body
 - [x] All P0 cases pass (TC-A01/A02/A03, TC-B01..TC-B03, TC-C01..TC-C04, TC-D01..TC-D04, TC-E01/E02, TC-F01/F02, TC-G01..TC-G03) - **both macOS (after M5) and Windows (2026-09-23) now pass**: the Windows re-run covered TC-D01..D04, TC-C01..C04, TC-E01/E02/E03, TC-F01/F04, TC-G03, TC-G04, TC-H01/H02, TC-B05
-- [ ] No unresolved blocking defects in the P1 cases — `KI-014` (CAS asset truncation) is `Accepted` as an issue outside the app and bridge, with reload as a workaround; `KI-019` (sporadic academic-affairs stall through the bridge) is reopened because the original upstream attribution did not distinguish local TUN/mitmproxy from the external path.
+- [ ] No unresolved blocking defects in the P1 cases — `KI-014` (CAS asset truncation) is `Accepted` as an issue outside the app and bridge, with reload as a workaround; field checks on 2026-09-23 locate `KI-019` (sporadic academic-affairs stall through the bridge) in the bridge upstream request/response stage, but its root cause is unknown and it remains `Open`.
 - [x] Browser acceptance on the academic-affairs site passes on at least one desktop OS (both targeted) - **both passed on 2026-09-23**: macOS TC-G01/TC-G02 (M5) and Windows TC-G03 (M4 Windows round)
 - [x] The known-issues list is recorded (`id/title/severity/status/linked_case/owner/note`, including the new `KI-007`..`KI-020`; `KI-001` set to `Fixed` on 2026-09-23)
 - [x] Affected documents are synced (including bilingual pairs: `development-run.md`, milestone/roadmap/testing-strategy and the five spec files)
 
-> Exit floor: macOS and Windows P0 cases and academic-affairs browser acceptance all pass, and `KI-001` is `Fixed`. The external transfer risk of `KI-014` is accepted. The historical `KI-019` stall did not recur in same-path checks, but its prior non-local attribution is unsupported; M4 and spec 001 therefore remain short of `Done` / `Verified`. See the "KI-014 / KI-019 同日复核" section of [verification.md](../../../specs/001-phase1-local-bridge/verification.md).
+> Exit floor: macOS and Windows P0 cases and academic-affairs browser acceptance all pass, and `KI-001` is `Fixed`. The external transfer risk of `KI-014` is accepted. Same-day checks locate the `KI-019` anomaly in the bridge upstream request/response stage, but there is no packet-level evidence establishing its root cause; M4 and spec 001 therefore remain short of `Done` / `Verified`. See the KI-019 follow-up records in [verification.md](../../../specs/001-phase1-local-bridge/verification.md).
 
 Acceptance environment: one macOS and one Windows test machine, Chrome/Edge, mitmproxy and curl; the test account is the tester's own SWUFE account (never committed to the repository) and is used only on authorized devices.
 Measured additions this round: **the TUN / virtual-interface mode of any other proxy tool must be off before acceptance** (Clash/mihomo fake-ip makes upstream connections through the bridge hang, see `KI-013`; since 2026-09-21 the fake-ip shape is refused by a pre-start preflight, while the `redir-host` shape still has to be turned off by hand — see [ADR-0011](../../architecture/adr/ADR-0011-refuse-start-on-fake-ip-dns.en.md)); the academic-affairs site is only proxyable through the gateway in its `http://jwxt.swufe.edu.cn/...` form (the `https` form returns `/wengine-vpn/failed`). **Windows-side additions (2026-09-23)**: (1) Chrome / Edge upgrade the entry to `https://` automatically — use `--disable-features=HttpsUpgrades` or turn "always use secure connections" off during acceptance; (2) "selected apps" capture does not intercept DNS, so the academic-affairs site (no public record) works only in the default "system proxy" mode; (3) the bundled Windows curl needs `--ssl-no-revoke` to accept the local CA; (4) reaching the academic-affairs site through the bridge stalls sporadically (`KI-019`) and a reload recovers it.

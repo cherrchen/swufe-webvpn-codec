@@ -33,7 +33,7 @@ It is the first document a newcomer or agent should read, and expands the Projec
 
 **The pain**: resources are usable only under WebVPN-shaped URLs; campus sites (especially the academic-affairs system) contain many absolute URLs, so once that shape is left, clicks escape to an unreachable direct connection and cookies may be written to the wrong domain.
 
-**Why now**: Phase 1 pre-research (M0) is complete — WRD URL coding was verified against real-machine URLs by the `wrd_codec.py` prototype, and the requirements specification was aligned with the product owner (2026-09-20); the next step is the M1 bridge core.
+**Current stage**: The M1–M4 desktop bridge path has passed real-machine acceptance on macOS and Windows, and the M6 UI rework is implemented. M5 open-source documentation preparation is complete. M5 does not include installers or a public release. See the [001 verification record](../../specs/001-phase1-local-bridge/verification.md) and [roadmap](../planning/roadmap.en.md) for acceptance status and unresolved issues.
 
 ## Scope
 
@@ -51,9 +51,9 @@ Out of scope: NG-001..NG-008, see goals-and-non-goals.md
 ## Delivery shape
 
 ```text
-Repository type:  Documentation-first (docs/ + specs/) + the M1 bridge implementation (bridges/python/swufe_bridge/, bridges/python/tests/)
+Repository type:  Documentation-first (docs/ + specs/) + Python bridge (bridges/python/) + Electron desktop app (apps/desktop/)
 Primary language: Python 3 (bridge sidecar / addon, authoritative WRD codec, see bridges/python/swufe_bridge/)
-                  + TypeScript (Electron app, IPC declared in TS; from M2)
+                  + TypeScript / React (Electron app and renderer)
                   Docs are Markdown plus Node documentation checks
 License:          MIT
 Owner:            cherrchen
