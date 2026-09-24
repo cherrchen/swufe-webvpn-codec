@@ -165,7 +165,7 @@ sequenceDiagram
     participant A as Adapter
     participant C as Core
     participant W as WebVPN
-    B->>H: https://jwxt.swufe.edu.cn/a
+    B->>H: http://jwxt.swufe.edu.cn/a
     H->>A: request
     A->>C: normalized RequestDTO
     C->>C: allowlist + session + encode
@@ -192,7 +192,7 @@ desktop 当前将 `/wengine-vpn/`、`/authserver/` 视为 gateway root namespace
 
 ## 13. HTTP/3 / QUIC
 
-Stash 官方文档明确 HTTP/3 当前不会进入 HTTP Engine，而作为 UDP 转发；Stash 版必须保证目标域名回落到 TCP HTTP/1.1/2。不要把这些主机的 443 放进 `force-http-engine`：2026-09-24 真机里，该项让 HTTPS 进不了 HTTP 脚本，Safari 显示无法建立安全连接。HTTPS 只走 MitM。
+Stash 官方文档明确 HTTP/3 当前不会进入 HTTP Engine，而作为 UDP 转发；Stash 版必须保证目标域名回落到 TCP HTTP/1.1/2。教务实际入口为 HTTP 端口 80；来自 Tunnel 的该连接必须以 `jwxt.swufe.edu.cn:80` 进入 `force-http-engine` 才能触发脚本。不要把这些主机的 443 放进 `force-http-engine`：2026-09-24 真机里，该项让 HTTPS 进不了 HTTP 脚本，Safari 显示无法建立安全连接。HTTPS 只走 MitM。
 
 Loon 有 UDP 端口/规则能力，但全局 `disable-udp-ports = 443` 不应成为默认插件配置。优先验证按目标域名限制 QUIC 的方式；若做不到，必须披露权衡。
 

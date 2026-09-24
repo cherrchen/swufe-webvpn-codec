@@ -156,7 +156,11 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 2026-09-25 用户报告手机端没有任何日志。尚无法据此确定脚本未执行，因为 Stash 的 `console.log` 写入独立的**脚本日志**，不在普通运行日志中。为区分加载阶段，M2 Tile 的静态默认文字改为「脚本未运行 · 检查远程资源」；Tile 脚本执行后会覆盖为「未登录」/「已登录」等状态。三个远程脚本 URL 加入本次版本参数，以便更新覆写时区分旧缓存。真机复测时：无 Tile → 检查覆写是否导入并启用；显示静态默认文字 → 检查远程资源下载/脚本运行；显示动态文字 → Tile 脚本已运行，再检查独立脚本日志与 MitM/HTTP Engine。上述判断尚待真机执行。
 
+2026-09-25 更新正式 M2 覆写后，用户报告 Tile 显示「已登录」，并提供 Stash 独立脚本日志。脱敏统计：Tile 有 10 次 `entered`；request 有 55 次 `entered`、18 次 `session-captured`、37 次 `pass`；response 有 48 次 `entered`、48 次 `pass`；无脚本错误。request/response 中只出现 `webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn`，没有 `jwxt.swufe.edu.cn`。因此已确认覆写的 Tile 与登录脚本运行、会话被捕获；H07 教务访问和 H09 QUIC 回落仍待打开教务页后的新日志验证。日志内容未复制进文档。
+
+2026-09-25 用户指出教务内网服务入口为 HTTP，使用先前步骤中的 HTTPS 地址出现连接异常。桌面端 Spec 001 M5 真机通过的入口也是 `http://jwxt.swufe.edu.cn/`，WebVPN 上游路径为 `/http/`。Stash 覆写补入仅 `jwxt.swufe.edu.cn:80` 的 `force-http-engine`，供 Tunnel 中的 HTTP 请求进入脚本；HTTPS 443 的既有 MitM 配置不变。H07 需用 HTTP 入口重新真机验证，不能因本地测试通过而标 Passed。
+
 1. 将 `plugins/stash/dist/*.js` 与 `plugins/stash/swufe-webvpn.stoverride` 推到 `main` 之后，再从 GitHub raw 导入 override。合并前 URL 会 404。
 2. 打开 Tile「打开网页登录」，完成 CAS/MFA。确认 Tile 变为「已登录」。不要记录 Cookie 值。
-3. 用 Safari 打开 `https://jwxt.swufe.edu.cn`，走教务主路径，看跳转是否仍落在校内主机名上。
+3. 用 Safari 明确打开 `http://jwxt.swufe.edu.cn/`，确认 request 日志出现 `jwxt` 的 `rewrite` 且 WebVPN URL 使用 `/http/`；继续走教务主路径，观察是否按网关 bootstrap 规则升级到原生 WebVPN URL 空间。
 4. 在 Stash 连接里确认 `jwxt` / `webvpn` / `authserver` 的 QUIC 被拒绝、TCP 进入 HTTP Engine（IOS-TC-H09）。未确认前不要把 H09 标成 Passed。

@@ -17,7 +17,7 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 如果直接让用户在 Safari 手工使用 WebVPN：
 
 - 用户必须以网关 URL 访问资源，地址语义不稳定；
-- 普通 `https://jwxt.swufe.edu.cn/...` 请求在校外无法直接访问；
+- 普通 `http://jwxt.swufe.edu.cn/...` 请求在校外无法直接访问；教务实际入口为 HTTP（桌面端 M5 真机验收与 2026-09-25 移动端反馈）。
 - WebVPN URL 需要 WRD AES-CFB128 hostname 编码；
 - 页面中的跳转、Cookie Domain/Path 和绝对 URL 可能需要反向改写；
 - 会话过期后用户需要重新认证；
@@ -70,7 +70,7 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 
 ### 6.2 日常访问
 
-1. 用户访问 `https://jwxt.swufe.edu.cn/...`。
+1. 用户访问 `http://jwxt.swufe.edu.cn/...`。
 2. 请求脚本做 allowlist 判定。
 3. 命中后生成 WRD URL、注入 WebVPN Cookie、最小化改写请求 Header。
 4. 请求发往 `webvpn.swufe.edu.cn`。
@@ -211,7 +211,7 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 ## 10. 验收标准
 
 - [ ] AC-IOS-001：真实 iPhone/iPad 上至少一个宿主客户端可以安装插件、完成官方 CAS/MFA、捕获 WebVPN Session。
-- [ ] AC-IOS-002：用户访问 `https://jwxt.swufe.edu.cn` 时可经 WebVPN 打开并完成至少一条真实业务操作。
+- [ ] AC-IOS-002：用户访问 `http://jwxt.swufe.edu.cn` 时可经 WebVPN 打开并完成至少一条真实业务操作。
 - [ ] AC-IOS-003：Python 与 JS codec 共享向量全部一致。
 - [ ] AC-IOS-004：非 allowlist 请求不注入 WebVPN Cookie。
 - [ ] AC-IOS-005：`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 不被二次 WRD 包装。

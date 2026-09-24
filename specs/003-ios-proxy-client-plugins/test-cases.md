@@ -120,7 +120,7 @@
 | H04 | CAS/MFA | redirect 成功 |
 | H05 | gateway observation | request script 观察 |
 | H06 | 返回 Stash | Tile 已登录 |
-| H07 | Safari jwxt | 可访问 |
+| H07 | Safari 访问 `http://jwxt.swufe.edu.cn/` | 命中脚本并经 WebVPN 可访问 |
 | H08 | 教务主要页面 | 无关键跳转断裂 |
 | H09 | HTTP/3 | 目标流量进入 HTTP Engine |
 | H10 | disable | 不再 rewrite |

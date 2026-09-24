@@ -31,7 +31,7 @@
 
 | 术语 | 定义 |
 | --- | --- |
-| Ordinary URL | 用户看到的真实 URL，如 `https://jwxt.swufe.edu.cn/x` |
+| Ordinary URL | 用户看到的真实 URL，如 `http://jwxt.swufe.edu.cn/x` |
 | WRD URL | 网瑞达 WebVPN URL，如 `https://webvpn.../https/<token>/x` |
 | Gateway | `webvpn.swufe.edu.cn` |
 | Auth Server | `authserver.swufe.edu.cn`，CAS/SSO/MFA 所在服务 |

@@ -58,6 +58,30 @@ describe("Stash adapter", () => {
     expect(JSON.stringify(next.requests[0])).toContain("webvpn.swufe.edu.cn/https/");
   });
 
+  it("routes the plain-HTTP jwxt entry through the gateway HTTP namespace", () => {
+    const rt = runtime({ request: { url: "http://jwxt.swufe.edu.cn/", method: "GET", headers: {} } });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: "webvpn.swufe.edu.cn",
+      cookieHeader: "route=fake",
+      capturedAt: NOW,
+      lastConfirmedAt: null,
+      status: "captured",
+    });
+    handleStashRequest(rt);
+    const rewritten = rt.requests[0] as { decision: string; url: string };
+    expect(rewritten.decision).toBe("rewrite");
+    expect(rewritten.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn\/http\//);
+
+    const res = runtime({
+      request: { url: rewritten.url, method: "GET", headers: {} },
+      response: { status: 200, headers: { "content-type": "text/html" }, body: '<script>var __vpn_x=1</script><script src="/wengine-vpn/js/main.js"></script>' },
+      read: rt.read,
+    });
+    handleStashResponse(res);
+    expect(res.responses[0]).toMatchObject({ status: 302, headers: { location: rewritten.url } });
+  });
+
   it("asks for login and does not attach a cookie when no session exists", () => {
     const rt = runtime({ request: { url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} } });
     handleStashRequest(rt);
