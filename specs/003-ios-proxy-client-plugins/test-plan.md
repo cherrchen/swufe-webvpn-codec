@@ -39,6 +39,8 @@ release bundle：单文件可解析、无 Node built-in、无 unresolved imports
 
 校外网络：Safari 访问教务、至少完成一项真实只读/低风险操作、redirect/Cookie/body rewrite、失效后重登、Wi-Fi/Cellular 冒烟。
 
+Loon M3 执行时，按 [G13–G18](test-cases.md) 顺序记录：先确认 HTTP/80 命中与 `/http/` 上游，再覆盖首次 CAS 往返、原生 WebVPN bootstrap、Header-only 响应和更新后的日志可见性。对重定向记录脱敏的来源/目标主机与路径类别，并确认目标不是当前浏览器 URL；不得保存完整 WRD token。Stash M2 的对应修复只作为风险线索，Loon 的宿主行为须独立取证。
+
 ## 3. 测试环境
 
 自动化使用仓库当前 Node/pnpm/Python 版本。真机至少 1 台 iPhone + 另一个 iOS/iPadOS 组合；最新受支持 Loon/Stash；测试者自有合法 SWUFE 账号；校外 Wi-Fi；蜂窝网络冒烟。

@@ -33,6 +33,8 @@
 
 Status：`Pending` / `Passed` / `Failed` / `N/A`。
 
+M3 Loon 新增回归门槛：G13（HTTP/80 与 WRD `/http/`）、G14/G15（首次 CAS 与已确认会话过期）、G16（原生 WebVPN URL 无自重定向）、G17（两阶段 URL 语义与响应体保留）、G18（脚本加载、日志和远程版本）。这些用例均为 `Pending`；Stash 的真机证据与本地修复不能代替 Loon 验证。执行方法见 [test-plan.md](test-plan.md)，风险边界见 [architecture.md](architecture.md)。
+
 ## 验收标准覆盖
 
 | Acceptance Criteria | 对应验证项 | Status |

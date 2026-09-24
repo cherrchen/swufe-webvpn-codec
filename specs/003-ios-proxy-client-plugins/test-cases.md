@@ -109,6 +109,12 @@
 | G10 | disable | 不再 rewrite |
 | G11 | update | schema 兼容数据保留 |
 | G12 | QUIC | 稳定进入 HTTP script |
+| G13 | Safari 打开 `http://jwxt.swufe.edu.cn/` | HTTP/80 命中 request/response 脚本；上游使用 WRD `/http/` |
+| G14 | 捕获 Cookie 后首次教务 CAS 往返 | 首次 CAS 302 保留 `captured`；回调仍可改写；成功响应后才标 `valid` |
+| G15 | 已确认会话后再次跳 CAS | 按过期契约失效并可重登 |
+| G16 | 浏览器进入原生 WebVPN `/http/<token>/` | 不反向改写网关 bootstrap；无指向当前 URL 的 302 或重定向循环 |
+| G17 | Loon request/response URL 与 Header-only 响应 | 记录两阶段 URL 语义；Header 改写不清空业务 body |
+| G18 | 插件更新后的日志定位 | 能区分未加载、脚本未执行与流量未命中；远程 bundle 使用预期版本，日志无敏感值 |
 
 ## H. Stash
 

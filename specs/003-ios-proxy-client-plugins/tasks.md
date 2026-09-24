@@ -37,12 +37,12 @@
 
 ## Phase M3 — Loon
 
-- [ ] T016 实现 LoonAdapter — 依赖：T011..T015 — 验证：Adapter unit — 关联：IOS-REQ-001/011
+- [ ] T016 实现 LoonAdapter，覆盖首次 CAS 会话状态、原生 WebVPN 命名空间与 Header-only 响应 — 依赖：T011..T015 — 验证：Adapter unit、IOS-TC-G14..G17 — 关联：IOS-REQ-001/011
 - [ ] T017 生成 request/response self-contained bundles — 依赖：T016 — 验证：bundle scan — 关联：IOS-REQ-011
-- [ ] T018 编写 `.plugin` Argument/Script/MitM/Rule（GitHub 远程安装 URL） — 依赖：T017 — 验证：IOS-TC-G01..G04 — 关联：IOS-REQ-001
+- [ ] T018 编写 `.plugin` Argument/Script/MitM/Rule（GitHub 远程安装 URL），确认 HTTP/80 捕获与脚本日志/版本 — 依赖：T017 — 验证：IOS-TC-G01..G04/G13/G18 — 关联：IOS-REQ-001
 - [ ] T019 实现 Session 缺失/过期通知节流 — 依赖：T016 — 验证：IOS-TC-G05 — 关联：IOS-REQ-008
 - [ ] T020 验证 Loon QUIC/HTTP path — 依赖：T018 — 验证：IOS-TC-G12 — 关联：IOS-REQ-010
-- [ ] T021 Loon 真机 E2E 教务 — 依赖：T018..T020 — 验证：IOS-TC-G07..G12 — 关联：AC-IOS-001/002
+- [ ] T021 Loon 真机 E2E 教务 — 依赖：T018..T020 — 验证：IOS-TC-G07..G18 — 关联：AC-IOS-001/002
 
 ## Phase M4 — Hardening
 
