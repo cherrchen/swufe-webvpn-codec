@@ -1,5 +1,5 @@
 import { handleStashRequest, type StashRuntime } from "./adapter.ts";
-import { traceThrew } from "./script-trace.ts";
+import { traceEntered, traceThrew } from "./script-trace.ts";
 
 declare const $request: StashRuntime["request"];
 declare const $persistentStore: { read(key: string): string | null; write(value: string, key: string): void };
@@ -9,6 +9,7 @@ declare function $done(value: Record<string, unknown>): void;
 
 const requestUrl = typeof $request === "undefined" ? undefined : $request?.url;
 try {
+  traceEntered("swufe-webvpn-request", requestUrl);
   handleStashRequest(bindRuntime());
 } catch (error) {
   traceThrew("swufe-webvpn-request", requestUrl, error);

@@ -1,4 +1,4 @@
-/* swufe-webvpn stash ec9eb12 */
+/* swufe-webvpn stash f5f1aab */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -690,7 +690,7 @@
       expired: last === "SESSION_EXPIRED",
       incompatible: parsed?.kind === "incompatible"
     });
-    return tile;
+    return { ...tile, sessionState: parsed?.kind ?? "missing" };
   }
   function readLastError(runtime) {
     const raw = runtime.read(STORAGE_KEYS.lastError);
@@ -704,6 +704,15 @@
   }
 
   // src/script-trace.ts
+  function traceEntered(script, requestUrl) {
+    writeTrace({
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      host: hostnameOf(requestUrl),
+      direction: "system",
+      action: "entered",
+      detail: requestUrl ? `${script} trace=1 ${requestUrl}` : `${script} trace=1`
+    });
+  }
   function traceThrew(script, requestUrl, error) {
     const message = error instanceof Error ? error.message : "unknown";
     writeTrace({
@@ -717,7 +726,7 @@
   }
   function writeTrace(record) {
     const safe = safeDiagnostic(record, false);
-    if (safe) console.log(safe);
+    if (safe) console.log(JSON.stringify(safe));
   }
   function hostnameOf(requestUrl) {
     if (!requestUrl) return null;
@@ -730,7 +739,9 @@
 
   // src/tile-entry.ts
   try {
+    traceEntered("swufe-webvpn-tile", void 0);
     const tile = handleStashTile(bindTileRuntime());
+    console.log(JSON.stringify({ direction: "system", action: "entered", detail: `swufe-webvpn-tile trace=1 content=${tile.content} session=${tile.sessionState}` }));
     $done({ title: tile.title, content: tile.content, url: tile.url, icon: tile.icon });
   } catch (error) {
     traceThrew("swufe-webvpn-tile", void 0, error);

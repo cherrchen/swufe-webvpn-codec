@@ -1,4 +1,4 @@
-/* swufe-webvpn stash ec9eb12 */
+/* swufe-webvpn stash f5f1aab */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1270,6 +1270,7 @@
   function handleStashRequest(runtime) {
     const settings = loadSettings(runtime);
     if (!settings.enabled) {
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host: null, direction: "request", action: "pass", detail: "disabled" });
       runtime.finishRequest({ decision: "pass" });
       return;
     }
@@ -1279,6 +1280,7 @@
     const compatible = loaded && sessionSchemaOk(runtime);
     const request = runtime.request;
     if (!request?.url) {
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host: null, direction: "request", action: "pass", detail: "missing-url" });
       runtime.finishRequest({ decision: "pass" });
       return;
     }
@@ -1294,23 +1296,24 @@
       runtime.nowIso
     );
     const host = safeHost(request.url);
+    const detail = requestDetail(request.url, loaded ? "ready" : "missing", request.headers);
     if (decision.kind === "capture_session") {
       const next = loaded ? applyNewerCookie(loaded, decision.session) : decision.session;
       store.save(next);
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-captured" });
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-captured", detail });
       runtime.finishRequest({ decision: "pass" });
       return;
     }
     if (decision.kind === "login_required") {
       notifyThrottled(runtime, "login-required");
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: "NOT_LOGGED_IN" });
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: "NOT_LOGGED_IN", detail });
       runtime.finishRequest({ decision: "pass" });
       return;
     }
     if (decision.kind === "error") {
       writeLastError(runtime, decision.code, host);
       notifyThrottled(runtime, decision.code === "CODEC_FAILED" ? "codec-failed" : "runtime-incompatible");
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: decision.code });
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: decision.code, detail });
       runtime.finishRequest({ decision: "pass" });
       return;
     }
@@ -1318,11 +1321,11 @@
       if (loaded) {
         store.save(promoteSession(loaded, runtime.nowIso));
       }
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite" });
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail });
       runtime.finishRequest({ decision: "rewrite", url: decision.url, headers: decision.headers });
       return;
     }
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "pass" });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "pass", detail });
     runtime.finishRequest({ decision: "pass" });
   }
   function loadSettings(runtime) {
@@ -1365,6 +1368,28 @@
   function emit(runtime, debug, record) {
     const safe = safeDiagnostic(record, debug);
     if (safe) runtime.debug(safe);
+    if (record.direction === "system") return;
+    const always = safeDiagnostic({ ...record, direction: "system" }, false);
+    if (always) runtime.debug(always);
+  }
+  function requestDetail(url, session, headers) {
+    return `path=${pathOf(url)} session=${session} cookieHeader=${cookieHeaderState(headers)}`;
+  }
+  function pathOf(url) {
+    try {
+      return new URL(url).pathname || "/";
+    } catch {
+      return "/";
+    }
+  }
+  function cookieHeaderState(headers) {
+    if (!headers) return "absent";
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === "cookie") {
+        return String(value ?? "").trim() ? "present" : "absent";
+      }
+    }
+    return "absent";
   }
   function safeHost(url) {
     try {
@@ -1375,6 +1400,15 @@
   }
 
   // src/script-trace.ts
+  function traceEntered(script, requestUrl2) {
+    writeTrace({
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      host: hostnameOf(requestUrl2),
+      direction: "system",
+      action: "entered",
+      detail: requestUrl2 ? `${script} trace=1 ${requestUrl2}` : `${script} trace=1`
+    });
+  }
   function traceThrew(script, requestUrl2, error) {
     const message = error instanceof Error ? error.message : "unknown";
     writeTrace({
@@ -1388,7 +1422,7 @@
   }
   function writeTrace(record) {
     const safe = safeDiagnostic(record, false);
-    if (safe) console.log(safe);
+    if (safe) console.log(JSON.stringify(safe));
   }
   function hostnameOf(requestUrl2) {
     if (!requestUrl2) return null;
@@ -1402,6 +1436,7 @@
   // src/request-entry.ts
   var requestUrl = typeof $request === "undefined" ? void 0 : $request?.url;
   try {
+    traceEntered("swufe-webvpn-request", requestUrl);
     handleStashRequest(bindRuntime());
   } catch (error) {
     traceThrew("swufe-webvpn-request", requestUrl, error);

@@ -56,6 +56,7 @@ export function createStashAdapter(runtime: StashRuntime): HostAdapter {
 export function handleStashRequest(runtime: StashRuntime): void {
   const settings = loadSettings(runtime);
   if (!settings.enabled) {
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host: null, direction: "request", action: "pass", detail: "disabled" });
     runtime.finishRequest({ decision: "pass" });
     return;
   }
@@ -65,6 +66,7 @@ export function handleStashRequest(runtime: StashRuntime): void {
   const compatible = loaded && sessionSchemaOk(runtime);
   const request = runtime.request;
   if (!request?.url) {
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host: null, direction: "request", action: "pass", detail: "missing-url" });
     runtime.finishRequest({ decision: "pass" });
     return;
   }
@@ -80,23 +82,24 @@ export function handleStashRequest(runtime: StashRuntime): void {
     runtime.nowIso,
   );
   const host = safeHost(request.url);
+  const detail = requestDetail(request.url, loaded ? "ready" : "missing", request.headers);
   if (decision.kind === "capture_session") {
     const next = loaded ? applyNewerCookie(loaded, decision.session) : decision.session;
     store.save(next);
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-captured" });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-captured", detail });
     runtime.finishRequest({ decision: "pass" });
     return;
   }
   if (decision.kind === "login_required") {
     notifyThrottled(runtime, "login-required");
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: "NOT_LOGGED_IN" });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: "NOT_LOGGED_IN", detail });
     runtime.finishRequest({ decision: "pass" });
     return;
   }
   if (decision.kind === "error") {
     writeLastError(runtime, decision.code, host);
     notifyThrottled(runtime, decision.code === "CODEC_FAILED" ? "codec-failed" : "runtime-incompatible");
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: decision.code });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: decision.code, detail });
     runtime.finishRequest({ decision: "pass" });
     return;
   }
@@ -104,11 +107,11 @@ export function handleStashRequest(runtime: StashRuntime): void {
     if (loaded) {
       store.save(promoteSession(loaded, runtime.nowIso));
     }
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite" });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail });
     runtime.finishRequest({ decision: "rewrite", url: decision.url, headers: decision.headers });
     return;
   }
-  emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "pass" });
+  emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "pass", detail });
   runtime.finishRequest({ decision: "pass" });
 }
 
@@ -130,15 +133,18 @@ export function handleStashResponse(runtime: StashRuntime): void {
     rewriteSettings,
   );
   const host = context?.originalHost ?? safeHost(runtime.request.url);
+  const detail = responseDetail(runtime.response);
   if (result.sessionExpired) {
     createSessionStore(kv(runtime)).clear();
     writeLastError(runtime, "SESSION_EXPIRED", host);
     notifyThrottled(runtime, "session-expired");
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED" });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED", detail });
   } else if (result.warning) {
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "body-skipped", detail: result.warning });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "body-skipped", detail: `${result.warning} ${detail}` });
   } else if (result.changed) {
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "rewrite" });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "rewrite", detail });
+  } else {
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail });
   }
   if (!result.changed && !result.sessionExpired) {
     runtime.finishResponse({});
@@ -151,7 +157,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
   });
 }
 
-export function handleStashTile(runtime: StashRuntime): { title: "SWUFE WebVPN"; content: string; url: string; icon?: string } {
+export function handleStashTile(runtime: StashRuntime): { title: "SWUFE WebVPN"; content: string; url: string; icon?: string; sessionState: string } {
   const raw = runtime.read(STORAGE_KEYS.session);
   const parsed = raw ? parseSession(raw) : null;
   const last = readLastError(runtime);
@@ -160,7 +166,7 @@ export function handleStashTile(runtime: StashRuntime): { title: "SWUFE WebVPN";
     expired: last === "SESSION_EXPIRED",
     incompatible: parsed?.kind === "incompatible",
   });
-  return tile;
+  return { ...tile, sessionState: parsed?.kind ?? "missing" };
 }
 
 export function deriveRewriteContext(requestUrl: string, gatewayBase: string, key: string, iv: string): RequestRewriteContext | null {
@@ -260,6 +266,48 @@ function readLastError(runtime: StashRuntime): string | null {
 function emit(runtime: StashRuntime, debug: boolean, record: SafeDiagnosticRecord): void {
   const safe = safeDiagnostic(record, debug);
   if (safe) runtime.debug(safe);
+  if (record.direction === "system") return;
+  const always = safeDiagnostic({ ...record, direction: "system" }, false);
+  if (always) runtime.debug(always);
+}
+
+function requestDetail(url: string, session: "ready" | "missing", headers: Record<string, string> | undefined): string {
+  return `path=${pathOf(url)} session=${session} cookieHeader=${cookieHeaderState(headers)}`;
+}
+
+function responseDetail(response: NonNullable<StashRuntime["response"]>): string {
+  return `status=${response.status ?? 0} locationHost=${locationHost(response.headers) ?? "-"}`;
+}
+
+function pathOf(url: string): string {
+  try {
+    return new URL(url).pathname || "/";
+  } catch {
+    return "/";
+  }
+}
+
+function cookieHeaderState(headers: Record<string, string> | undefined): "present" | "absent" {
+  if (!headers) return "absent";
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === "cookie") {
+      return String(value ?? "").trim() ? "present" : "absent";
+    }
+  }
+  return "absent";
+}
+
+function locationHost(headers: Record<string, string> | undefined): string | null {
+  if (!headers) return null;
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() !== "location" || !value) continue;
+    try {
+      return new URL(value, "https://webvpn.swufe.edu.cn").hostname;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 function safeHost(url: string): string | null {

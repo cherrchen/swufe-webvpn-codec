@@ -158,6 +158,20 @@ describe("Stash adapter", () => {
     expect(handleStashTile(res).content).toContain("失效");
   });
 
+  it("logs the decision without a cookie value when debug is off", () => {
+    const logs: string[] = [];
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/login?ticket=abc", method: "GET", headers: { cookie: "route=fake" } },
+      debug: (record) => logs.push(JSON.stringify(record)),
+    });
+    handleStashRequest(rt);
+    const visible = logs.filter((line) => line.includes('"direction":"system"'));
+    expect(visible.some((line) => line.includes("session-captured"))).toBe(true);
+    expect(visible.join("\n")).not.toContain("route=fake");
+    expect(visible.join("\n")).not.toContain("ticket=abc");
+    expect(handleStashTile(rt).sessionState).toBe("ok");
+  });
+
   it("H02 tile copy follows session state", () => {
     const loggedOut = runtime();
     expect(handleStashTile(loggedOut).content).toBe("未登录 · 打开网页登录");

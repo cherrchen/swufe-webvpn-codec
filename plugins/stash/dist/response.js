@@ -1,4 +1,4 @@
-/* swufe-webvpn stash ec9eb12 */
+/* swufe-webvpn stash f5f1aab */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1322,15 +1322,18 @@
       rewriteSettings
     );
     const host = context?.originalHost ?? safeHost(runtime.request.url);
+    const detail = responseDetail(runtime.response);
     if (result.sessionExpired) {
       createSessionStore(kv(runtime)).clear();
       writeLastError(runtime, "SESSION_EXPIRED", host);
       notifyThrottled(runtime, "session-expired");
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED" });
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED", detail });
     } else if (result.warning) {
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "body-skipped", detail: result.warning });
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "body-skipped", detail: `${result.warning} ${detail}` });
     } else if (result.changed) {
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "rewrite" });
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "rewrite", detail });
+    } else {
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail });
     }
     if (!result.changed && !result.sessionExpired) {
       runtime.finishResponse({});
@@ -1417,6 +1420,24 @@
   function emit(runtime, debug, record) {
     const safe = safeDiagnostic(record, debug);
     if (safe) runtime.debug(safe);
+    if (record.direction === "system") return;
+    const always = safeDiagnostic({ ...record, direction: "system" }, false);
+    if (always) runtime.debug(always);
+  }
+  function responseDetail(response) {
+    return `status=${response.status ?? 0} locationHost=${locationHost(response.headers) ?? "-"}`;
+  }
+  function locationHost(headers) {
+    if (!headers) return null;
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() !== "location" || !value) continue;
+      try {
+        return new URL(value, "https://webvpn.swufe.edu.cn").hostname;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
   function safeHost(url) {
     try {
@@ -1427,6 +1448,15 @@
   }
 
   // src/script-trace.ts
+  function traceEntered(script, requestUrl2) {
+    writeTrace({
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      host: hostnameOf(requestUrl2),
+      direction: "system",
+      action: "entered",
+      detail: requestUrl2 ? `${script} trace=1 ${requestUrl2}` : `${script} trace=1`
+    });
+  }
   function traceThrew(script, requestUrl2, error) {
     const message = error instanceof Error ? error.message : "unknown";
     writeTrace({
@@ -1440,7 +1470,7 @@
   }
   function writeTrace(record) {
     const safe = safeDiagnostic(record, false);
-    if (safe) console.log(safe);
+    if (safe) console.log(JSON.stringify(safe));
   }
   function hostnameOf(requestUrl2) {
     if (!requestUrl2) return null;
@@ -1454,6 +1484,7 @@
   // src/response-entry.ts
   var requestUrl = typeof $request === "undefined" ? void 0 : $request?.url;
   try {
+    traceEntered("swufe-webvpn-response", requestUrl);
     handleStashResponse(bindResponseRuntime());
   } catch (error) {
     traceThrew("swufe-webvpn-response", requestUrl, error);
