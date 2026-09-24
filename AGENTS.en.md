@@ -28,6 +28,8 @@ Status:           Phase 1 P0 cases and academic-affairs browser acceptance pass 
                   renders a four-window layout (720×560 scroll-free main window and three single-instance
                   non-modal secondary windows). Real-session academic-affairs use and process-capture
                   scope were checked on Windows with spec 001; see spec 002 verification.md for what remains.
+                  Spec 003 (iOS Loon/Stash proxy plugins, not a standalone app) is documented in-repo as `Draft`;
+                  implementation has not started.
 Primary language: Python 3 (bridge sidecar/Addon, WRD codec, see `bridges/python/swufe_bridge/`) + TypeScript (Electron app, from M2);
                   Markdown docs (`docs/` + `specs/`) plus Node documentation-check scripts form the bulk
 Repository type:  Documentation-first (docs/ + specs/) + implementation (Python bridge `bridges/python/`,
@@ -50,6 +52,7 @@ Owner:            cherrchen
 | Feature what/why/how | [specs/](specs/README.en.md) |
 | Phase 1 feature implementation and verification | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | Desktop UI structure (four windows, scroll-free main window, secondary windows) | [specs/002-desktop-ui-multiwindow/](specs/002-desktop-ui-multiwindow/spec.md) |
+| iOS proxy client plugins (Loon / Stash, spec 003) | [specs/003-ios-proxy-client-plugins/](specs/003-ios-proxy-client-plugins/spec.md) |
 | Technical decisions (why) | [docs/architecture/adr/](docs/architecture/adr/README.en.md) |
 | Testing strategy | [docs/development/testing-strategy.md](docs/development/testing-strategy.md) |
 | Documentation rules and language policy | [docs/development/documentation-rules.md](docs/development/documentation-rules.md) |

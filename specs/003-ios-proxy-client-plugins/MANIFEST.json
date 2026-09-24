@@ -1,0 +1,82 @@
+{
+  "package": "swufe-webvpn-ios-proxy-plugin-docs",
+  "proposedSpec": "003-ios-proxy-client-plugins",
+  "created": "2026-09-24",
+  "principalDocuments": [
+    "prd.md",
+    "ui-ux.md",
+    "domain.md",
+    "architecture.md",
+    "interfaces.md",
+    "data-model.md",
+    "test-plan.md",
+    "test-cases.md",
+    "project-management.md"
+  ],
+  "files": {
+    "README.md": {
+      "bytes": 5396,
+      "sha256": "0008b535ef54a9734c57bbf99fc5e484751aac4e180a5bdc90e8f6065356f561"
+    },
+    "architecture.md": {
+      "bytes": 8290,
+      "sha256": "ae5ea26a9f49a01a1eb4cea4faafe26388a578c32f350765fb5a6ddebfb409fc"
+    },
+    "data-model.md": {
+      "bytes": 4507,
+      "sha256": "89947f96b934f6e0b960d5c248fa79d0e180d1d5be10104112e718cb69fe2dc5"
+    },
+    "design.md": {
+      "bytes": 2679,
+      "sha256": "c9d79e8fcfc844a1f69e1000cfc9f8f75b0183c6c91782973f294c5967828056"
+    },
+    "domain.md": {
+      "bytes": 6410,
+      "sha256": "2760f298018e3db6eaed36339d515a58960e21e1c83c0a06f2b3bbf6dab55ae4"
+    },
+    "interfaces.md": {
+      "bytes": 5892,
+      "sha256": "39d19e75122e186bca512879949e2df71a46f495294ca8f6a99c9f4543b0ef8e"
+    },
+    "plan.md": {
+      "bytes": 2937,
+      "sha256": "a150cc57c99a85a0be470f6ec71748ffb6351b621d584a0fa1eabdce50085a60"
+    },
+    "prd.md": {
+      "bytes": 11544,
+      "sha256": "acb3f88327d26a459cd8bed12117554c174ba48f7e47524d9191413498e847a6"
+    },
+    "project-management.md": {
+      "bytes": 4537,
+      "sha256": "fdc0ff1b45e93301f3e9ebd4710eb104f6ca96ced687ccf0363ecd5ec1a1e516"
+    },
+    "references.md": {
+      "bytes": 4385,
+      "sha256": "fdddf4c8aa23265b57bff1d889ba084dca928f9382cb2e96beb6fbb942776b00"
+    },
+    "spec.md": {
+      "bytes": 2826,
+      "sha256": "8fb4c39c71fbc9e3c7ee0fb19ac001af2c6dec01f820b9ff36727bc67c615f26"
+    },
+    "tasks.md": {
+      "bytes": 4844,
+      "sha256": "d29df07c06dcc6cf60f47d48cc422b568af16879349751b0252f76d424e81666"
+    },
+    "test-cases.md": {
+      "bytes": 5032,
+      "sha256": "57ce5a4fe077994745f7072d2eaf62543f095053e21fa9bacd64790a7d5f87b8"
+    },
+    "test-plan.md": {
+      "bytes": 3827,
+      "sha256": "37375e4e85105fb641b3101ce81dad7251fd22a39c0eb92c1d6aa4889987482d"
+    },
+    "ui-ux.md": {
+      "bytes": 7082,
+      "sha256": "434605c2b60cf5cd890523bb1275279d79225acf9a9cfc7c2445a84f1e4ea23a"
+    },
+    "verification.md": {
+      "bytes": 3362,
+      "sha256": "c215ee58340ac85c96eec1eeb2749d63e286bdd5f31b5b2938300c3a6aec5524"
+    }
+  }
+}

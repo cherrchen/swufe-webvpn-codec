@@ -1,6 +1,6 @@
 # Feature Specs
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-24
 >
 > Chinese source of truth: [README.md](README.md)
 
@@ -25,6 +25,7 @@ specs/001-phase1-local-bridge/     ← the first spec of this project (phase 1 l
 | ---- | ----- | ------------ | ------ | ---- |
 | 001-phase1-local-bridge | phase 1 local bridge and academic-system browser acceptance | REQ-001..REQ-011, NFR-001..NFR-007 | Implemented (macOS and Windows real-machine acceptance passes; `KI-014` and `KI-019` are provisionally `Accepted`; `KI-019` remains unattributed and reopens on recurrence) | [spec.md](001-phase1-local-bridge/spec.md) |
 | 002-desktop-ui-multiwindow | desktop UI rework (React + Ant Design, multiple windows) | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012, NFR-003 / NFR-005 / NFR-007 | Implemented (2026-09-23: implementation and machine-executable acceptance are complete; Windows UI criteria and macOS process-capture authorization checks remain, see verification.md) | [spec.md](002-desktop-ui-multiwindow/spec.md) |
+| 003-ios-proxy-client-plugins | iOS proxy client plugins (Loon / Stash) | `IOS-REQ-*` (draft) + semantic alignment with REQ-002 / REQ-005 / REQ-006 / REQ-007, NFR-002 / NFR-003 | Draft (P0: host URL presentation and script observability need real devices; see [README.md](003-ios-proxy-client-plugins/README.md)) | [spec.md](003-ios-proxy-client-plugins/spec.md) |
 
 > Register one row per spec here, and mirror it in [roadmap.md](../docs/planning/roadmap.md); long-lived facts never live in a spec.
 

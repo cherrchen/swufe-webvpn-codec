@@ -1,6 +1,6 @@
 # Feature Specs
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-24
 
 **用途**：本目录是 **Layer 3 — Feature Specs**：每个 Feature 从需求到实现与验证的完整记录。
 Spec-driven Development 的目的：把 `Prompt → Code` 变成
@@ -25,6 +25,7 @@ specs/001-phase1-local-bridge/     ← 本项目第一个 Spec（Phase 1 本机�
 | ---- | ---- | -------- | ------ | ---- |
 | 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | Implemented（macOS 与 Windows 真机验收通过；`KI-014` 与 `KI-019` 均暂列 `Accepted`，`KI-019` 根因未定、复现时重开） | [spec.md](001-phase1-local-bridge/spec.md) |
 | 002-desktop-ui-multiwindow | 桌面界面重构（React + Ant Design 多窗口） | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012、NFR-003 / NFR-005 / NFR-007 | Implemented（2026-09-23：实现与可机器执行的验收已完成；仍有 Windows 界面判据及 macOS 进程捕获授权验证项，见 verification.md） | [spec.md](002-desktop-ui-multiwindow/spec.md) |
+| 003-ios-proxy-client-plugins | iOS 代理客户端插件（Loon / Stash） | `IOS-REQ-*`（草案）+ 语义对齐 REQ-002 / REQ-005 / REQ-006 / REQ-007、NFR-002 / NFR-003 | Draft（P0：宿主 URL 呈现与 Script 可观察性待真机；见 [README.md](003-ios-proxy-client-plugins/README.md)） | [spec.md](003-ios-proxy-client-plugins/spec.md) |
 
 > 每个 Spec 在此登记一行，并在 [roadmap.md](../docs/planning/roadmap.md) 同步注册；长期事实不属于 Spec。
 

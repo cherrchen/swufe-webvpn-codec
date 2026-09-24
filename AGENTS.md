@@ -23,6 +23,7 @@ Status:           Phase 1 的 macOS 与 Windows 真机 P0 用例及教务浏览�
                   M6 界面重构（Spec 002）已交付并推进到 `Implemented`：渲染层为 React 19 + Ant Design 6
                   的四窗口结构（主窗口 720×560 严格零滚动，三类单实例非模态二级窗口）。Windows 真机
                   的真实会话教务操作与进程捕获范围已随 001 验证；002 其余未验证项见其 verification.md。
+                  Spec 003（iOS Loon/Stash 代理插件，非独立 App）文档已入库，状态 `Draft`，实现未启动。
 Primary language: Python 3（bridge sidecar/Addon、WRD codec，见 `bridges/python/swufe_bridge/`）+ TypeScript（Electron 应用，M2 起）；
                   文档（`docs/` + `specs/`）与 Node 文档检查脚本是主体
 Repository type:  Documentation-first（docs/ + specs/）+ 实现（Python 桥 `bridges/python/`、Electron 应用 `apps/desktop/`）
@@ -44,6 +45,7 @@ Owner:            cherrchen
 | Feature 的 What/Why/How | [specs/](specs/README.md) |
 | 第一期 Feature 实现与验证 | [specs/001-phase1-local-bridge/](specs/001-phase1-local-bridge/spec.md) |
 | 桌面界面结构（四窗口、零滚动主窗口、二级窗口）| [specs/002-desktop-ui-multiwindow/](specs/002-desktop-ui-multiwindow/spec.md) |
+| iOS 代理客户端插件（Loon / Stash，Spec 003） | [specs/003-ios-proxy-client-plugins/](specs/003-ios-proxy-client-plugins/spec.md) |
 | 技术决策（为什么这样设计） | [docs/architecture/adr/](docs/architecture/adr/README.md) |
 | 测试策略 | [docs/development/testing-strategy.md](docs/development/testing-strategy.md) |
 | 文档规则与语言要求 | [docs/development/documentation-rules.md](docs/development/documentation-rules.md) |
