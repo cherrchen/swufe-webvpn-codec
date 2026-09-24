@@ -152,6 +152,10 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 ## Stash 真机步骤（T027，尚未执行）
 
+2026-09-25 本地修复：Stash 响应脚本现在同时接受 `$request.url` 为 WRD 上游 URL 或原始 `jwxt` URL。此前仅识别前者；若宿主提供后者，`deriveRewriteContext()` 返回 `null`，Location/Set-Cookie/body 的反向改写全部跳过。新增原始 URL 的回归用例，`pnpm --filter swufe-webvpn-stash test`（9 passed，bundle scan 通过）和 `typecheck` 通过。Stash 对本机实际提供哪种 URL 尚待真机日志确认，不能据此将 H07 标为 Passed。
+
+2026-09-25 用户报告手机端没有任何日志。尚无法据此确定脚本未执行，因为 Stash 的 `console.log` 写入独立的**脚本日志**，不在普通运行日志中。为区分加载阶段，M2 Tile 的静态默认文字改为「脚本未运行 · 检查远程资源」；Tile 脚本执行后会覆盖为「未登录」/「已登录」等状态。三个远程脚本 URL 加入本次版本参数，以便更新覆写时区分旧缓存。真机复测时：无 Tile → 检查覆写是否导入并启用；显示静态默认文字 → 检查远程资源下载/脚本运行；显示动态文字 → Tile 脚本已运行，再检查独立脚本日志与 MitM/HTTP Engine。上述判断尚待真机执行。
+
 1. 将 `plugins/stash/dist/*.js` 与 `plugins/stash/swufe-webvpn.stoverride` 推到 `main` 之后，再从 GitHub raw 导入 override。合并前 URL 会 404。
 2. 打开 Tile「打开网页登录」，完成 CAS/MFA。确认 Tile 变为「已登录」。不要记录 Cookie 值。
 3. 用 Safari 打开 `https://jwxt.swufe.edu.cn`，走教务主路径，看跳转是否仍落在校内主机名上。

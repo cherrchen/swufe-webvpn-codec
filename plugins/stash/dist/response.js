@@ -1,4 +1,4 @@
-/* swufe-webvpn stash f5f1aab */
+/* swufe-webvpn stash 963b27e */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -778,6 +778,7 @@
   // ../../packages/webvpn-core-js/src/routing/allowlist.ts
   var DEFAULT_HOSTS = ["jwxt.swufe.edu.cn"];
   var EXCLUDED_HOSTS = ["webvpn.swufe.edu.cn", "authserver.swufe.edu.cn"];
+  var GATEWAY_HOST = "webvpn.swufe.edu.cn";
   var AUTH_HOST = "authserver.swufe.edu.cn";
   var MAX_HOST_LENGTH = 253;
   var LABEL_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
@@ -806,6 +807,36 @@
       }
     }
     return candidate;
+  }
+  function tryNormalizeHost(host) {
+    try {
+      return normalizeHost(host);
+    } catch {
+      return null;
+    }
+  }
+  function decideRoute(host, policy) {
+    const candidate = tryNormalizeHost(host);
+    if (candidate === null) {
+      return { kind: "invalid", reason: "invalid-host" };
+    }
+    if (candidate === GATEWAY_HOST) {
+      return { kind: "gateway" };
+    }
+    if (candidate === AUTH_HOST || isExcluded(candidate, policy.excludedHosts)) {
+      return candidate === AUTH_HOST ? { kind: "auth" } : { kind: "pass" };
+    }
+    const exact = policy.exactHosts.map((item) => tryNormalizeHost(item)).filter((item) => item !== null);
+    if (exact.includes(candidate)) {
+      return { kind: "rewrite", originalHost: candidate };
+    }
+    if (policy.includeSwufeWildcard && (candidate === "swufe.edu.cn" || candidate.endsWith(".swufe.edu.cn"))) {
+      return { kind: "rewrite", originalHost: candidate };
+    }
+    return { kind: "pass" };
+  }
+  function isExcluded(host, excluded) {
+    return excluded.some((entry) => tryNormalizeHost(entry) === host);
   }
 
   // ../../packages/webvpn-core-js/src/session/session.ts
@@ -867,13 +898,215 @@
       }
     };
   }
+  function captureSession(input) {
+    let host = "";
+    try {
+      host = new URL(input.url).hostname;
+    } catch {
+      return { kind: "invalid" };
+    }
+    const normalized = tryNormalizeHost(host);
+    const gateway = tryNormalizeHost(input.gatewayHost);
+    if (!normalized || !gateway) {
+      return { kind: "invalid" };
+    }
+    if (normalized !== gateway) {
+      return { kind: "not_gateway" };
+    }
+    const cookie = headerValue(input.headers, "cookie").trim();
+    if (!cookie) {
+      return { kind: "no_cookie" };
+    }
+    return {
+      kind: "captured",
+      session: {
+        schemaVersion: 1,
+        gatewayHost: gateway,
+        cookieHeader: cookie,
+        capturedAt: input.nowIso,
+        lastConfirmedAt: null,
+        status: "captured"
+      }
+    };
+  }
+  function sessionMatchesGateway(session, gatewayHost2) {
+    if (!session) {
+      return false;
+    }
+    const left = tryNormalizeHost(session.gatewayHost);
+    const right = tryNormalizeHost(gatewayHost2);
+    return left !== null && left === right;
+  }
+  function headerValue(headers, name) {
+    const target = name.toLowerCase();
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === target) {
+        return value;
+      }
+    }
+    return "";
+  }
 
   // ../../packages/webvpn-core-js/src/rewrite/request.ts
+  var GATEWAY_ROOT_PREFIXES = ["/wengine-vpn/", "/authserver/"];
   var DEFAULT_BODY_REWRITE_MAX_BYTES = 1048576;
+  function rewriteRequest(request, settings, session, nowIso) {
+    let parsed;
+    try {
+      parsed = new URL(request.url);
+    } catch {
+      return { kind: "error", code: "REWRITE_FAILED" };
+    }
+    const route = decideRoute(parsed.hostname, settings.routing);
+    if (route.kind === "invalid" || route.kind === "pass" || route.kind === "auth") {
+      return { kind: "pass" };
+    }
+    if (route.kind === "gateway") {
+      const captured = captureSession({
+        url: request.url,
+        headers: request.headers,
+        nowIso,
+        gatewayHost: gatewayHost(settings.gatewayBase)
+      });
+      if (captured.kind === "captured") {
+        return { kind: "capture_session", session: captured.session, pass: true };
+      }
+      return { kind: "pass" };
+    }
+    const usable = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
+    if (!usable) {
+      return { kind: "login_required" };
+    }
+    const path = parsed.pathname || "/";
+    if (GATEWAY_ROOT_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+      const url = `${settings.gatewayBase.replace(/\/+$/, "")}${path}${parsed.search}${parsed.hash}`;
+      return {
+        kind: "rewrite",
+        url,
+        headers: injectCookie(request.headers, usable.cookieHeader),
+        context: {
+          originalUrl: request.url,
+          originalHost: route.originalHost,
+          wrdUrl: url,
+          wrdPrefix: "",
+          gatewayOwned: true
+        }
+      };
+    }
+    let codec;
+    try {
+      codec = new WrdCodec(settings.wrdKey, settings.wrdIv, gatewayHost(settings.gatewayBase));
+    } catch (error) {
+      if (error instanceof CodecError) {
+        return { kind: "error", code: "CODEC_FAILED" };
+      }
+      return { kind: "error", code: "CODEC_FAILED" };
+    }
+    let wrdUrl;
+    try {
+      wrdUrl = codec.encodeUrl(request.url, settings.gatewayBase);
+    } catch (error) {
+      if (error instanceof CodecError) {
+        return { kind: "error", code: "CODEC_FAILED" };
+      }
+      return { kind: "error", code: "CODEC_FAILED" };
+    }
+    const headers = injectCookie(request.headers, usable.cookieHeader);
+    rewriteOrigin(headers, request.headers, route.originalHost, settings);
+    rewriteReferer(headers, request.headers, settings, codec);
+    return {
+      kind: "rewrite",
+      url: wrdUrl,
+      headers,
+      context: {
+        originalUrl: request.url,
+        originalHost: route.originalHost,
+        wrdUrl,
+        wrdPrefix: wrdPrefixOf(wrdUrl),
+        gatewayOwned: false
+      }
+    };
+  }
   function wrdPrefixOf(wrdUrl) {
     const path = new URL(wrdUrl).pathname.replace(/^\/+/, "");
     const parts = path.split("/");
     return `/${parts.slice(0, 2).join("/")}`;
+  }
+  function injectCookie(headers, sessionCookie) {
+    const next = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() !== "cookie") {
+        next[key] = value;
+      }
+    }
+    const existing = headerValue(headers, "cookie");
+    next.cookie = mergeCookies(existing, sessionCookie);
+    return next;
+  }
+  function mergeCookies(existing, sessionCookie) {
+    const sessionPairs = parseCookies(sessionCookie);
+    const kept = parseCookies(existing).filter((pair) => !sessionPairs.some((item) => item.name === pair.name));
+    return [...kept, ...sessionPairs].map((pair) => `${pair.name}=${pair.value}`).join("; ");
+  }
+  function parseCookies(header) {
+    if (!header.trim()) {
+      return [];
+    }
+    return header.split(";").map((part) => {
+      const eq = part.indexOf("=");
+      if (eq <= 0) {
+        return null;
+      }
+      return { name: part.slice(0, eq).trim(), value: part.slice(eq + 1).trim() };
+    }).filter((pair) => pair !== null && pair.name.length > 0);
+  }
+  function rewriteOrigin(headers, original, originalHost, settings) {
+    const origin = headerValue(original, "origin");
+    if (!origin) {
+      return;
+    }
+    let originHost = "";
+    try {
+      originHost = new URL(origin).hostname.toLowerCase();
+    } catch {
+      return;
+    }
+    const route = decideRoute(originHost, settings.routing);
+    if (originHost === originalHost || route.kind === "rewrite") {
+      const base = new URL(settings.gatewayBase);
+      setHeader(headers, "origin", `${base.protocol}//${base.host}`);
+    }
+  }
+  function rewriteReferer(headers, original, settings, codec) {
+    const referer = headerValue(original, "referer");
+    if (!referer) {
+      return;
+    }
+    let refererHost = "";
+    try {
+      refererHost = new URL(referer).hostname.toLowerCase();
+    } catch {
+      return;
+    }
+    if (decideRoute(refererHost, settings.routing).kind !== "rewrite") {
+      return;
+    }
+    try {
+      setHeader(headers, "referer", codec.encodeUrl(referer, settings.gatewayBase));
+    } catch (error) {
+      if (error instanceof CodecError) {
+        return;
+      }
+      throw error;
+    }
+  }
+  function setHeader(headers, name, value) {
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === name) {
+        delete headers[key];
+      }
+    }
+    headers[name] = value;
   }
 
   // ../../packages/webvpn-core-js/src/rewrite/body.ts
@@ -1023,7 +1256,7 @@
     if (location) {
       const rewritten = rewriteLocation(location, codec, host);
       if (rewritten.changed) {
-        setHeader(headers, "location", rewritten.value);
+        setHeader2(headers, "location", rewritten.value);
         changes.push("location");
       }
     }
@@ -1098,7 +1331,7 @@
       return serializeSetCookie(parsed.name, parsed.value, parsed.attrs);
     });
     if (changed) {
-      setHeader(headers, "set-cookie", next.join("\n"));
+      setHeader2(headers, "set-cookie", next.join("\n"));
     }
     return changed;
   }
@@ -1159,7 +1392,7 @@
     }
     return "";
   }
-  function setHeader(headers, name, value) {
+  function setHeader2(headers, name, value) {
     for (const key of Object.keys(headers)) {
       if (key.toLowerCase() === name) {
         delete headers[key];
@@ -1311,7 +1544,7 @@
       return;
     }
     const rewriteSettings = toRewriteSettings(settings);
-    const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv);
+    const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
     const result = rewriteResponse(
       context,
       {
@@ -1344,6 +1577,19 @@
       headers: result.response.headers,
       body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : void 0
     });
+  }
+  function deriveOriginalRequestContext(runtime, settings) {
+    const request = runtime.request;
+    if (!request?.url) return null;
+    const session = createSessionStore(kv(runtime)).load();
+    if (!session) return null;
+    const decision = rewriteRequest(
+      { url: request.url, method: request.method ?? "GET", headers: request.headers ?? {} },
+      settings,
+      session,
+      runtime.nowIso
+    );
+    return decision.kind === "rewrite" ? decision.context : null;
   }
   function deriveRewriteContext(requestUrl2, gatewayBase, key, iv) {
     let url;

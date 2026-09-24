@@ -101,6 +101,26 @@ describe("Stash adapter", () => {
     });
   });
 
+  it("reverse-rewrites when Stash exposes the original URL to the response script", () => {
+    const rt = runtime({
+      request: { url: "https://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
+    });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: "webvpn.swufe.edu.cn",
+      cookieHeader: "route=fake",
+      capturedAt: NOW,
+      lastConfirmedAt: null,
+      status: "captured",
+    });
+    const req = runtime({ request: rt.request, read: rt.read });
+    handleStashRequest(req);
+    const rewritten = req.requests[0] as { url: string };
+    rt.response = { status: 302, headers: { location: rewritten.url }, body: "" };
+    handleStashResponse(rt);
+    expect(rt.responses[0]).toMatchObject({ headers: { location: "https://jwxt.swufe.edu.cn/main" } });
+  });
+
   it("keeps a captured session when the login page redirects to CAS", () => {
     const rt = runtime({
       request: { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: "route=fake" } },

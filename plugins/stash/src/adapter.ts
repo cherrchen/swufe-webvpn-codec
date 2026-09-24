@@ -122,7 +122,8 @@ export function handleStashResponse(runtime: StashRuntime): void {
     return;
   }
   const rewriteSettings = toRewriteSettings(settings);
-  const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv);
+  const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv)
+    ?? deriveOriginalRequestContext(runtime, rewriteSettings);
   const result = rewriteResponse(
     context,
     {
@@ -155,6 +156,23 @@ export function handleStashResponse(runtime: StashRuntime): void {
     headers: result.response.headers,
     body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : undefined,
   });
+}
+
+// Stash may expose the browser URL, rather than the rewritten upstream URL, to
+// a response script. Reconstruct only a request that our request script would
+// have rewritten with the current session.
+function deriveOriginalRequestContext(runtime: StashRuntime, settings: ReturnType<typeof toRewriteSettings>): RequestRewriteContext | null {
+  const request = runtime.request;
+  if (!request?.url) return null;
+  const session = createSessionStore(kv(runtime)).load();
+  if (!session) return null;
+  const decision = rewriteRequest(
+    { url: request.url, method: request.method ?? "GET", headers: request.headers ?? {} },
+    settings,
+    session,
+    runtime.nowIso,
+  );
+  return decision.kind === "rewrite" ? decision.context : null;
 }
 
 export function handleStashTile(runtime: StashRuntime): { title: "SWUFE WebVPN"; content: string; url: string; icon?: string; sessionState: string } {
