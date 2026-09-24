@@ -160,6 +160,8 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 2026-09-25 用户指出教务内网服务入口为 HTTP，使用先前步骤中的 HTTPS 地址出现连接异常。桌面端 Spec 001 M5 真机通过的入口也是 `http://jwxt.swufe.edu.cn/`，WebVPN 上游路径为 `/http/`。Stash 覆写补入仅 `jwxt.swufe.edu.cn:80` 的 `force-http-engine`，供 Tunnel 中的 HTTP 请求进入脚本；HTTPS 443 的既有 MitM 配置不变。H07 需用 HTTP 入口重新真机验证，不能因本地测试通过而标 Passed。
 
+2026-09-25 HTTP 入口复测日志：`jwxt` 的 request 脚本有 26 次 `entered`、17 次 `rewrite`、9 次 `NOT_LOGGED_IN`；response 脚本有 2 次 `SESSION_EXPIRED`。在 HTTP 主路径中，`/` 和 `/xtgl/login_slogin.html` 已进入改写，后者的 CAS 跳转被当作会话过期并清除，紧接着 `/sso/jziotlogin` 被判 `NOT_LOGGED_IN`，与用户所见白屏相符。原因是 request 在收到上游成功响应前就把刚捕获的 Cookie 标为 `valid`，使首次 CAS 往返误触发失效清理。修复为：只在教务的 2xx 响应后确认会话；初次 CAS 跳转保留 `captured` 会话；已确认会话后来跳回 CAS 仍按过期处理。另修复 response-entry 在仅改写 Header、无可用 body 时输出空 body 的问题。Stash Adapter 11 个测试通过，H07 仍须真机复验。
+
 1. 将 `plugins/stash/dist/*.js` 与 `plugins/stash/swufe-webvpn.stoverride` 推到 `main` 之后，再从 GitHub raw 导入 override。合并前 URL 会 404。
 2. 打开 Tile「打开网页登录」，完成 CAS/MFA。确认 Tile 变为「已登录」。不要记录 Cookie 值。
 3. 用 Safari 明确打开 `http://jwxt.swufe.edu.cn/`，确认 request 日志出现 `jwxt` 的 `rewrite` 且 WebVPN URL 使用 `/http/`；继续走教务主路径，观察是否按网关 bootstrap 规则升级到原生 WebVPN URL 空间。

@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 963b27e */
+/* swufe-webvpn stash 584c44e */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -937,6 +937,9 @@
     const right = tryNormalizeHost(gatewayHost2);
     return left !== null && left === right;
   }
+  function promoteSession(session, nowIso) {
+    return { ...session, status: "valid", lastConfirmedAt: nowIso };
+  }
   function headerValue(headers, name) {
     const target = name.toLowerCase();
     for (const [key, value] of Object.entries(headers)) {
@@ -1556,11 +1559,16 @@
     );
     const host = context?.originalHost ?? safeHost(runtime.request.url);
     const detail = responseDetail(runtime.response);
-    if (result.sessionExpired) {
-      createSessionStore(kv(runtime)).clear();
+    const store = createSessionStore(kv(runtime));
+    const session = store.load();
+    const confirmedExpiry = result.sessionExpired && session?.status === "valid";
+    if (confirmedExpiry) {
+      store.clear();
       writeLastError(runtime, "SESSION_EXPIRED", host);
       notifyThrottled(runtime, "session-expired");
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED", detail });
+    } else if (result.sessionExpired) {
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail: `initial-auth-redirect ${detail}` });
     } else if (result.warning) {
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "body-skipped", detail: `${result.warning} ${detail}` });
     } else if (result.changed) {
@@ -1568,7 +1576,10 @@
     } else {
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail });
     }
-    if (!result.changed && !result.sessionExpired) {
+    if (context && !context.gatewayOwned && !result.sessionExpired && !result.changes.includes("promotion") && result.response.status >= 200 && result.response.status < 300 && session?.status === "captured") {
+      store.save(promoteSession(session, runtime.nowIso));
+    }
+    if (!result.changed) {
       runtime.finishResponse({});
       return;
     }
@@ -1758,11 +1769,14 @@
           $done({});
           return;
         }
-        $done({
+        const output = {
           status: result.status,
-          headers: result.headers,
-          body: typeof result.body === "string" ? result.body : result.body ? bytesToString(result.body) : ""
-        });
+          headers: result.headers
+        };
+        if (result.body !== void 0) {
+          output.body = typeof result.body === "string" ? result.body : bytesToString(result.body);
+        }
+        $done(output);
       },
       env: () => ({
         host: "stash",

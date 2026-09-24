@@ -39,11 +39,14 @@ function bindResponseRuntime(): StashRuntime {
         $done({});
         return;
       }
-      $done({
+      const output: Record<string, unknown> = {
         status: result.status,
         headers: result.headers,
-        body: typeof result.body === "string" ? result.body : result.body ? bytesToString(result.body) : "",
-      });
+      };
+      if (result.body !== undefined) {
+        output.body = typeof result.body === "string" ? result.body : bytesToString(result.body);
+      }
+      $done(output);
     },
     env: () => ({
       host: "stash",

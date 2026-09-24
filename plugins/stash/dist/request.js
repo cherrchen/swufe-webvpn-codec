@@ -1,4 +1,4 @@
-/* swufe-webvpn stash f5f1aab */
+/* swufe-webvpn stash 584c44e */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -950,9 +950,6 @@
     const right = tryNormalizeHost(gatewayHost2);
     return left !== null && left === right;
   }
-  function promoteSession(session, nowIso) {
-    return { ...session, status: "valid", lastConfirmedAt: nowIso };
-  }
   function headerValue(headers, name) {
     const target = name.toLowerCase();
     for (const [key, value] of Object.entries(headers)) {
@@ -1300,6 +1297,7 @@
     if (decision.kind === "capture_session") {
       const next = loaded ? applyNewerCookie(loaded, decision.session) : decision.session;
       store.save(next);
+      runtime.write(STORAGE_KEYS.lastError, null);
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-captured", detail });
       runtime.finishRequest({ decision: "pass" });
       return;
@@ -1318,9 +1316,6 @@
       return;
     }
     if (decision.kind === "rewrite") {
-      if (loaded) {
-        store.save(promoteSession(loaded, runtime.nowIso));
-      }
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail });
       runtime.finishRequest({ decision: "rewrite", url: decision.url, headers: decision.headers });
       return;

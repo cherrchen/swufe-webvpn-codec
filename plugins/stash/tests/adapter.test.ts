@@ -177,7 +177,33 @@ describe("Stash adapter", () => {
     expect(JSON.stringify(jwxt.requests[0])).not.toContain("NOT_LOGGED_IN");
   });
 
-  it("clears the session when a rewritten allowlist response redirects to CAS", () => {
+  it("keeps a captured gateway session through the initial jwxt CAS redirect", () => {
+    const rt = runtime({ request: { url: "http://jwxt.swufe.edu.cn/xtgl/login_slogin.html", method: "GET", headers: {} } });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: "webvpn.swufe.edu.cn",
+      cookieHeader: "route=fake",
+      capturedAt: NOW,
+      lastConfirmedAt: null,
+      status: "captured",
+    });
+    handleStashRequest(rt);
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").status).toBe("captured");
+    rt.response = { status: 302, headers: { location: "https://authserver.swufe.edu.cn/authserver/login" } };
+    handleStashResponse(rt);
+    expect(rt.store[STORAGE_KEYS.session]).toContain("route=fake");
+    expect(rt.responses[0]).toEqual({});
+    expect(rt.notes).toEqual([]);
+
+    rt.request = { url: "http://jwxt.swufe.edu.cn/sso/jziotlogin?ticket=fake", method: "GET", headers: {} };
+    handleStashRequest(rt);
+    expect(rt.requests[1]).toMatchObject({ decision: "rewrite" });
+    rt.response = { status: 200, headers: { "content-type": "text/html" }, body: "<html>ready</html>" };
+    handleStashResponse(rt);
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").status).toBe("valid");
+  });
+
+  it("clears a confirmed session when a rewritten allowlist response redirects to CAS", () => {
     const req = runtime({
       request: { url: "https://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
     });
@@ -187,7 +213,7 @@ describe("Stash adapter", () => {
       cookieHeader: "route=fake",
       capturedAt: NOW,
       lastConfirmedAt: null,
-      status: "captured",
+      status: "valid",
     });
     handleStashRequest(req);
     const rewritten = req.requests[0] as { url: string };

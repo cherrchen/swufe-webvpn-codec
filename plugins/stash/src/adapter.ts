@@ -86,6 +86,7 @@ export function handleStashRequest(runtime: StashRuntime): void {
   if (decision.kind === "capture_session") {
     const next = loaded ? applyNewerCookie(loaded, decision.session) : decision.session;
     store.save(next);
+    runtime.write(STORAGE_KEYS.lastError, null);
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-captured", detail });
     runtime.finishRequest({ decision: "pass" });
     return;
@@ -104,9 +105,6 @@ export function handleStashRequest(runtime: StashRuntime): void {
     return;
   }
   if (decision.kind === "rewrite") {
-    if (loaded) {
-      store.save(promoteSession(loaded, runtime.nowIso));
-    }
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail });
     runtime.finishRequest({ decision: "rewrite", url: decision.url, headers: decision.headers });
     return;
@@ -135,11 +133,18 @@ export function handleStashResponse(runtime: StashRuntime): void {
   );
   const host = context?.originalHost ?? safeHost(runtime.request.url);
   const detail = responseDetail(runtime.response);
-  if (result.sessionExpired) {
-    createSessionStore(kv(runtime)).clear();
+  const store = createSessionStore(kv(runtime));
+  const session = store.load();
+  const confirmedExpiry = result.sessionExpired && session?.status === "valid";
+  if (confirmedExpiry) {
+    store.clear();
     writeLastError(runtime, "SESSION_EXPIRED", host);
     notifyThrottled(runtime, "session-expired");
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED", detail });
+  } else if (result.sessionExpired) {
+    // A first visit to jwxt normally redirects through CAS. The gateway
+    // Cookie was captured, but no successful jwxt response has confirmed it.
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail: `initial-auth-redirect ${detail}` });
   } else if (result.warning) {
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "body-skipped", detail: `${result.warning} ${detail}` });
   } else if (result.changed) {
@@ -147,7 +152,11 @@ export function handleStashResponse(runtime: StashRuntime): void {
   } else {
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail });
   }
-  if (!result.changed && !result.sessionExpired) {
+  if (context && !context.gatewayOwned && !result.sessionExpired && !result.changes.includes("promotion")
+    && result.response.status >= 200 && result.response.status < 300 && session?.status === "captured") {
+    store.save(promoteSession(session, runtime.nowIso));
+  }
+  if (!result.changed) {
     runtime.finishResponse({});
     return;
   }
