@@ -1,5 +1,7 @@
 packages:
   - apps/*
+  - packages/*
+  - plugins/stash
 
 # pnpm refuses to run dependency build scripts unless they are reviewed here
 # (ERR_PNPM_IGNORED_BUILDS). esbuild's postinstall links the platform binary.

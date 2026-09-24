@@ -1,0 +1,60 @@
+export { CodecError, PluginError } from "./errors.ts";
+export type { CodecErrorCode, PluginErrorCode } from "./errors.ts";
+export { WrdCodec, DEFAULT_IV, DEFAULT_KEY, DEFAULT_WEBVPN_HOST, gatewayHost } from "./codec/wrd-codec.ts";
+export type { WrdCodecOptions } from "./codec/wrd-codec.ts";
+export {
+  decideRoute,
+  defaultRoutingPolicy,
+  normalizeHost,
+  tryNormalizeHost,
+  AUTH_HOST,
+  DEFAULT_HOSTS,
+  EXCLUDED_HOSTS,
+  GATEWAY_HOST,
+} from "./routing/allowlist.ts";
+export type { RouteDecision, RoutingPolicy } from "./routing/allowlist.ts";
+export {
+  STORAGE_KEYS,
+  applyNewerCookie,
+  captureSession,
+  createSessionStore,
+  headerValue,
+  memoryKv,
+  parseSession,
+  promoteSession,
+  sessionMatchesGateway,
+} from "./session/session.ts";
+export type {
+  KeyValueStore,
+  SessionCaptureInput,
+  SessionCaptureResult,
+  SessionParseResult,
+  SessionRecordV1,
+  SessionStore,
+} from "./session/session.ts";
+export {
+  DEFAULT_BODY_REWRITE_MAX_BYTES,
+  GATEWAY_ROOT_PREFIXES,
+  mergeCookies,
+  rewriteRequest,
+  wrdPrefixOf,
+} from "./rewrite/request.ts";
+export type { RequestDTO, RequestDecision, RequestRewriteContext, RewriteSettings } from "./rewrite/request.ts";
+export {
+  decodeWrdReference,
+  isGatewayBootstrapHtml,
+  isRewritableContentType,
+  rewriteBodyText,
+  rewriteLocation,
+  rewriteSetCookieAttrs,
+  stripWrdPrefix,
+  GATEWAY_BOOTSTRAP_MAX_BYTES,
+  REWRITABLE_CONTENT_TYPES,
+} from "./rewrite/body.ts";
+export { rewriteResponse } from "./rewrite/response.ts";
+export type { ResponseDTO, ResponseRewriteResult } from "./rewrite/response.ts";
+export { diagnosticContainsSensitive, notificationFor, redactText, safeDiagnostic } from "./runtime/diagnostics.ts";
+export type { NotificationDTO, SafeDiagnosticRecord } from "./runtime/diagnostics.ts";
+export { defaultSettings, parseSettings, stashTile, toRewriteSettings } from "./runtime/settings.ts";
+export type { PluginSettingsV1, RuntimeCompatibility, StashTileViewModel } from "./runtime/settings.ts";
+export type { HostAdapter, HostEnvironment, HostRequestResult, HostResponseResult } from "./runtime/contracts.ts";

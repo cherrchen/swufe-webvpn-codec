@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "key": "wrdvpnisthebest!",
+  "iv": "wrdvpnisthebest!",
+  "gatewayHost": "webvpn.swufe.edu.cn",
+  "sampleHostToken": "77726476706e69737468656265737421f1e2559434357a467b1ac7bf8f40253097e41b52087752",
+  "cases": [
+    {
+      "id": "encrypt-authserver",
+      "op": "encryptHost",
+      "input": "authserver.swufe.edu.cn",
+      "output": "77726476706e69737468656265737421f1e2559434357a467b1ac7bf8f40253097e41b52087752"
+    },
+    {
+      "id": "encrypt-jwxt",
+      "op": "encryptHost",
+      "input": "jwxt.swufe.edu.cn",
+      "output": "77726476706e69737468656265737421fae0598869237f45780dc7a99c406d361f"
+    },
+    {
+      "id": "decode-captured",
+      "op": "decode",
+      "input": "https://webvpn.swufe.edu.cn/https/77726476706e69737468656265737421f1e2559434357a467b1ac7bf8f40253097e41b52087752/authserver/login?service=http%3A%2F%2Fjwxt.swufe.edu.cn%2Fsso%2Fjziotlogin",
+      "output": "https://authserver.swufe.edu.cn/authserver/login?service=http%3A%2F%2Fjwxt.swufe.edu.cn%2Fsso%2Fjziotlogin"
+    },
+    {
+      "id": "encode-1",
+      "op": "encode",
+      "input": "https://jwxt.swufe.edu.cn/sso/jziotlogin",
+      "output": "https://webvpn.swufe.edu.cn/https/77726476706e69737468656265737421fae0598869237f45780dc7a99c406d361f/sso/jziotlogin"
+    },
+    {
+      "id": "roundtrip-1",
+      "op": "decode",
+      "input": "https://webvpn.swufe.edu.cn/https/77726476706e69737468656265737421fae0598869237f45780dc7a99c406d361f/sso/jziotlogin",
+      "output": "https://jwxt.swufe.edu.cn/sso/jziotlogin"
+    },
+    {
+      "id": "encode-2",
+      "op": "encode",
+      "input": "http://host:8080/x",
+      "output": "https://webvpn.swufe.edu.cn/http-8080/77726476706e69737468656265737421f8f85288/x"
+    },
+    {
+      "id": "roundtrip-2",
+      "op": "decode",
+      "input": "https://webvpn.swufe.edu.cn/http-8080/77726476706e69737468656265737421f8f85288/x",
+      "output": "http://host:8080/x"
+    },
+    {
+      "id": "encode-3",
+      "op": "encode",
+      "input": "https://host:443/x",
+      "output": "https://webvpn.swufe.edu.cn/https/77726476706e69737468656265737421f8f85288/x"
+    },
+    {
+      "id": "roundtrip-3",
+      "op": "decode",
+      "input": "https://webvpn.swufe.edu.cn/https/77726476706e69737468656265737421f8f85288/x",
+      "output": "https://host/x"
+    },
+    {
+      "id": "encode-4",
+      "op": "encode",
+      "input": "https://host:8443/x?q=1#frag",
+      "output": "https://webvpn.swufe.edu.cn/https-8443/77726476706e69737468656265737421f8f85288/x?q=1#frag"
+    },
+    {
+      "id": "roundtrip-4",
+      "op": "decode",
+      "input": "https://webvpn.swufe.edu.cn/https-8443/77726476706e69737468656265737421f8f85288/x?q=1#frag",
+      "output": "https://host:8443/x?q=1#frag"
+    },
+    {
+      "id": "encode-5",
+      "op": "encode",
+      "input": "https://jwxt.swufe.edu.cn/a/b?service=http%3A%2F%2Fx%2Fy#s",
+      "output": "https://webvpn.swufe.edu.cn/https/77726476706e69737468656265737421fae0598869237f45780dc7a99c406d361f/a/b?service=http%3A%2F%2Fx%2Fy#s"
+    },
+    {
+      "id": "roundtrip-5",
+      "op": "decode",
+      "input": "https://webvpn.swufe.edu.cn/https/77726476706e69737468656265737421fae0598869237f45780dc7a99c406d361f/a/b?service=http%3A%2F%2Fx%2Fy#s",
+      "output": "https://jwxt.swufe.edu.cn/a/b?service=http%3A%2F%2Fx%2Fy#s"
+    },
+    {
+      "id": "bad-key-short",
+      "op": "construct",
+      "key": "short",
+      "error": "INVALID_KEY"
+    },
+    {
+      "id": "bad-key-long",
+      "op": "construct",
+      "key": "seventeen-bytes!!",
+      "error": "INVALID_KEY"
+    },
+    {
+      "id": "bad-iv-short",
+      "op": "construct",
+      "iv": "short",
+      "error": "INVALID_IV"
+    },
+    {
+      "id": "bad-token-short",
+      "op": "decryptHost",
+      "input": "abc",
+      "error": "INVALID_TOKEN"
+    },
+    {
+      "id": "bad-token-odd",
+      "op": "decryptHost",
+      "input": "000000000000000000000000000000000",
+      "error": "INVALID_TOKEN"
+    },
+    {
+      "id": "bad-token-nonhex",
+      "op": "decryptHost",
+      "input": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "error": "INVALID_TOKEN"
+    },
+    {
+      "id": "bad-scheme",
+      "op": "encode",
+      "input": "ftp://host/x",
+      "error": "UNSUPPORTED_SCHEME"
+    },
+    {
+      "id": "missing-host",
+      "op": "encode",
+      "input": "https:///x",
+      "error": "INVALID_URL"
+    },
+    {
+      "id": "bad-wrd-path",
+      "op": "decode",
+      "input": "https://webvpn.swufe.edu.cn/login",
+      "error": "INVALID_URL"
+    }
+  ]
+}

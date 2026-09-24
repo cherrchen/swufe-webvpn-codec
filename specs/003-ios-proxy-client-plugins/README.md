@@ -1,6 +1,6 @@
 # SWUFE WebVPN iOS Proxy Client Plugins — 文档包
 
-> Status: Approved  
+> Status: In Progress  
 > Spec ID: `003-ios-proxy-client-plugins`  
 > Owner: cherrchen  
 > Last Reviewed: 2026-09-24  
@@ -21,7 +21,7 @@
 9. HTTPS 解密仅作用于明确的 WebVPN/目标域名范围，不默认 MITM 整个互联网。
 10. **P0 实机结论（2026-09-24）**：Loon 通知 `openUrl` 与 Stash Tile `url` 都打开系统 Safari，不在宿主内嵌网页。MitM 启用后，两个宿主的脚本都能看见 `webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn`，登录后的 gateway 请求里能看到会话 Cookie 名。登录文案使用「打开网页登录」。细节见 [verification.md](verification.md)。
 11. **安装与更新分发**：`.stoverride` / `.plugin` 及 bundled 脚本仅通过本仓库 **GitHub** 提供（Release 附件与/或 `raw.githubusercontent.com` 固定路径）；不引入第三方 CDN 或项目自建下载服务器。用户从仓库 README 的安装入口导入。
-12. **Spec 状态（2026-09-24）**：`Approved` = Gate A（P0）+ 文档评审通过；进入 M1 实现前须满足 **Gate B**（Python/JS 向量全绿）。见 [spec.md §Status](spec.md)。
+12. **Spec 状态（2026-09-24）**：`In Progress`。Gate A 与文档评审已通过；Gate B（Python/JS 向量全绿）已在本地通过。Stash 真机 E2E 仍待做。见 [spec.md §Status](spec.md)。
 
 ## 文件导航
 

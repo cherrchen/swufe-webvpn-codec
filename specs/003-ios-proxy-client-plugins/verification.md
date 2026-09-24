@@ -1,7 +1,7 @@
 # Verification: iOS Proxy Client Plugins
 
 > Spec ID: 003  
-> Status: Approved  
+> Status: In Progress  
 > Owner: cherrchen  
 > Last Updated: 2026-09-24
 
@@ -12,19 +12,19 @@
 | IOS-REQ-001 | G01/H01 + disable/update cases | Pending |
 | IOS-REQ-002 | I01/I03 + G07/H04 | Pending |
 | IOS-REQ-003 | C01..C10 + I02/I04 | Pending |
-| IOS-REQ-004 | B01..B09 | Pending |
-| IOS-REQ-005 | A01..A09 | Pending |
-| IOS-REQ-006 | D01..D09 | Pending |
-| IOS-REQ-007 | E01..E11 | Pending |
+| IOS-REQ-004 | B01..B09 | Passed |
+| IOS-REQ-005 | A01..A09 | Passed |
+| IOS-REQ-006 | D01..D09 | Passed |
+| IOS-REQ-007 | E01..E11 | Passed |
 | IOS-REQ-008 | H02/H06/H12 + Loon notification cases | Pending |
 | IOS-REQ-009 | F01..F08 | Pending |
 | IOS-REQ-010 | G12/H09 | Pending |
-| IOS-REQ-011 | bundle/version smoke | Pending |
+| IOS-REQ-011 | bundle/version smoke | Passed |
 | IOS-REQ-012 | G11/H11/J06 | Pending |
-| IOS-NFR-001 | A09 | Pending |
+| IOS-NFR-001 | A09 | Passed |
 | IOS-NFR-002 | F04 | Pending |
-| IOS-NFR-003 | D09 | Pending |
-| IOS-NFR-004 | architecture/code review | Pending |
+| IOS-NFR-003 | D09 | Passed |
+| IOS-NFR-004 | architecture/code review | Passed |
 | IOS-NFR-005 | request/body policy review + perf | Pending |
 | IOS-NFR-006 | expired flow | Pending |
 | IOS-NFR-007 | F01..F03 | Pending |
@@ -39,9 +39,9 @@ Status：`Pending` / `Passed` / `Failed` / `N/A`。
 | --- | --- | --- |
 | AC-IOS-001 | I01..I06 + 至少一宿主 E2E | Pending |
 | AC-IOS-002 | G09/H07 | Pending |
-| AC-IOS-003 | A09 | Pending |
-| AC-IOS-004 | D03/D09 | Pending |
-| AC-IOS-005 | B03/B04 | Pending |
+| AC-IOS-003 | A09 | Passed |
+| AC-IOS-004 | D03/D09 | Passed |
+| AC-IOS-005 | B03/B04 | Passed |
 | AC-IOS-006 | H12 + Loon equivalent | Pending |
 | AC-IOS-007 | F01..F08 | Pending |
 | AC-IOS-008 | G01/G10/G11 + H01/H10/H11 | Pending |
@@ -58,6 +58,15 @@ Status：`Pending` / `Passed` / `Failed` / `N/A`。
 - 用虚构 Cookie / query / WRD 路径跑探测脚本：日志只有 host、无 query 的 path、Cookie 名、Set-Cookie 名、Location host；Cookie 值、Authorization、body、query、长十六进制 token 未出现。通知文案只有登录提示和 `https://webvpn.swufe.edu.cn`。
 
 I01–I04 已有 2026-09-24 真机结论，见下方。探测脚本没有把 Session 写入持久存储，所以「sessionCaptured」只表示脚本看见了 Cookie 名。
+
+2026-09-24 M1/M2 本地检查（不是真机结论）：
+
+- `pnpm --filter webvpn-core-js test`：46 passed。覆盖 A/B/C/D/E 与 F01/F02/F03/F05/F08，以及 Core 源码不含 `$request`、`$persistentStore`、`$done`、`node:crypto`、`Buffer`。
+- `pnpm --filter webvpn-core-js typecheck`：通过。
+- `uv run --directory bridges/python pytest tests/l0/test_wrd_vectors_shared.py tests/l0/test_wrd_codec.py -q`：25 passed。共享向量与 Python codec 一致，含实机 `SAMPLE_HOST_TOKEN`。
+- `pnpm --filter swufe-webvpn-stash test`：Adapter 5 passed；`plugins/stash/dist/{request,response,tile}.js` bundle 扫描通过（无 `node:`、`fs`、`crypto`、`Buffer`、未打包的 import/export）。
+- `pnpm --filter swufe-webvpn-stash typecheck`：通过。
+- Gate B（向量全绿、Core 无宿主 API）在本地通过。T024 的 Stash 导入、T026 的 HTTP/3 回落（IOS-TC-H09）和 T027 教务 E2E 仍待真机。`.stoverride` 的 script URL 指向 `main` 上的 raw 路径；合并前导入会 404。
 
 ## P0 真机记录
 
@@ -104,14 +113,14 @@ Q-001、Q-002 因此关闭。Gate A 通过。I05（Safari 是否总能捕获）�
 | 检查项 | 结论 | 依据 |
 | --- | --- | --- |
 | 不存账号密码/MFA | Pending | F04 |
-| Session 不进日志/通知 | Pending | F01..F03 |
-| 非 gateway 不注入 Session | Pending | D09 |
-| authserver 不持久化认证 Cookie | Pending | C03 |
+| Session 不进日志/通知 | Passed | F01..F03 单元测试 |
+| 非 gateway 不注入 Session | Passed | D09 |
+| authserver 不持久化认证 Cookie | Passed | C03 |
 | MitM scope 最小化 | Pending | 配置审查 + 真机 |
 
 ## 文档同步
 
-P0 结论写在本 Feature 文档包内。Spec 003 已标为 `Approved`（Gate A + 文档评审）；长期 `docs/**` 与 ADR 在 M1/M4 按 [project-management.md §12](project-management.md) 同步，尚未开始。
+P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES backend 已记入 ADR-0013。README、requirements 与 architecture 正文的全量同步仍留在 M4 T033。
 
 ## 未验证 / 无法验证项
 
@@ -131,4 +140,11 @@ P0 结论写在本 Feature 文档包内。Spec 003 已标为 `Approved`（Gate A
 - [ ] 长期文档与 ADR 已同步
 - [ ] Spec 状态可推进到 `Verified`
 
-当前结论：**不可推进到 Verified**；这是实施前的完整验证计划。
+当前结论：**不可推进到 Verified**。M1 与 Stash 自动项已有本地证据；T024 导入、T026 HTTP/3（H09）与 T027 教务 E2E 仍待真机。
+
+## Stash 真机步骤（T027，尚未执行）
+
+1. 将 `plugins/stash/dist/*.js` 与 `plugins/stash/swufe-webvpn.stoverride` 推到 `main` 之后，再从 GitHub raw 导入 override。合并前 URL 会 404。
+2. 打开 Tile「打开网页登录」，完成 CAS/MFA。确认 Tile 变为「已登录」。不要记录 Cookie 值。
+3. 用 Safari 打开 `https://jwxt.swufe.edu.cn`，走教务主路径，看跳转是否仍落在校内主机名上。
+4. 在 Stash 连接里确认 `jwxt` / `webvpn` / `authserver` 的 QUIC 被拒绝、TCP 进入 HTTP Engine（IOS-TC-H09）。未确认前不要把 H09 标成 Passed。

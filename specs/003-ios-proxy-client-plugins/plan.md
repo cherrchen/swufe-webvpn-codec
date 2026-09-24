@@ -1,7 +1,7 @@
 # Implementation Plan: iOS Proxy Client Plugins
 
 > Spec ID: 003  
-> Status: Approved  
+> Status: In Progress  
 > Owner: cherrchen  
 > Last Updated: 2026-09-24
 

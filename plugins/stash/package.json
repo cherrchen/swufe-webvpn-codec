@@ -1,0 +1,19 @@
+{
+  "name": "swufe-webvpn-stash",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "vitest run && node scripts/build.mjs && node scripts/scan-bundle.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "webvpn-core-js": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.7"
+  }
+}

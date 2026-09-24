@@ -1,7 +1,7 @@
 # Tasks: iOS Proxy Client Plugins
 
 > Spec ID: 003  
-> Status: Approved  
+> Status: In Progress  
 > Owner: cherrchen  
 > Last Updated: 2026-09-24
 
@@ -15,23 +15,23 @@
 
 ## Phase M1 — Shared Core
 
-- [ ] T006 新建 `packages/webvpn-core-js` — 输出：package skeleton — 依赖：T005 — 验证：typecheck — 关联：IOS-NFR-004
-- [ ] T007 提取/生成 Python 权威 codec vectors — 输出：共享 vectors JSON — 依赖：无 — 验证：Python 现有实现读取并通过 — 关联：IOS-NFR-001
-- [ ] T008 实现 JS WRD codec — 依赖：T006,T007 — 验证：IOS-TC-A01..A09 — 关联：IOS-REQ-005
-- [ ] T009 实现 RoutingPolicy — 依赖：T006 — 验证：IOS-TC-B01..B09 — 关联：IOS-REQ-004
-- [ ] T010 实现 Session schema/store/capture pure logic — 依赖：T006 — 验证：IOS-TC-C01..C10 — 关联：IOS-REQ-003
-- [ ] T011 实现 request rewrite — 依赖：T008,T009,T010 — 验证：IOS-TC-D01..D09 — 关联：IOS-REQ-005/006
-- [ ] T012 实现 response header rewrite — 依赖：T008 — 验证：IOS-TC-E01..E04 — 关联：IOS-REQ-007
-- [ ] T013 实现 body rewrite + size guard — 依赖：T008 — 验证：IOS-TC-E05..E09 — 关联：IOS-REQ-007
-- [ ] T014 移植 gateway namespace/promotion 契约 — 依赖：T012,T013 — 验证：IOS-TC-E10/E11 — 关联：IOS-REQ-007
-- [ ] T015 实现 safe diagnostics/redaction — 依赖：T006 — 验证：IOS-TC-F01..F08 — 关联：IOS-REQ-009
+- [x] T006 新建 `packages/webvpn-core-js` — 输出：package skeleton — 依赖：T005 — 验证：typecheck — 关联：IOS-NFR-004
+- [x] T007 提取/生成 Python 权威 codec vectors — 输出：共享 vectors JSON — 依赖：无 — 验证：Python 现有实现读取并通过 — 关联：IOS-NFR-001
+- [x] T008 实现 JS WRD codec — 依赖：T006,T007 — 验证：IOS-TC-A01..A09 — 关联：IOS-REQ-005
+- [x] T009 实现 RoutingPolicy — 依赖：T006 — 验证：IOS-TC-B01..B09 — 关联：IOS-REQ-004
+- [x] T010 实现 Session schema/store/capture pure logic — 依赖：T006 — 验证：IOS-TC-C01..C10 — 关联：IOS-REQ-003
+- [x] T011 实现 request rewrite — 依赖：T008,T009,T010 — 验证：IOS-TC-D01..D09 — 关联：IOS-REQ-005/006
+- [x] T012 实现 response header rewrite — 依赖：T008 — 验证：IOS-TC-E01..E04 — 关联：IOS-REQ-007
+- [x] T013 实现 body rewrite + size guard — 依赖：T008 — 验证：IOS-TC-E05..E09 — 关联：IOS-REQ-007
+- [x] T014 移植 gateway namespace/promotion 契约 — 依赖：T012,T013 — 验证：IOS-TC-E10/E11 — 关联：IOS-REQ-007
+- [x] T015 实现 safe diagnostics/redaction — 依赖：T006 — 验证：IOS-TC-F01..F08 — 关联：IOS-REQ-009
 
 ## Phase M2 — Stash（首发宿主）
 
-- [ ] T022 实现 StashAdapter — 依赖：T011..T015 — 验证：Adapter unit — 关联：IOS-REQ-001/011
-- [ ] T023 生成 request/response/tile bundles — 依赖：T022 — 验证：bundle scan — 关联：IOS-REQ-011
+- [x] T022 实现 StashAdapter — 依赖：T011..T015 — 验证：Adapter unit — 关联：IOS-REQ-001/011
+- [x] T023 生成 request/response/tile bundles — 依赖：T022 — 验证：bundle scan — 关联：IOS-REQ-011
 - [ ] T024 编写 `.stoverride`（GitHub 远程安装 URL） — 依赖：T023 — 验证：IOS-TC-H01 — 关联：IOS-REQ-001
-- [ ] T025 实现 Tile ViewModel — 依赖：T022 — 验证：IOS-TC-H02/H06/H12 — 关联：IOS-REQ-008
+- [x] T025 实现 Tile ViewModel — 依赖：T022 — 验证：IOS-TC-H02/H06/H12 — 关联：IOS-REQ-008
 - [ ] T026 配置并验证目标域 HTTP/3 fallback — 依赖：T024 — 验证：IOS-TC-H09 — 关联：IOS-REQ-010
 - [ ] T027 Stash 真机 E2E 教务 — 依赖：T024..T026 — 验证：IOS-TC-H03..H12 — 关联：AC-IOS-001/002
 
@@ -57,6 +57,7 @@
 
 ## 注意事项
 
+- T024、T026、T027 仍待 Stash 真机：导入、HTTP/3 回落（H09）与教务 E2E。自动测试不能代替这三项。
 - P0 失败时先更新需求与架构，不用猜测继续实现；
 - 真实 Cookie 不得写入 commit、Issue、PR、CI artifact；
 - shared core 同一时段应有明确集成责任；

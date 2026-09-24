@@ -5,6 +5,9 @@ node_modules/
 # Build output
 dist/
 build/
+# Stash script-providers load these bundles from GitHub raw.
+!plugins/stash/dist/
+!plugins/stash/dist/*.js
 
 # Environment
 .env

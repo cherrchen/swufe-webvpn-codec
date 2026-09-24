@@ -1,7 +1,7 @@
 # Feature: iOS Proxy Client Plugins
 
 > Spec ID: 003  
-> Status: Approved  
+> Status: In Progress  
 > Owner: cherrchen  
 > Created: 2026-09-24  
 > Related: REQ-002 / REQ-005 / REQ-006 / REQ-007 / NFR-002 / NFR-003
@@ -15,15 +15,15 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 **`Approved`**（2026-09-24）：P0 宿主能力验证（Gate A）与文档评审已通过；共享 Core 与双宿主实现尚未启动。
+当前为 **`In Progress`**（2026-09-24）：P0 宿主能力验证（Gate A）与文档评审已通过；M1 Shared Core 与 M2 Stash 实现已开始。M3/M4 未开始。
 
 | Gate | 含义 | 本 Spec 状态 |
 | --- | --- | --- |
 | **Gate A** | P0 登录链路与 Script 可观察性（见 [project-management.md §10](project-management.md)） | **已通过**（2026-09-24 真机；见 [verification.md](verification.md)） |
 | **文档评审** | PRD / 架构 / 任务 / 验证计划一致，产品决策已冻结（含 Stash 首发宿主、GitHub 分发） | **已通过**（2026-09-24） |
 | **Approved** | Gate A + 文档评审通过 | **当前** |
-| **Gate B** | M1 退出：Python/JS 共享向量全绿、Core 无 Host API 泄漏（见 [project-management.md §10](project-management.md)） | 未开始 |
-| **In Progress** | Gate B 通过后进入 M2/M3 实现 | 未到达 |
+| **Gate B** | M1 退出：Python/JS 共享向量全绿、Core 无 Host API 泄漏（见 [project-management.md §10](project-management.md)） | **已通过**（2026-09-24 本地向量与隔离扫描；真机 E2E 仍待 T027） |
+| **In Progress** | Gate B 通过后进入 M2/M3 实现 | **当前**（M1/M2 实现中；Gate B 以向量全绿为准） |
 
 ## Background
 

@@ -1,0 +1,58 @@
+name: SWUFE WebVPN
+desc: |-
+  把 allowlist 内的校内网站经官方 WebVPN 访问。
+  点击首页 Tile 打开网页登录。不要把 Cookie、密码或 MFA 发给任何人。
+openUrl: https://webvpn.swufe.edu.cn
+author: cherrchen
+homepage: https://github.com/cherrchen/swufe-webvpn-codec
+icon: network
+category: SWUFE
+date: 2026-09-24
+version: 0.1.0-m2
+
+tiles:
+  - name: swufe-webvpn-tile
+    interval: 600
+    title: SWUFE WebVPN
+    content: 未登录 · 打开网页登录
+    icon: network
+    url: https://webvpn.swufe.edu.cn
+
+script-providers:
+  swufe-webvpn-request:
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js
+    interval: 86400
+  swufe-webvpn-response:
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/response.js
+    interval: 86400
+  swufe-webvpn-tile:
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/tile.js
+    interval: 86400
+
+# HTTP/3 does not enter the Stash HTTP Engine. Reject QUIC only for these hosts
+# so clients fall back to TCP. Device confirmation is still required (IOS-TC-H09).
+rules:
+  - AND,((DOMAIN,jwxt.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
+  - AND,((DOMAIN,webvpn.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
+  - AND,((DOMAIN,authserver.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
+
+http:
+  force-http-engine:
+    - jwxt.swufe.edu.cn:443
+    - webvpn.swufe.edu.cn:443
+    - authserver.swufe.edu.cn:443
+  mitm:
+    - jwxt.swufe.edu.cn:443
+    - webvpn.swufe.edu.cn:443
+    - authserver.swufe.edu.cn:443
+  script:
+    - match: ^https?:\/\/(jwxt|webvpn|authserver)\.swufe\.edu\.cn
+      name: swufe-webvpn-request
+      type: request
+      require-body: false
+      timeout: 10
+    - match: ^https?:\/\/(jwxt|webvpn|authserver)\.swufe\.edu\.cn
+      name: swufe-webvpn-response
+      type: response
+      require-body: true
+      timeout: 15
