@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 093e52b */
+/* swufe-webvpn stash ec9eb12 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -997,7 +997,7 @@
   // ../../packages/webvpn-core-js/src/rewrite/response.ts
   function rewriteResponse(context, response, settings) {
     if (!context) {
-      return unchanged(response, sessionExpiredFrom(response, settings));
+      return unchanged(response, false);
     }
     if (context.gatewayOwned) {
       return unchanged(response, false);

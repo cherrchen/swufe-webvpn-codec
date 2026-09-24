@@ -101,6 +101,63 @@ describe("Stash adapter", () => {
     });
   });
 
+  it("keeps a captured session when the login page redirects to CAS", () => {
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: "route=fake" } },
+    });
+    handleStashRequest(rt);
+    expect(rt.store[STORAGE_KEYS.session]).toContain("route=fake");
+    const res = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: "route=fake" } },
+      response: { status: 302, headers: { location: "https://authserver.swufe.edu.cn/authserver/login" }, body: "" },
+      read: (key) => rt.store[key] ?? null,
+      write: (key, value) => {
+        if (value === null || value === "") delete rt.store[key];
+        else rt.store[key] = value;
+        return true;
+      },
+    });
+    handleStashResponse(res);
+    expect(rt.store[STORAGE_KEYS.session]).toContain("route=fake");
+    const jwxt = runtime({
+      request: { url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} },
+      read: (key) => rt.store[key] ?? null,
+      write: (key, value) => {
+        if (value === null || value === "") delete rt.store[key];
+        else rt.store[key] = value;
+        return true;
+      },
+    });
+    handleStashRequest(jwxt);
+    expect(jwxt.requests[0]).toMatchObject({ decision: "rewrite" });
+    expect(JSON.stringify(jwxt.requests[0])).not.toContain("NOT_LOGGED_IN");
+  });
+
+  it("clears the session when a rewritten allowlist response redirects to CAS", () => {
+    const req = runtime({
+      request: { url: "https://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
+    });
+    req.store[STORAGE_KEYS.session] = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: "webvpn.swufe.edu.cn",
+      cookieHeader: "route=fake",
+      capturedAt: NOW,
+      lastConfirmedAt: null,
+      status: "captured",
+    });
+    handleStashRequest(req);
+    const rewritten = req.requests[0] as { url: string };
+    const res = runtime({
+      request: { url: rewritten.url, method: "GET", headers: {} },
+      response: { status: 302, headers: { location: "https://authserver.swufe.edu.cn/authserver/login" }, body: "" },
+      read: (key) => req.store[key] ?? null,
+      write: req.write,
+    });
+    handleStashResponse(res);
+    expect(req.store[STORAGE_KEYS.session]).toBeUndefined();
+    expect(handleStashTile(res).content).toContain("失效");
+  });
+
   it("H02 tile copy follows session state", () => {
     const loggedOut = runtime();
     expect(handleStashTile(loggedOut).content).toBe("未登录 · 打开网页登录");

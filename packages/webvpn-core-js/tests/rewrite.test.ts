@@ -270,13 +270,22 @@ describe("IOS-TC-E response rewrite", () => {
     expect(result.response.body).toBe("keep");
   });
 
-  it("authserver redirect marks the session expired", () => {
+  it("authserver redirect on a rewritten allowlist response marks the session expired", () => {
     const result = rewriteResponse(
       context(),
       { status: 302, headers: { location: "https://authserver.swufe.edu.cn/authserver/login" } },
       settings(),
     );
     expect(result.sessionExpired).toBe(true);
+  });
+
+  it("login redirect from the gateway itself does not mark the session expired", () => {
+    const result = rewriteResponse(
+      null,
+      { status: 302, headers: { location: "https://authserver.swufe.edu.cn/authserver/login" } },
+      settings(),
+    );
+    expect(result.sessionExpired).toBe(false);
   });
 });
 

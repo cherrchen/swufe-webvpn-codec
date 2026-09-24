@@ -144,6 +144,12 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 当前结论：**不可推进到 Verified**。M1 与 Stash 自动项已有本地证据；T024 导入、T026 HTTP/3（H09）与 T027 教务 E2E 仍待真机。
 
+2026-09-24 登录态本地检查（不是真机结论）：
+
+- 普通 `webvpn` 响应 302 到 `authserver` 不再把会话标成失效，也不再 `clear()`。已改写的教务响应再跳回 CAS 仍会清会话。
+- `pnpm --filter webvpn-core-js test`：48 passed。`pnpm --filter swufe-webvpn-stash test`：7 passed，并重新生成 `plugins/stash/dist/{request,response,tile}.js`。
+- Tile `interval` 改为 30 秒，脚本只读本机会话。真机仍须重新导入 Override 后，登录并打开教务，确认 Tile 变为「已登录」、`jwxt` 走 rewrite。不要记录 Cookie 值。
+
 ## Stash 真机步骤（T027，尚未执行）
 
 1. 将 `plugins/stash/dist/*.js` 与 `plugins/stash/swufe-webvpn.stoverride` 推到 `main` 之后，再从 GitHub raw 导入 override。合并前 URL 会 404。

@@ -80,7 +80,7 @@ Tile = 已登录
 
 Tile Script 读取 `SessionRecord`：无 Session → `LOGGED_OUT`；有 Session且未明确过期 → `READY`；被判定失效 → `EXPIRED`；schema/version 不兼容 → `ERROR`。
 
-Tile 不主动以高频网络请求探测 Session，避免耗电；可以在用户访问 allowlist 服务后更新状态。
+Tile 不主动以高频网络请求探测 Session，避免耗电。脚本每 30 秒只读本机会话：登录写入后回到首页即可显示「已登录」，不把 10 分钟间隔当作登录完成的刷新。
 
 ## 4. Loon 体验
 

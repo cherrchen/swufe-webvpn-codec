@@ -30,7 +30,7 @@ export function rewriteResponse(
   settings: RewriteSettings,
 ): ResponseRewriteResult {
   if (!context) {
-    return unchanged(response, sessionExpiredFrom(response, settings));
+    return unchanged(response, false);
   }
   if (context.gatewayOwned) {
     return unchanged(response, false);
