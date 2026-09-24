@@ -1,4 +1,4 @@
-import { handleStashRequest, type StashRuntime } from "./adapter.ts";
+import { handleStashRequest, nativeGatewayRedirect, type StashRuntime } from "./adapter.ts";
 import { traceEntered, traceThrew } from "./script-trace.ts";
 
 declare const $request: StashRuntime["request"];
@@ -32,6 +32,11 @@ function bindRuntime(): StashRuntime {
       console.log(JSON.stringify(record));
     },
     finishRequest: (result) => {
+      const nativeUrl = nativeGatewayRedirect(typeof $request === "undefined" ? undefined : $request, result);
+      if (nativeUrl) {
+        $done({ response: { status: 302, headers: { location: nativeUrl, "cache-control": "no-store" } } });
+        return;
+      }
       if (result.decision === "rewrite" && result.url) {
         $done({ url: result.url, headers: result.headers ?? {} });
         return;

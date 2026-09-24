@@ -184,6 +184,8 @@ Request/Response script 不保证共享 JS 调用栈，因此不依赖内存对�
 
 desktop 当前将 `/wengine-vpn/`、`/authserver/` 视为 gateway root namespace，并有 bootstrap HTML promotion。移动端默认保持语义一致；必须由真机教务验证确认，不因脚本实现困难直接删除。
 
+Stash 真机日志显示，响应脚本把透明改写后的请求和浏览器直接访问的 WebVPN 原生 `/http/<token>/` 请求都呈现为同一 gateway URL。对原生 bootstrap 再执行 `302` promotion 会跳回自身，形成无限重定向。Stash Adapter 因此在教务文档导航的 request 阶段直接向浏览器返回指向 WebVPN URL 的 `302`；浏览器对该原生 URL 的响应不再反向改写。其它宿主的 Core promotion 语义不变。
+
 ## 12. MitM Scope
 
 最小范围建议：gateway、默认 allowlist host、用户显式加入的其它目标 host。

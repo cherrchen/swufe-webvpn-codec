@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 584c44e */
+/* swufe-webvpn stash 2998d62 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1548,6 +1548,10 @@
     }
     const rewriteSettings = toRewriteSettings(settings);
     const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
+    if (context?.originalHost === "jwxt.swufe.edu.cn" && safeHost(runtime.request.url) === gatewayHost(rewriteSettings.gatewayBase)) {
+      runtime.finishResponse({});
+      return;
+    }
     const result = rewriteResponse(
       context,
       {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STORAGE_KEYS } from "webvpn-core-js";
-import { handleStashRequest, handleStashResponse, handleStashTile, type StashRuntime } from "../src/adapter.ts";
+import { handleStashRequest, handleStashResponse, handleStashTile, nativeGatewayRedirect, type StashRuntime } from "../src/adapter.ts";
 
 const NOW = "2026-09-24T08:00:00.000Z";
 
@@ -73,13 +73,7 @@ describe("Stash adapter", () => {
     expect(rewritten.decision).toBe("rewrite");
     expect(rewritten.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn\/http\//);
 
-    const res = runtime({
-      request: { url: rewritten.url, method: "GET", headers: {} },
-      response: { status: 200, headers: { "content-type": "text/html" }, body: '<script>var __vpn_x=1</script><script src="/wengine-vpn/js/main.js"></script>' },
-      read: rt.read,
-    });
-    handleStashResponse(res);
-    expect(res.responses[0]).toMatchObject({ status: 302, headers: { location: rewritten.url } });
+    expect(nativeGatewayRedirect(rt.request, rewritten as { decision: "rewrite"; url: string; headers: Record<string, string> })).toBe(rewritten.url);
   });
 
   it("asks for login and does not attach a cookie when no session exists", () => {
@@ -99,9 +93,18 @@ describe("Stash adapter", () => {
     expect(rt.requests[0]).toEqual({ decision: "pass" });
   });
 
-  it("reverse-rewrites a location on the rewritten request URL", () => {
+  it("redirects jwxt document navigation into native WebVPN space", () => {
+    const rewritten = { decision: "rewrite" as const, url: "https://webvpn.swufe.edu.cn/http/token/", headers: {} };
+    expect(nativeGatewayRedirect({ url: "http://jwxt.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBe(rewritten.url);
+    expect(nativeGatewayRedirect({ url: "http://jwxt.swufe.edu.cn/xtgl/index_initMenu.html", method: "GET", headers: { Accept: "text/html,application/xhtml+xml" } }, rewritten)).toBe(rewritten.url);
+    expect(nativeGatewayRedirect({ url: "http://jwxt.swufe.edu.cn/api", method: "GET", headers: { Accept: "application/json" } }, rewritten)).toBeNull();
+    expect(nativeGatewayRedirect({ url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBeNull();
+    expect(nativeGatewayRedirect({ url: "http://other.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBeNull();
+  });
+
+  it("passes the native WebVPN bootstrap document without redirecting to itself", () => {
     const req = runtime({
-      request: { url: "https://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
+      request: { url: "http://jwxt.swufe.edu.cn/", method: "GET", headers: {} },
     });
     req.store[STORAGE_KEYS.session] = JSON.stringify({
       schemaVersion: 1,
@@ -115,14 +118,12 @@ describe("Stash adapter", () => {
     const rewritten = req.requests[0] as { url: string };
     const res = runtime({
       request: { url: rewritten.url, method: "GET", headers: {} },
-      response: { status: 302, headers: { location: rewritten.url }, body: "" },
+      response: { status: 200, headers: { "content-type": "text/html" }, body: '<script>var __vpn_x=1</script><script src="/wengine-vpn/js/main.js"></script>' },
       read: (key) => req.store[key] ?? null,
       write: req.write,
     });
     handleStashResponse(res);
-    expect(res.responses[0]).toMatchObject({
-      headers: { location: "https://jwxt.swufe.edu.cn/main" },
-    });
+    expect(res.responses[0]).toEqual({});
   });
 
   it("reverse-rewrites when Stash exposes the original URL to the response script", () => {
@@ -216,9 +217,8 @@ describe("Stash adapter", () => {
       status: "valid",
     });
     handleStashRequest(req);
-    const rewritten = req.requests[0] as { url: string };
     const res = runtime({
-      request: { url: rewritten.url, method: "GET", headers: {} },
+      request: { url: "https://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
       response: { status: 302, headers: { location: "https://authserver.swufe.edu.cn/authserver/login" }, body: "" },
       read: (key) => req.store[key] ?? null,
       write: req.write,

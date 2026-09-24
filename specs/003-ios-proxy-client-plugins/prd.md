@@ -75,7 +75,7 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 3. 命中后生成 WRD URL、注入 WebVPN Cookie、最小化改写请求 Header。
 4. 请求发往 `webvpn.swufe.edu.cn`。
 5. 响应脚本反向改写网关 URL/Cookie。
-6. 浏览器继续保持真实主机名语义。
+6. 普通页面保持真实主机名语义；教务页面可按 gateway bootstrap 规则进入 WebVPN 原生 URL 空间。
 
 ### 6.3 会话过期
 

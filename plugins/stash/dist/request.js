@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 584c44e */
+/* swufe-webvpn stash 2998d62 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1323,6 +1323,18 @@
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "pass", detail });
     runtime.finishRequest({ decision: "pass" });
   }
+  function nativeGatewayRedirect(request, result) {
+    if (result.decision !== "rewrite" || !result.url || !request?.url) return null;
+    let url;
+    try {
+      url = new URL(request.url);
+    } catch {
+      return null;
+    }
+    if (url.protocol !== "http:" || url.hostname.toLowerCase() !== "jwxt.swufe.edu.cn" || (request.method ?? "GET").toUpperCase() !== "GET") return null;
+    const accept = Object.entries(request.headers ?? {}).find(([key]) => key.toLowerCase() === "accept")?.[1] ?? "";
+    return url.pathname === "/" || accept.toLowerCase().includes("text/html") ? result.url : null;
+  }
   function loadSettings(runtime) {
     return parseSettings(runtime.read(STORAGE_KEYS.settings));
   }
@@ -1453,6 +1465,11 @@
         console.log(JSON.stringify(record));
       },
       finishRequest: (result) => {
+        const nativeUrl = nativeGatewayRedirect(typeof $request === "undefined" ? void 0 : $request, result);
+        if (nativeUrl) {
+          $done({ response: { status: 302, headers: { location: nativeUrl, "cache-control": "no-store" } } });
+          return;
+        }
         if (result.decision === "rewrite" && result.url) {
           $done({ url: result.url, headers: result.headers ?? {} });
           return;

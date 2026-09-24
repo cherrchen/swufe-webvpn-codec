@@ -162,6 +162,8 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 2026-09-25 HTTP 入口复测日志：`jwxt` 的 request 脚本有 26 次 `entered`、17 次 `rewrite`、9 次 `NOT_LOGGED_IN`；response 脚本有 2 次 `SESSION_EXPIRED`。在 HTTP 主路径中，`/` 和 `/xtgl/login_slogin.html` 已进入改写，后者的 CAS 跳转被当作会话过期并清除，紧接着 `/sso/jziotlogin` 被判 `NOT_LOGGED_IN`，与用户所见白屏相符。原因是 request 在收到上游成功响应前就把刚捕获的 Cookie 标为 `valid`，使首次 CAS 往返误触发失效清理。修复为：只在教务的 2xx 响应后确认会话；初次 CAS 跳转保留 `captured` 会话；已确认会话后来跳回 CAS 仍按过期处理。另修复 response-entry 在仅改写 Header、无可用 body 时输出空 body 的问题。Stash Adapter 11 个测试通过，H07 仍须真机复验。
 
+2026-09-25 再次复测 Safari 报「太多重定位」。脱敏时间线：教务 CAS 回调后约 17:11:54 首次进入 WebVPN `/http/<token>/`，随后同一路径在 17:11:55–17:12:03 连续出现三十余次；每次响应脚本都记为 `rewrite status=200`。根因是响应脚本无法从 `$request.url` 区分透明改写的上游请求与浏览器已进入的 WebVPN 原生请求，反复把原生 bootstrap `302` promotion 到自身。Stash 修复改为教务文档导航在 request 脚本直接返回指向 WebVPN 原生 URL 的 `302`，原生 WebVPN 响应不再做反向改写。Adapter 回归覆盖原生跳转选择和 bootstrap 原样返回；H07 仍待真机重新验证。
+
 1. 将 `plugins/stash/dist/*.js` 与 `plugins/stash/swufe-webvpn.stoverride` 推到 `main` 之后，再从 GitHub raw 导入 override。合并前 URL 会 404。
 2. 打开 Tile「打开网页登录」，完成 CAS/MFA。确认 Tile 变为「已登录」。不要记录 Cookie 值。
 3. 用 Safari 明确打开 `http://jwxt.swufe.edu.cn/`，确认 request 日志出现 `jwxt` 的 `rewrite` 且 WebVPN URL 使用 `/http/`；继续走教务主路径，观察是否按网关 bootstrap 规则升级到原生 WebVPN URL 空间。
