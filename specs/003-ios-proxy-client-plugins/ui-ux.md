@@ -1,6 +1,6 @@
 # 交互与 UI/UX 设计：Loon / Stash 插件
 
-> Status: Draft  
+> Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
 > Last Reviewed: 2026-09-24
@@ -36,7 +36,7 @@
 | 状态 | Title | Content | 点击行为 |
 | --- | --- | --- | --- |
 | `SETUP_REQUIRED` | SWUFE WebVPN | 需要配置 MitM | 打开说明页或 Override homepage |
-| `LOGGED_OUT` | SWUFE WebVPN | 未登录 · 点击登录 | `https://webvpn.swufe.edu.cn` |
+| `LOGGED_OUT` | SWUFE WebVPN | 未登录 · 打开网页登录 | `https://webvpn.swufe.edu.cn` |
 | `READY` | SWUFE WebVPN | 已登录 · 教务可用 | 打开 WebVPN 首页或状态说明 |
 | `EXPIRED` | SWUFE WebVPN | 登录已失效 · 点击重新登录 | WebVPN 首页 |
 | `ERROR` | SWUFE WebVPN | 配置错误 · 查看日志 | 项目故障排查页 |
@@ -59,7 +59,7 @@ Tile 不展示 Cookie 名、Cookie 值、WRD token、账户信息。
 ```text
 Stash Tile
     ↓ tap
-WebVPN 官方页面（优先 App 内）
+系统 Safari 中的 WebVPN 官方页面
     ↓
 CAS / SSO
     ↓
@@ -69,12 +69,12 @@ WebVPN
     ↓
 Session Capture
     ↓
-关闭网页登录页
+回到 Stash
     ↓
 Tile = 已登录
 ```
 
-**P0 假设**：Tile `url`/Override `openUrl` 的实际呈现容器必须真机确认。若它打开系统 Safari，流程不变，但产品文案改为“打开网页登录”。
+2026-09-24 真机：Tile `url` 打开系统 Safari。Tile 与说明文案使用「打开网页登录」，不称应用内登录。Safari 里的 gateway 请求仍能进入 Stash 脚本。
 
 ### 3.4 Tile 刷新
 
@@ -102,11 +102,11 @@ Gateway                 webvpn.swufe.edu.cn
 Loon 当前公开 Script API 提供通知 `openUrl`，但没有公开“脚本主动 present WebView”的 API。因此第一版 UX：
 
 - 安装后/会话失效时发送一次低频通知；
-- 通知内容：“SWUFE WebVPN 未登录，点击完成官方 CAS/MFA 登录”；
+- 通知内容：「SWUFE WebVPN 未登录，点击打开网页登录」；
 - `openUrl = https://webvpn.swufe.edu.cn`；
 - 插件 homepage 指向项目说明页，而不是伪登录页。
 
-若后续真机发现 Loon 插件页面存在可稳定承载 Web URL 的入口，可将它升级为主入口，但必须先验证。
+2026-09-24、Loon 3.5.1(998)：该通知打开系统 Safari。不把这条入口写成应用内网页。
 
 ### 4.3 通知节流
 

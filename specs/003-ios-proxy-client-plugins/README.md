@@ -1,6 +1,6 @@
 # SWUFE WebVPN iOS Proxy Client Plugins — 文档包
 
-> Status: Draft  
+> Status: Approved  
 > Spec ID: `003-ios-proxy-client-plugins`  
 > Owner: cherrchen  
 > Last Reviewed: 2026-09-24  
@@ -11,7 +11,7 @@
 ## 已确认的产品决策
 
 1. **不开发独立 iOS App**。移动端作为第三方代理客户端插件运行。
-2. **Loon 为第一实现，Stash 为第二适配器**；两者共享同一个 TypeScript/JavaScript 业务 Core。
+2. **Stash 为首发宿主，Loon 为第二适配器**；两者共享同一个 TypeScript/JavaScript 业务 Core。
 3. 移动端不复刻 desktop 的 mitmproxy、CA Manager、System Proxy、进程捕获；这些基础网络能力由 Loon / Stash 提供。
 4. CAS / SSO / MFA 始终使用学校官方网页，不存储学号、密码，不模拟登录协议。
 5. 插件只保存 WebVPN 会话所需的最小 Cookie 状态，并禁止 Cookie/正文进入日志。
@@ -19,7 +19,9 @@
 7. 默认仍采用 allowlist，`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 必须排除二次包装。
 8. Stash 首页 Tile 用作状态/登录入口；Loon 使用插件参数、通知/入口能力形成相近体验。
 9. HTTPS 解密仅作用于明确的 WebVPN/目标域名范围，不默认 MITM 整个互联网。
-10. **P0 实机门槛**：必须验证 Loon/Stash 的 URL 入口是否能以应用内网页呈现，以及该页面的 WebVPN 请求能否进入同一 HTTP Script/MitM 链路。公开文档没有把这一点作为插件 API 契约保证，因此不得在未实测前写成已确认事实。
+10. **P0 实机结论（2026-09-24）**：Loon 通知 `openUrl` 与 Stash Tile `url` 都打开系统 Safari，不在宿主内嵌网页。MitM 启用后，两个宿主的脚本都能看见 `webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn`，登录后的 gateway 请求里能看到会话 Cookie 名。登录文案使用「打开网页登录」。细节见 [verification.md](verification.md)。
+11. **安装与更新分发**：`.stoverride` / `.plugin` 及 bundled 脚本仅通过本仓库 **GitHub** 提供（Release 附件与/或 `raw.githubusercontent.com` 固定路径）；不引入第三方 CDN 或项目自建下载服务器。用户从仓库 README 的安装入口导入。
+12. **Spec 状态（2026-09-24）**：`Approved` = Gate A（P0）+ 文档评审通过；进入 M1 实现前须满足 **Gate B**（Python/JS 向量全绿）。见 [spec.md §Status](spec.md)。
 
 ## 文件导航
 
@@ -75,10 +77,10 @@ swufe-webvpn-codec/
 
 | ID | 问题 | 处理方式 | 是否阻塞 |
 | --- | --- | --- | --- |
-| OQ-001 | `openUrl`/Tile URL 在当前 Loon/Stash iOS 版本中是否稳定以应用内网页呈现 | P0 真机 PoC | 阻塞目标 UX，不阻塞 Core 开发 |
-| OQ-002 | 上述网页中的 WebVPN 请求是否进入同一 MitM/HTTP Script 链路 | P0 真机抓取 | 阻塞自动 Session Capture |
+| OQ-001 | `openUrl`/Tile URL 在当前 Loon/Stash iOS 版本中是否稳定以应用内网页呈现 | 已关闭：两边都打开系统 Safari。Loon 3.5.1(998)；Stash 版本未记录 | 不阻塞。文案改为打开网页登录 |
+| OQ-002 | 上述网页中的 WebVPN 请求是否进入同一 MitM/HTTP Script 链路 | 已关闭：Safari 中的 gateway 与 authserver 请求都能被对应宿主脚本看见 | 不阻塞自动 Session Capture |
 | OQ-003 | 实机 WebVPN 会话所需 Cookie 的最小集合与失效信号 | 不硬编码 Cookie 名；P0/集成测试确认 | 阻塞 Session 最小化收敛 |
 | OQ-004 | Loon 对目标域名 QUIC/HTTP3 的最佳局部禁用方式 | 真机网络测试；不得为了本插件全局关闭 UDP/443 | 不阻塞 Core |
 | OQ-005 | Stash/Loon 对大 HTML/JS 响应脚本的内存/超时上限 | 压测后设置 body size guard | 不阻塞首个 PoC |
 
-如 OQ-001 失败，产品降级为“点击后打开系统 Safari”；如 OQ-002 失败，则“纯插件自动捕获登录态”不可成立，需要重新评估是否接受手工 Session 导入或开发极小原生 Companion App。该降级不应被静默隐藏。
+OQ-001 的结果是系统 Safari，产品文案不得再称「应用内登录」。OQ-002 通过，Gate A 不改走 Companion App，也不把手工复制 Cookie 当默认流程。

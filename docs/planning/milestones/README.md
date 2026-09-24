@@ -30,7 +30,7 @@ docs/planning/milestones/<MILESTONE_ID>-<short-name>.md
 | M4 验收 | [M4-acceptance.md](M4-acceptance.md) | In Progress | [001-phase1-local-bridge](../../../specs/001-phase1-local-bridge/spec.md) | 两侧 P0 与教务浏览器验收已通过；`KI-014` 已接受，`KI-019` 保持 `Open`，现场证据定位到桥上游阶段，根因未定 |
 | M5 开源准备（可选） | [M5-open-source-preparation.md](M5-open-source-preparation.md) | Done（2026-09-23） | —（文档准备里程碑） | 用户/开发者 README、开源边界说明与后续 TUN 设计备忘完成；不含安装包或公开发行 |
 | M6 界面重构 | [M6-ui-rework.md](M6-ui-rework.md) | Done（2026-09-23） | [002-desktop-ui-multiwindow](../../../specs/002-desktop-ui-multiwindow/spec.md)（`Implemented`） | 渲染层迁移到 React + Ant Design 6 并固定为四窗口结构（主窗口 720×560 零滚动，捕获/日志/Allowlist 进非模态二级窗口）；可机器执行的验收全部通过，未验证项 = Windows 真机、真实会话下的教务页面操作、进程捕获真实范围 |
-| M7 iOS 代理插件 | [M7-ios-proxy-plugins.md](M7-ios-proxy-plugins.md) | Draft | [003-ios-proxy-client-plugins](../../../specs/003-ios-proxy-client-plugins/spec.md) | Loon/Stash 插件 + 共享 JS Core；Spec 003 文档已入库，P0 宿主能力与 Session Capture 待真机 |
+| M7 iOS 代理插件 | [M7-ios-proxy-plugins.md](M7-ios-proxy-plugins.md) | In Progress | [003-ios-proxy-client-plugins](../../../specs/003-ios-proxy-client-plugins/spec.md) | Stash/Loon 插件 + 共享 JS Core；Spec 003 `Approved`，P0 Gate A 已通过，M1 待启动 |
 
 > 阶段划分、依赖与 Spec 索引见 [roadmap.md](../roadmap.md)。M5 的完成范围仅为开源前文档准备，不代表发行物已完成。
 

@@ -1,6 +1,6 @@
 # 技术方案选型与架构设计：iOS Proxy Client Plugins
 
-> Status: Draft  
+> Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
 > Last Reviewed: 2026-09-24
@@ -9,7 +9,7 @@
 
 采用“共享 JS Core + Loon Adapter + Stash Adapter”的方案。不采用独立 iOS App，不复刻 Network Extension/TUN/MitM/证书管理。Loon/Stash 已提供 HTTP(S) 拦截、MitM 与脚本运行能力，插件只实现 SWUFE WebVPN 特有协议与状态逻辑。
 
-客户端顺序：Loon 第一实现；Stash 第二实现；两者只在配置语法、Host API、Tile/通知层有差异。
+客户端顺序：**Stash 首发宿主**；Loon 第二实现；两者只在配置语法、Host API、Tile/通知层有差异。
 
 ## 2. 系统上下文
 
@@ -154,7 +154,7 @@ sequenceDiagram
 
 插件不需要知道 CAS 内部账号/MFA 数据；只关心认证完成后的 gateway Session。
 
-**P0 风险**：公开脚本 API没有 JS `presentWebView()`。Stash Tile/Override 与 Loon notification 支持 URL 入口，但“是否 App 内呈现”和“该容器是否走同一脚本管线”必须真机确认。
+**P0 结论（2026-09-24）**：两个宿主都没有把登录 URL 留在应用内，通知和 Tile 打开的是系统 Safari。MitM 开启后，Safari 里的 `webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 仍进入各自 HTTP Script，登录完成后的 gateway 请求能看到会话 Cookie 名。因此保持插件方案，不改为 Companion App。不为此单开 ADR：Safari 是原方案已写明的降级，组件边界没有变。
 
 ## 9. Ordinary Request 数据流
 
@@ -208,7 +208,7 @@ Plugin JS
 Official WebVPN
 ```
 
-约束：Session 只存在本机宿主持久化；无项目云后端；无账号密码；日志 redact URL token/Cookie/body；只有 allowlist 进入 WRD rewrite；远程更新来自固定 HTTPS 地址。
+约束：Session 只存在本机宿主持久化；无项目云后端；无账号密码；日志 redact URL token/Cookie/body；只有 allowlist 进入 WRD rewrite；远程安装与脚本更新仅来自本仓库 **GitHub** HTTPS（Release 与/或 `raw.githubusercontent.com`，见 [prd.md §7 IOS-REQ-001/012](prd.md)）。
 
 ## 15. 兼容性
 

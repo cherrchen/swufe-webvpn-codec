@@ -16,6 +16,8 @@
 
 仓库：`https://github.com/cherrchen/swufe-webvpn-codec`
 
+**插件分发（产品决策，2026-09-24）**：`.stoverride`、`.plugin` 与 bundled 脚本仅通过上述 GitHub 仓库提供（GitHub Releases 与/或 `raw.githubusercontent.com` 固定路径）。见 [prd.md §7 IOS-REQ-001/012](prd.md)。
+
 ## 2. Loon 官方资料
 
 ### Plugin
@@ -128,4 +130,4 @@
 5. Loon 对本项目目标域名 QUIC 的最佳局部禁用/回退配置；
 6. 两个宿主对大响应 Body Script 的实际内存、超时与大小上限。
 
-这些事项统一由 `test-plan.md` 的 P0/真机测试关闭，不以猜测补全。
+1–4 已由 2026-09-24 真机关闭，结论见 [verification.md](verification.md)。5 与 6 仍待 M2/M4。

@@ -23,7 +23,8 @@ Status:           Phase 1 的 macOS 与 Windows 真机 P0 用例及教务浏览�
                   M6 界面重构（Spec 002）已交付并推进到 `Implemented`：渲染层为 React 19 + Ant Design 6
                   的四窗口结构（主窗口 720×560 严格零滚动，三类单实例非模态二级窗口）。Windows 真机
                   的真实会话教务操作与进程捕获范围已随 001 验证；002 其余未验证项见其 verification.md。
-                  Spec 003（iOS Loon/Stash 代理插件，非独立 App）文档已入库，状态 `Draft`，实现未启动。
+                  Spec 003（iOS Stash/Loon 代理插件，非独立 App）状态 `Approved`（Gate A + 文档评审，2026-09-24）；
+                  P0 宿主能力已真机验证；M1 Shared Core 与 GitHub 分发制品尚未交付。
 Primary language: Python 3（bridge sidecar/Addon、WRD codec，见 `bridges/python/swufe_bridge/`）+ TypeScript（Electron 应用，M2 起）；
                   文档（`docs/` + `specs/`）与 Node 文档检查脚本是主体
 Repository type:  Documentation-first（docs/ + specs/）+ 实现（Python 桥 `bridges/python/`、Electron 应用 `apps/desktop/`）

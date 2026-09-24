@@ -18,7 +18,7 @@
 | [M4 验收](milestones/M4-acceptance.md) | macOS + Windows 教务浏览器验收、缺陷收敛 | G-001 / G-002 / G-003 | TBD | In Progress（两侧既定 P0 与教务浏览器验收已通过；`KI-014` 已接受外部传输风险；`KI-019` 为 `Open`，现场证据定位到桥上游请求/响应阶段，根因未定） |
 | [M5 开源准备（可选）](milestones/M5-open-source-preparation.md) | 开源清理、用户/开发者 README、后续 TUN 设计备忘 | G-004 | TBD | Done（2026-09-23：文档准备完成；不含安装包或公开发行） |
 | [M6 界面重构](milestones/M6-ui-rework.md) | 渲染层迁移到 React + Ant Design 6（Vite 多入口），主窗口 720×560 零滚动，捕获/日志/Allowlist 进二级窗口 | G-002 / G-004 | TBD | Done（2026-09-23：实现与可机器执行的验收全部通过，Spec 002 为 `Implemented`；未验证项见 002 的 verification.md——其中 Windows 真机一项于同日随 001 的 `KI-001` 解除，其余仍受 002 自身条目约束） |
-| [M7 iOS 代理插件](milestones/M7-ios-proxy-plugins.md) | Loon / Stash 插件与共享 JS Core：P0 宿主能力 → M1 Core → M2 Loon → M3 Stash → M4 硬化/发布 | G-001 / G-002 / G-003 | TBD | Draft（Spec 003 文档已入库，实现未启动；见 [project-management.md](../../specs/003-ios-proxy-client-plugins/project-management.md)） |
+| [M7 iOS 代理插件](milestones/M7-ios-proxy-plugins.md) | Stash / Loon 插件与共享 JS Core：P0（已完成）→ M1 Core → M2 Stash → M3 Loon → M4 硬化/发布；GitHub 分发 | G-001 / G-002 / G-003 | TBD | In Progress（Spec 003 `Approved`，Gate A 已通过；M1 未启动；见 [project-management.md](../../specs/003-ios-proxy-client-plugins/project-management.md)） |
 
 > 时间段一律为 `TBD`：原包未定义日历时间（原包只给出里程碑顺序与依赖，未给日期）。里程碑的完成定义与退出条件见 [milestones/](milestones/README.md)。M5 的完成范围是开源前文档准备，不代表发布发行物。
 
@@ -30,7 +30,7 @@
 | ---- | ---- | -------- | ---- | ------ | ---- |
 | 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | M1–M4 | Implemented（两侧真机验收已通过；`KI-014` 为 `Accepted`，`KI-019` 为 `Open`，根因未定） | [spec.md](../../specs/001-phase1-local-bridge/spec.md) |
 | 002-desktop-ui-multiwindow | 桌面界面重构（React + Ant Design 多窗口） | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012、NFR-003 / NFR-005 / NFR-007 | M6 | Implemented（2026-09-23：四窗口渲染层、主窗口零滚动、Main 侧日志环形缓冲；可机器执行的验收全部通过，`Verified` 受 002 的未验证项约束——其中 Windows 真机一项随 001 的 `KI-001` 于同日解除） | [spec.md](../../specs/002-desktop-ui-multiwindow/spec.md) |
-| 003-ios-proxy-client-plugins | iOS 代理客户端插件（Loon / Stash） | `IOS-REQ-*`（草案）+ 语义对齐 REQ-002 / REQ-005 / REQ-006 / REQ-007、NFR-002 / NFR-003 | M7 | Draft（文档已入库；P0 宿主能力与 Session Capture 待真机，见 003 verification.md） | [spec.md](../../specs/003-ios-proxy-client-plugins/spec.md) |
+| 003-ios-proxy-client-plugins | iOS 代理客户端插件（Stash / Loon） | `IOS-REQ-*`（草案）+ 语义对齐 REQ-002 / REQ-005 / REQ-006 / REQ-007、NFR-002 / NFR-003 | M7 | Approved（Gate A 已通过；Stash 首发；见 [spec.md §Status](../../specs/003-ios-proxy-client-plugins/spec.md)） | [spec.md](../../specs/003-ios-proxy-client-plugins/spec.md) |
 
 > Phase 1 归属一个 Spec；建立后续 Spec 时按 [specs/README.md](../../specs/README.md) 再补一行。REQ/NFR 的规范定义在 [requirements/](../requirements/README.md)，本表只引用 ID。
 

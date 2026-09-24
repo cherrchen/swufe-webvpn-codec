@@ -1,6 +1,6 @@
 # 项目管理：iOS Proxy Client Plugins
 
-> Status: Draft  
+> Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
 > Last Reviewed: 2026-09-24
@@ -10,26 +10,26 @@
 先验证最不确定、最影响产品形态的“宿主内网页登录与 Session Capture”，再扩展协议和双客户端支持。不要先投入大量 UI/重写代码，最后才发现登录流量不经过插件。
 
 ```text
-P0 Host capability PoC → M1 Shared Core → M2 Loon → M3 Stash → M4 E2E/Security/Release
+P0 Host capability PoC → M1 Shared Core → M2 Stash → M3 Loon → M4 E2E/Security/Release
 ```
 
 ## 2. Phase P0 — 宿主能力验证
 
 目标：明确 URL 呈现方式、网页流量是否经过同一 Script、CAS/MFA 跨域链路、gateway Cookie 是否可观察。
 
-退出：OQ-001/OQ-002 两宿主均有实机结论；至少一个宿主能 Session Capture，或项目明确改路线。
+退出：OQ-001/OQ-002 两宿主均有实机结论；至少一个宿主能 Session Capture，或项目明确改路线。2026-09-24 已满足：Safari 呈现，脚本可观察 gateway。
 
 ## 3. M1 — Shared Core
 
 新建 `packages/webvpn-core-js`；codec/routing/session/rewrite；Python/JS vectors；safe diagnostics。退出：L0/L1 全绿、无 Host API 泄漏、无真实敏感测试数据。
 
-## 4. M2 — Loon Adapter
+## 4. M2 — Stash Adapter（首发宿主）
 
-`.plugin`、request/response bundle、persistent store、login-required notification、MitM/Rule、E2E jwxt。退出：Loon 主路径、disable/update 冒烟通过。
+`.stoverride`、request/response、Tile、HTTP Engine/MitM、HTTP/3 处理、E2E jwxt；制品与脚本经本仓库 **GitHub**（Release 或 `raw.githubusercontent.com`）分发。退出：Stash 主路径通过或宿主限制明确记录。
 
-## 5. M3 — Stash Adapter
+## 5. M3 — Loon Adapter
 
-`.stoverride`、request/response、Tile、HTTP Engine/MitM、HTTP/3 处理、E2E jwxt。退出：Stash 主路径通过或宿主限制明确记录。
+`.plugin`、request/response bundle、persistent store、login-required notification、MitM/Rule、QUIC 路径、E2E jwxt；远程安装 URL 同样托管在 GitHub。退出：Loon 主路径、disable/update 冒烟通过。
 
 ## 6. M4 — Hardening & Release
 
@@ -37,7 +37,7 @@ body 压测、Session 过期、安全审计、文档、安装链接、rollback�
 
 ## 7. 工作流
 
-建议分支：`feat/ios-proxy-client-plugins`、`feat/ios-plugin-core`、`feat/ios-plugin-loon`、`feat/ios-plugin-stash`。Core API 变更必须更新两 Adapter contract；协议语义变更必须有 Python parity；Session 逻辑变更必须跑 security tests。
+建议分支：`feat/ios-proxy-client-plugins`、`feat/ios-plugin-core`、`feat/ios-plugin-stash`、`feat/ios-plugin-loon`（实现顺序与 M2/M3 一致）。Core API 变更必须更新两 Adapter contract；协议语义变更必须有 Python parity；Session 逻辑变更必须跑 security tests。
 
 ## 8. CI
 
@@ -64,6 +64,8 @@ body 压测、Session 过期、安全审计、文档、安装链接、rollback�
 ### Gate A — P0 Login
 
 若两个宿主都无法让登录后的 gateway request 被脚本观察，暂停产品化投入，评估外部 Safari 是否仍可观察、手工 Session 是否可接受、极小 Companion App 是否值得。不得偷偷把“手工复制 Cookie”当默认流程。
+
+2026-09-24：两个宿主的 URL 都打开系统 Safari，但登录后的 gateway 请求仍被各自脚本看见。Gate A 通过，继续共享 Core。登录文案改为「打开网页登录」。
 
 ### Gate B — Core Parity
 

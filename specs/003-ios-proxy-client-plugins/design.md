@@ -1,7 +1,7 @@
 # Technical Design: iOS Proxy Client Plugins
 
 > Spec ID: 003  
-> Status: Draft  
+> Status: Approved  
 > Owner: cherrchen  
 > Last Updated: 2026-09-24
 
@@ -18,7 +18,7 @@ Desktop 当前由 Electron + mitmproxy + Python `WrdCodec` 实现。Loon/Stash �
 
 ## Proposed Solution
 
-新增共享 `packages/webvpn-core-js`，Loon/Stash 只实现 Host Adapter 与各自配置制品。Loon 为第一实现，Stash 为第二实现；WRD 行为由现有 Python 实现与共享测试向量约束。
+新增共享 `packages/webvpn-core-js`，Loon/Stash 只实现 Host Adapter 与各自配置制品。**Stash 为首发宿主**，Loon 为第二实现；制品与脚本经 GitHub 分发。WRD 行为由现有 Python 实现与共享测试向量约束。
 
 ## Architecture Impact
 

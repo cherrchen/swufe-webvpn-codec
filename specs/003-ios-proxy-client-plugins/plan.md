@@ -1,13 +1,13 @@
 # Implementation Plan: iOS Proxy Client Plugins
 
 > Spec ID: 003  
-> Status: Draft  
+> Status: Approved  
 > Owner: cherrchen  
 > Last Updated: 2026-09-24
 
 ## Strategy
 
-先验证最不确定的宿主登录能力，再做共享 Core，然后按 Loon → Stash 顺序实现，最后完成安全、性能、发布与长期文档同步。详细项目管理见 [project-management.md](project-management.md)。
+先验证最不确定的宿主登录能力，再做共享 Core，然后按 **Stash → Loon** 顺序实现（Stash 首发宿主），最后完成安全、性能、GitHub 发布与长期文档同步。详细项目管理见 [project-management.md](project-management.md)。
 
 ## Phases
 
@@ -16,6 +16,7 @@
 - 目标：验证 URL 呈现、CAS/MFA、Script 可观察性与 Session Capture。
 - 交付物：Loon/Stash 最小 PoC + 真机证据。
 - 退出条件：Q-001/Q-002 对两个宿主都有明确结论；至少一个宿主能自动捕获 Session，或路线重新决策。
+- 2026-09-24 已退出：两边 URL 都打开系统 Safari；两边脚本都能看见登录后的 gateway 请求。继续 M1，不改 Companion App。
 
 ### Phase M1 — Shared Core
 
@@ -23,19 +24,19 @@
 - 交付物：codec/routing/session/request/response/safe diagnostics。
 - 退出条件：L0/L1 全绿且无 Host API 泄漏。
 
-### Phase M2 — Loon
-
-- 目标：Loon Adapter、`.plugin`、bundle、Session 通知、E2E。
-- 退出条件：Loon 主路径与禁用/更新冒烟通过。
-
-### Phase M3 — Stash
+### Phase M2 — Stash（首发宿主）
 
 - 目标：Stash Adapter、`.stoverride`、Tile、HTTP/3 fallback、E2E。
 - 退出条件：Stash 主路径通过，或宿主限制已明确记入产品范围。
 
+### Phase M3 — Loon
+
+- 目标：Loon Adapter、`.plugin`、bundle、Session 通知、QUIC 路径、E2E。
+- 退出条件：Loon 主路径与禁用/更新冒烟通过。
+
 ### Phase M4 — Hardening & Release
 
-- 目标：body 压测、会话过期、安全审计、文档、安装链接、rollback。
+- 目标：body 压测、会话过期、安全审计、文档、GitHub 安装链接、rollback。
 - 退出条件：`verification.md` 中 Must 项无 Pending。
 
 ## Dependencies

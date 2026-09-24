@@ -1,6 +1,6 @@
 # 测试用例：iOS Proxy Client Plugins
 
-> Status: Draft  
+> Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
 > Last Reviewed: 2026-09-24

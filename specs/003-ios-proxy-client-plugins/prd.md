@@ -1,6 +1,6 @@
 # PRD：iOS 代理客户端插件
 
-> Status: Draft  
+> Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
 > Last Reviewed: 2026-09-24  
@@ -38,7 +38,7 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 | --- | --- | --- |
 | G-IOS-001 | 不开发独立 iOS App 即实现 WebVPN bridge 主路径 | Loon 或 Stash 至少一个客户端完成真实设备端到端验收 |
 | G-IOS-002 | 复用 desktop 的协议语义 | Python 与 JS WRD codec 对同一测试向量结果一致 |
-| G-IOS-003 | 登录体验尽量留在代理 App 内 | 若客户端 URL 入口支持应用内网页，则 CAS/MFA 全程在该页面完成 |
+| G-IOS-003 | 登录使用官方网页，并如实描述打开位置 | 2026-09-24 真机：Loon 通知与 Stash Tile 都打开系统 Safari。文案写「打开网页登录」，不称应用内登录 |
 | G-IOS-004 | 不收集学校密码 | 插件代码、存储和日志均不存在用户名/密码保存路径 |
 | G-IOS-005 | 两客户端共享业务逻辑 | Loon/Stash 仅包含薄 Adapter，核心 codec/routing/rewrite/session 由共享包提供 |
 | G-IOS-006 | 安全范围最小化 | 仅对 gateway + allowlist 所需域名启用 MitM/改写，不默认解密普通互联网流量 |
@@ -53,13 +53,13 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 | NG-IOS-004 | 兼容所有证书 pinning App | MitM 架构天然不保证 pinning 客户端 |
 | NG-IOS-005 | 默认代理/解密全部 `*.swufe.edu.cn` | 遵循最小范围；通配必须显式打开 |
 | NG-IOS-006 | 在插件内实现完整浏览器 UI | 第三方脚本没有稳定的原生 WebView API；只使用客户端已有 URL 入口 |
-| NG-IOS-007 | 首期支持 Surge/Quantumult X/Shadowrocket | 先完成 Loon 与 Stash，之后再评估 Adapter 扩展 |
+| NG-IOS-007 | 首期支持 Surge/Quantumult X/Shadowrocket | 先完成 Stash 与 Loon，之后再评估 Adapter 扩展 |
 
 ## 6. 核心用户旅程
 
 ### 6.1 首次安装
 
-1. 用户从仓库 README 点击 Loon 或 Stash 的安装入口。
+1. 用户从本仓库 GitHub README 点击 Stash 或 Loon 的安装入口（远程 `.stoverride` / `.plugin` URL 指向 GitHub）。
 2. 客户端导入插件/Override。
 3. 用户按客户端原生流程安装并信任 MitM CA。
 4. 插件显示“未登录”状态，并提供“登录 SWUFE WebVPN”入口。
@@ -88,16 +88,17 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 
 ### IOS-REQ-001 插件安装与启用
 
+- Stash 应提供可远程安装的 `.stoverride`，并支持标准一键导入 URL（**首发宿主**）。
 - Loon 应提供可远程安装的 `.plugin`。
-- Stash 应提供可远程安装的 `.stoverride`，并支持标准一键导入 URL。
+- 远程安装 URL 与 bundled 脚本仅托管在本仓库 **GitHub**（GitHub Releases 附件与/或 `raw.githubusercontent.com` 上固定路径）；不使用第三方 CDN 或项目自建下载服务。
 - 安装制品中不得包含用户凭据。
 - 插件更新不得覆盖用户的 Session 数据，除非发生显式不兼容的数据迁移。
 
 ### IOS-REQ-002 登录入口与状态
 
 - 未登录时必须有明确入口打开 WebVPN 官方首页。
-- 若客户端在 App 内呈现 URL，则必须允许 WebVPN → CAS → MFA → WebVPN 的跨域重定向自然进行。
-- 若实际行为跳到系统 Safari，应正常工作，但 UI/文档必须如实描述该降级。
+- 2026-09-24 真机中，Loon 与 Stash 的登录 URL 都打开系统 Safari。入口文案必须写「打开网页登录」。
+- WebVPN → CAS → MFA → WebVPN 的跳转由官方页面完成。P0 中这些请求在 MitM 开启后进入对应宿主脚本。
 - 不得在自建 HTML 中伪造学校登录表单。
 
 ### IOS-REQ-003 WebVPN Session Capture
@@ -177,9 +178,9 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 
 ### IOS-REQ-012 更新与回滚
 
-- 远程脚本应带版本标识。
+- 远程脚本应带版本标识；发布物通过 GitHub Release（推荐）或带标签的 raw 路径提供，便于用户与客户端回滚到上一版本。
 - Core 数据模型必须支持 schema version。
-- 更新失败时用户可退回上一发布版本，不应破坏 desktop。
+- 更新失败时用户可退回上一 GitHub 发布版本，不应破坏 desktop。
 - Loon 与 Stash 发布可独立回滚。
 
 ## 8. 非功能需求
@@ -218,4 +219,4 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 - [ ] AC-IOS-007：日志、持久化存储中不存在用户名、密码、MFA、完整 Cookie 明文输出到调试界面/日志。
 - [ ] AC-IOS-008：Stash 与 Loon 各自至少通过安装/启用/禁用/更新/卸载冒烟测试。
 - [ ] AC-IOS-009：desktop 原有测试不受影响。
-- [ ] AC-IOS-010：OQ-001/OQ-002 的 P0 实机结论已记录；若失败，PRD 和 UI/UX 已按真实降级行为更新。
+- [x] AC-IOS-010：OQ-001/OQ-002 的 P0 实机结论已记录；Safari 降级已写入 PRD 与 UI/UX。
