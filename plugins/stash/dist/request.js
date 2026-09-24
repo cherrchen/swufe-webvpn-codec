@@ -1,4 +1,4 @@
-/* swufe-webvpn stash a530908 */
+/* swufe-webvpn stash 093e52b */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1374,15 +1374,46 @@
     }
   }
 
+  // src/script-trace.ts
+  function traceThrew(script, requestUrl2, error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    writeTrace({
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      host: hostnameOf(requestUrl2),
+      direction: "system",
+      action: "error",
+      code: "script-threw",
+      detail: `${script} ${message}`
+    });
+  }
+  function writeTrace(record) {
+    const safe = safeDiagnostic(record, false);
+    if (safe) console.log(safe);
+  }
+  function hostnameOf(requestUrl2) {
+    if (!requestUrl2) return null;
+    try {
+      return new URL(requestUrl2).hostname;
+    } catch {
+      return null;
+    }
+  }
+
   // src/request-entry.ts
-  handleStashRequest(bindRuntime());
+  var requestUrl = typeof $request === "undefined" ? void 0 : $request?.url;
+  try {
+    handleStashRequest(bindRuntime());
+  } catch (error) {
+    traceThrew("swufe-webvpn-request", requestUrl, error);
+    $done({});
+  }
   function bindRuntime() {
     return {
       nowIso: (/* @__PURE__ */ new Date()).toISOString(),
       request: typeof $request === "undefined" ? void 0 : $request,
       read: (key) => $persistentStore.read(key) || null,
       write: (key, value) => {
-        $persistentStore.write(key, value ?? "");
+        $persistentStore.write(value ?? "", key);
         return true;
       },
       notify: (input) => {

@@ -290,6 +290,22 @@ describe("IOS-TC-F diagnostics", () => {
     ).toBeNull();
   });
 
+  it("F01 system entered is kept when debug is off and query is redacted", () => {
+    const record = safeDiagnostic(
+      {
+        ts: NOW,
+        host: "webvpn.swufe.edu.cn",
+        direction: "system",
+        action: "entered",
+        detail: "swufe-webvpn-request https://webvpn.swufe.edu.cn/login?ticket=abc",
+      },
+      false,
+    );
+    expect(record?.action).toBe("entered");
+    expect(record?.detail).toBe("swufe-webvpn-request https://webvpn.swufe.edu.cn/login?ticket=[redacted]");
+    expect(diagnosticContainsSensitive(record)).toBe(false);
+  });
+
   it("F02 debug on redacts cookie, body, and token", () => {
     const record = safeDiagnostic(
       {

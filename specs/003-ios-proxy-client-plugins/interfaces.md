@@ -189,7 +189,7 @@ export interface SafeDiagnosticRecord {
   ts: string
   host: string | null
   direction: "request" | "response" | "system"
-  action: "pass" | "rewrite" | "session-captured" | "session-expired" | "body-skipped" | "error"
+  action: "pass" | "rewrite" | "session-captured" | "session-expired" | "body-skipped" | "error" | "entered"
   code?: string
   detail?: string
 }

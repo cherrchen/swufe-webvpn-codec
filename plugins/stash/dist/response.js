@@ -1,4 +1,4 @@
-/* swufe-webvpn stash a530908 */
+/* swufe-webvpn stash 093e52b */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1342,10 +1342,10 @@
       body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : void 0
     });
   }
-  function deriveRewriteContext(requestUrl, gatewayBase, key, iv) {
+  function deriveRewriteContext(requestUrl2, gatewayBase, key, iv) {
     let url;
     try {
-      url = new URL(requestUrl);
+      url = new URL(requestUrl2);
     } catch {
       return null;
     }
@@ -1356,9 +1356,9 @@
     const path = url.pathname;
     if (path.startsWith("/wengine-vpn/") || path.startsWith("/authserver/")) {
       return {
-        originalUrl: requestUrl,
+        originalUrl: requestUrl2,
         originalHost: gateway,
-        wrdUrl: requestUrl,
+        wrdUrl: requestUrl2,
         wrdPrefix: "",
         gatewayOwned: true
       };
@@ -1369,13 +1369,13 @@
     }
     try {
       const codec = new WrdCodec(key, iv, gateway);
-      const originalUrl = codec.decodeUrl(requestUrl);
+      const originalUrl = codec.decodeUrl(requestUrl2);
       const originalHost = new URL(originalUrl).hostname;
       return {
         originalUrl,
         originalHost,
-        wrdUrl: requestUrl,
-        wrdPrefix: wrdPrefixOf(requestUrl),
+        wrdUrl: requestUrl2,
+        wrdPrefix: wrdPrefixOf(requestUrl2),
         gatewayOwned: false
       };
     } catch {
@@ -1426,40 +1426,74 @@
     }
   }
 
+  // src/script-trace.ts
+  function traceThrew(script, requestUrl2, error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    writeTrace({
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      host: hostnameOf(requestUrl2),
+      direction: "system",
+      action: "error",
+      code: "script-threw",
+      detail: `${script} ${message}`
+    });
+  }
+  function writeTrace(record) {
+    const safe = safeDiagnostic(record, false);
+    if (safe) console.log(safe);
+  }
+  function hostnameOf(requestUrl2) {
+    if (!requestUrl2) return null;
+    try {
+      return new URL(requestUrl2).hostname;
+    } catch {
+      return null;
+    }
+  }
+
   // src/response-entry.ts
-  handleStashResponse({
-    nowIso: (/* @__PURE__ */ new Date()).toISOString(),
-    request: typeof $request === "undefined" ? void 0 : $request,
-    response: typeof $response === "undefined" ? void 0 : $response,
-    read: (key) => $persistentStore.read(key) || null,
-    write: (key, value) => {
-      $persistentStore.write(key, value ?? "");
-      return true;
-    },
-    notify: (input) => {
-      $notification.post(input.title, "", input.body, input.openUrl ? { url: input.openUrl } : void 0);
-    },
-    debug: (record) => {
-      console.log(JSON.stringify(record));
-    },
-    finishRequest: () => $done({}),
-    finishResponse: (result) => {
-      if (result.status === void 0 && result.headers === void 0 && result.body === void 0) {
-        $done({});
-        return;
-      }
-      $done({
-        status: result.status,
-        headers: result.headers,
-        body: typeof result.body === "string" ? result.body : result.body ? bytesToString(result.body) : ""
-      });
-    },
-    env: () => ({
-      host: "stash",
-      version: $environment?.version ?? "",
-      platform: $environment?.system === "macOS" ? "macos" : "ios"
-    })
-  });
+  var requestUrl = typeof $request === "undefined" ? void 0 : $request?.url;
+  try {
+    handleStashResponse(bindResponseRuntime());
+  } catch (error) {
+    traceThrew("swufe-webvpn-response", requestUrl, error);
+    $done({});
+  }
+  function bindResponseRuntime() {
+    return {
+      nowIso: (/* @__PURE__ */ new Date()).toISOString(),
+      request: typeof $request === "undefined" ? void 0 : $request,
+      response: typeof $response === "undefined" ? void 0 : $response,
+      read: (key) => $persistentStore.read(key) || null,
+      write: (key, value) => {
+        $persistentStore.write(value ?? "", key);
+        return true;
+      },
+      notify: (input) => {
+        $notification.post(input.title, "", input.body, input.openUrl ? { url: input.openUrl } : void 0);
+      },
+      debug: (record) => {
+        console.log(JSON.stringify(record));
+      },
+      finishRequest: () => $done({}),
+      finishResponse: (result) => {
+        if (result.status === void 0 && result.headers === void 0 && result.body === void 0) {
+          $done({});
+          return;
+        }
+        $done({
+          status: result.status,
+          headers: result.headers,
+          body: typeof result.body === "string" ? result.body : result.body ? bytesToString(result.body) : ""
+        });
+      },
+      env: () => ({
+        host: "stash",
+        version: $environment?.version ?? "",
+        platform: $environment?.system === "macOS" ? "macos" : "ios"
+      })
+    };
+  }
   function bytesToString(body) {
     return new TextDecoder().decode(body);
   }

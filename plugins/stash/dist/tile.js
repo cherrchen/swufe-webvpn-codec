@@ -1,4 +1,4 @@
-/* swufe-webvpn stash a530908 */
+/* swufe-webvpn stash 093e52b */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -635,6 +635,33 @@
   var SLASH = String.raw`(?:\\?/)`;
   var REST = String.raw`(?:\\/|[^\s"'<>\\])*`;
 
+  // ../../packages/webvpn-core-js/src/runtime/diagnostics.ts
+  var FORBIDDEN = ["cookie", "authorization", "password", "body", "token", "set-cookie"];
+  var REDACTED = "[redacted]";
+  function safeDiagnostic(record, debug) {
+    if (!debug && record.direction !== "system") {
+      return null;
+    }
+    const detail = record.detail ? redactText(record.detail) : void 0;
+    return {
+      ts: record.ts,
+      host: record.host,
+      direction: record.direction,
+      action: record.action,
+      ...record.code ? { code: record.code } : {},
+      ...detail ? { detail } : {}
+    };
+  }
+  function redactText(value) {
+    let text = value.replace(/[0-9a-fA-F]{32,}/g, REDACTED);
+    text = text.replace(/([?&][^=\s]+=)[^&\s]*/g, `$1${REDACTED}`);
+    for (const word of FORBIDDEN) {
+      const pattern = new RegExp(`(${word}\\s*[:=]\\s*)([^\\s,;]+)`, "gi");
+      text = text.replace(pattern, `$1${REDACTED}`);
+    }
+    return text;
+  }
+
   // ../../packages/webvpn-core-js/src/runtime/settings.ts
   function stashTile(input) {
     let content = "\u672A\u767B\u5F55 \xB7 \u6253\u5F00\u7F51\u9875\u767B\u5F55";
@@ -658,12 +685,12 @@
     const raw = runtime.read(STORAGE_KEYS.session);
     const parsed = raw ? parseSession(raw) : null;
     const last = readLastError(runtime);
-    const tile2 = stashTile({
+    const tile = stashTile({
       sessionReady: parsed?.kind === "ok",
       expired: last === "SESSION_EXPIRED",
       incompatible: parsed?.kind === "incompatible"
     });
-    return tile2;
+    return tile;
   }
   function readLastError(runtime) {
     const raw = runtime.read(STORAGE_KEYS.lastError);
@@ -676,16 +703,49 @@
     }
   }
 
+  // src/script-trace.ts
+  function traceThrew(script, requestUrl, error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    writeTrace({
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      host: hostnameOf(requestUrl),
+      direction: "system",
+      action: "error",
+      code: "script-threw",
+      detail: `${script} ${message}`
+    });
+  }
+  function writeTrace(record) {
+    const safe = safeDiagnostic(record, false);
+    if (safe) console.log(safe);
+  }
+  function hostnameOf(requestUrl) {
+    if (!requestUrl) return null;
+    try {
+      return new URL(requestUrl).hostname;
+    } catch {
+      return null;
+    }
+  }
+
   // src/tile-entry.ts
-  var tile = handleStashTile({
-    nowIso: (/* @__PURE__ */ new Date()).toISOString(),
-    read: (key) => $persistentStore.read(key) || null,
-    write: () => true,
-    notify: () => void 0,
-    debug: () => void 0,
-    finishRequest: () => void 0,
-    finishResponse: () => void 0,
-    env: () => ({ host: "stash", version: "", platform: "ios" })
-  });
-  $done({ title: tile.title, content: tile.content, url: tile.url, icon: tile.icon });
+  try {
+    const tile = handleStashTile(bindTileRuntime());
+    $done({ title: tile.title, content: tile.content, url: tile.url, icon: tile.icon });
+  } catch (error) {
+    traceThrew("swufe-webvpn-tile", void 0, error);
+    $done({ title: "SWUFE WebVPN", content: "\u811A\u672C\u5F02\u5E38", url: "https://webvpn.swufe.edu.cn" });
+  }
+  function bindTileRuntime() {
+    return {
+      nowIso: (/* @__PURE__ */ new Date()).toISOString(),
+      read: (key) => $persistentStore.read(key) || null,
+      write: () => true,
+      notify: () => void 0,
+      debug: () => void 0,
+      finishRequest: () => void 0,
+      finishResponse: () => void 0,
+      env: () => ({ host: "stash", version: "", platform: "ios" })
+    };
+  }
 })();

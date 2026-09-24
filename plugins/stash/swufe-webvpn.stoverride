@@ -30,17 +30,14 @@ script-providers:
     interval: 86400
 
 # HTTP/3 does not enter the Stash HTTP Engine. Reject QUIC only for these hosts
-# so clients fall back to TCP. Device confirmation is still required (IOS-TC-H09).
+# so clients fall back to TCP. Do not also list :443 under force-http-engine:
+# that kept HTTPS out of the HTTP script and Safari failed the TLS handshake.
 rules:
   - AND,((DOMAIN,jwxt.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
   - AND,((DOMAIN,webvpn.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
   - AND,((DOMAIN,authserver.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
 
 http:
-  force-http-engine:
-    - jwxt.swufe.edu.cn:443
-    - webvpn.swufe.edu.cn:443
-    - authserver.swufe.edu.cn:443
   mitm:
     - jwxt.swufe.edu.cn:443
     - webvpn.swufe.edu.cn:443
