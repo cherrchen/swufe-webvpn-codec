@@ -49,7 +49,7 @@ pnpm start --user-data-dir=/tmp/swufe-dev         # 使用隔离 profile
 | `SWUFE_USER_DATA_DIR` | 等价于 `--user-data-dir <dir>` |
 | `SWUFE_REPO_ROOT` | 覆盖仓库根路径（默认取应用目录上两级，即仓库根） |
 | `SWUFE_PYTHON` | 指定运行 sidecar / CA 生成入口的解释器（默认 `<repo>/bridges/python/.venv/bin/python`，缺失时回退 `uv run --project <repo>/bridges/python python`） |
-| `SWUFE_PROBE_INTERVAL_MS` | 会话过期探测间隔（默认 30000ms；验收时可调小，如 8000） |
+| `SWUFE_PROBE_INTERVAL_MS` | 已停用。会话是否仍有效由票据过期时间决定，不再定时探测门户 |
 | `SWUFE_RENDERER_URL` | 渲染层加载来源：设置后 Main 改为 `loadURL('<url>/<entry>.html')` 并使用开发期 CSP（默认加载静态产物 `apps/desktop/dist/renderer/*.html`）。只影响渲染层加载路径，不影响桥、sidecar 与系统代理 |
 
 ### 3.1 渲染层开发（HMR，M6 起）

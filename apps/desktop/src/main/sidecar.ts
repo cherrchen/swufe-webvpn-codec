@@ -21,6 +21,7 @@ export type SidecarEvent =
   | { kind: 'error'; code: string; message: string }
   | { kind: 'debug'; event: DebugLogEvent }
   | { kind: 'capture'; report: CaptureReport }
+  | { kind: 'session-expired' }
 
 export interface Sidecar {
   start(): Promise<void>
@@ -28,6 +29,7 @@ export interface Sidecar {
   onExit(cb: (code: number | null, signal: string | null) => void): void
   onDebug(cb: (event: DebugLogEvent) => void): void
   onCapture(cb: (report: CaptureReport) => void): void
+  onSessionExpired(cb: () => void): void
 }
 
 export interface SidecarOptions {
@@ -97,6 +99,7 @@ export function parseSidecarLine(line: string): SidecarEvent | null {
       return null
     }
   }
+  if (text === 'swufe-session expired') return { kind: 'session-expired' }
   if (text.startsWith('swufe-capture ')) {
     try {
       const payload = JSON.parse(text.slice('swufe-capture '.length)) as unknown
@@ -170,6 +173,7 @@ export class SidecarProcess implements Sidecar {
   private readonly exitListeners: Array<(code: number | null, signal: string | null) => void> = []
   private readonly debugListeners: Array<(event: DebugLogEvent) => void> = []
   private readonly captureListeners: Array<(report: CaptureReport) => void> = []
+  private readonly sessionExpiredListeners: Array<() => void> = []
 
   constructor(private readonly options: SidecarOptions) {}
 
@@ -183,6 +187,10 @@ export class SidecarProcess implements Sidecar {
 
   onCapture(cb: (report: CaptureReport) => void): void {
     this.captureListeners.push(cb)
+  }
+
+  onSessionExpired(cb: () => void): void {
+    this.sessionExpiredListeners.push(cb)
   }
 
   async start(): Promise<void> {
@@ -217,6 +225,10 @@ export class SidecarProcess implements Sidecar {
       if (event.kind === 'capture') {
         // Capture never gates readiness: the first enable may wait for an OS prompt.
         for (const listener of this.captureListeners) listener(event.report)
+        return
+      }
+      if (event.kind === 'session-expired') {
+        for (const listener of this.sessionExpiredListeners) listener()
         return
       }
       if (event.kind === 'error') {

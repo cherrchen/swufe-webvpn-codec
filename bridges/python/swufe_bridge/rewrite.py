@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from typing import Protocol
+from urllib.parse import urlsplit
 
 from swufe_bridge.wrd_codec import WrdCodec, WrdCodecError
 
@@ -27,6 +28,9 @@ GATEWAY_BOOTSTRAP_MARKERS: tuple[str, str] = ("__vpn_", "/wengine-vpn/js/main.js
 # specs/001-phase1-local-bridge/verification.md). Real site pages carry the same
 # injection on top of tens of kilobytes, so size separates the two.
 GATEWAY_BOOTSTRAP_MAX_BYTES = 8192
+
+# Session ticket. Auxiliary cookies such as show_faq are not a lifetime.
+TICKET_COOKIE_NAME = "wengine_vpn_ticketwebvpn_swufe_edu_cn"
 
 _SCHEME_TOKEN = r"https?(?:-\d+)?"
 _HOST_TOKEN = r"[0-9a-fA-F]{34,}"
@@ -182,3 +186,46 @@ def rewrite_body_text(text: str, codec: WrdCodec, webvpn_host: str) -> tuple[str
         return decoded
 
     return pattern.sub(_replace, text), replacements
+
+
+def ticket_revoked(
+    status: int, location: str | None, set_cookie: str | None, webvpn_host: str
+) -> bool:
+    """A rewritten response shows the ticket is gone: login redirect or a cleared ticket.
+
+    This reads traffic that already happened. It does not send a probe.
+    """
+    if set_cookie and _ticket_set_cookie_clears(set_cookie):
+        return True
+    if status < 300 or status >= 400 or not location:
+        return False
+    try:
+        target = urlsplit(location)
+    except ValueError:
+        return False
+    host = (target.hostname or "").lower()
+    return host == webvpn_host.lower() and (target.path or "").startswith("/login")
+
+
+def _ticket_set_cookie_clears(raw: str) -> bool:
+    for line in raw.split("\n"):
+        parts = [part.strip() for part in line.split(";") if part.strip()]
+        if not parts or "=" not in parts[0]:
+            continue
+        name, value = parts[0].split("=", 1)
+        if name.strip() != TICKET_COOKIE_NAME:
+            continue
+        if not value.strip():
+            return True
+        for attr in parts[1:]:
+            if "=" not in attr:
+                continue
+            key, attr_value = attr.split("=", 1)
+            if key.strip().lower() != "max-age":
+                continue
+            try:
+                if int(attr_value.strip()) <= 0:
+                    return True
+            except ValueError:
+                return True
+    return False

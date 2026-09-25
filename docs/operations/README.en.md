@@ -40,7 +40,7 @@
   - `<userData>/mitmproxy/`: the MITM CA confdir (private key `0600`), which is also the sidecar's `--confdir`.
   - `<userData>/Partitions/swufe-login/`: the login session (Electron persistent partition; no `session.bin` is written); cookie location and encryption are in section 4 of [security/README.md](../security/README.md).
 - **Configuration sources and precedence**: the persistent file is the single source; build-time defaults only fill missing keys or the first start; `settings.bridgePort` and `settings.webvpnBase` are read and pushed when the bridge starts, and the runtime marker `systemProxyManagedByApp` is written by the Proxy Orchestrator. How configuration reaches the sidecar is described in [bridge-control-protocol.md](../api/bridge-control-protocol.md).
-- **Development overrides**: `--user-data-dir <dir>` (or `SWUFE_USER_DATA_DIR`) overrides `userData`; `SWUFE_REPO_ROOT` overrides the repository root; `SWUFE_PYTHON` picks the interpreter that runs the sidecar/CA entry points; `SWUFE_PROBE_INTERVAL_MS` overrides the session-expiry probe interval.
+- **Development overrides**: `--user-data-dir <dir>` (or `SWUFE_USER_DATA_DIR`) overrides `userData`; `SWUFE_REPO_ROOT` overrides the repository root; `SWUFE_PYTHON` picks the interpreter that runs the sidecar/CA entry points. Session expiry follows the ticket `expiresAt`; `SWUFE_PROBE_INTERVAL_MS` no longer starts a timed probe.
 - **Secret handling**: see [security/README.md](../security/README.md).
 
 ## 3. Deployment

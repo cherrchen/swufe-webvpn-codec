@@ -6,13 +6,12 @@
  * flow (INV-004 / EC-005).
  */
 
-import { BrowserWindow, net, session, type Session } from 'electron'
+import { BrowserWindow, session, type Session } from 'electron'
 
 import type { SessionInfo } from '../shared/types'
-import { LOGIN_PARTITION, SESSION_PROBE_INTERVAL_MS, SESSION_PROBE_TIMEOUT_MS } from './constants'
-import { classifyProbe } from './session-probe'
-import { SessionProbeGuard, validateCapturedSession } from './session-guard'
-import type { ProbeResult, SessionCookie } from './session-types'
+import { LOGIN_PARTITION, TICKET_COOKIE_NAME } from './constants'
+import { SessionProbeGuard } from './session-guard'
+import type { SessionCookie } from './session-types'
 
 /** Chromium's "navigation was superseded/cancelled" error (`net::ERR_ABORTED`). */
 function isAbortError(error: unknown): boolean {
@@ -50,7 +49,7 @@ export class SessionBroker {
     return this.capturedAt
   }
 
-  /** Last successful `probe()` (data-model.md SessionState.lastValidatedAt). */
+  /** Last capture that accepted the ticket (data-model.md SessionState.lastValidatedAt). */
   get lastValidatedAtIso(): string | null {
     return this.lastValidatedAt
   }
@@ -116,7 +115,8 @@ export class SessionBroker {
     const revision = this.probeGuard.changeSession()
     const cookies = await this.requirePartition().cookies.get({ url: this.webvpnBase })
     const captured: SessionCookie[] = []
-    const expiries: number[] = []
+    let ticketExpires: number | null = null
+    let hasTicket = false
     for (const cookie of cookies) {
       if (!cookie.value) continue
       captured.push({
@@ -125,87 +125,45 @@ export class SessionBroker {
         domain: cookie.domain ?? this.webvpnHost,
         path: cookie.path ?? '/',
       })
-      if (typeof cookie.expirationDate === 'number') expiries.push(cookie.expirationDate)
+      if (cookie.name !== TICKET_COOKIE_NAME) continue
+      hasTicket = true
+      ticketExpires = typeof cookie.expirationDate === 'number' ? cookie.expirationDate : null
     }
-    const valid = await validateCapturedSession(captured.length, () => this.probe())
     if (!this.probeGuard.isCurrentSession(revision)) return false
-    if (!valid) return false
+    if (!hasTicket) return false
+    if (ticketExpires !== null && ticketExpires * 1000 <= Date.now()) return false
     this.capturedCookies = captured
     this.capturedAt = new Date().toISOString()
-    this.expiresAtIso = expiries.length > 0 ? new Date(Math.min(...expiries) * 1000).toISOString() : null
-    this.lastValidatedAt = new Date().toISOString()
+    this.expiresAtIso = ticketExpires === null ? null : new Date(ticketExpires * 1000).toISOString()
+    this.lastValidatedAt = this.capturedAt
     this.setLoggedIn(true)
     return true
   }
 
-  async probe(): Promise<ProbeResult> {
-    const partition = this.requirePartition()
-    const { promise, resolve } = Promise.withResolvers<ProbeResult>()
-    let settled = false
-    const finish = (result: ProbeResult, reason: string): void => {
-      if (settled) return
-      settled = true
-      if (result !== 'valid') console.log(`swufe-session 会话探测：${reason} → ${result}`)
-      resolve(result)
-    }
-    // `useSessionCookies` is off by default in Electron: without it the probe
-    // carries none of the login partition's cookies, every request looks
-    // anonymous, and a live session is misreported as expired (EC-007).
-    const request = net.request({
-      url: this.webvpnBase,
-      session: partition,
-      redirect: 'manual',
-      useSessionCookies: true,
-    })
-    const timer = setTimeout(() => {
-      request.abort()
-      finish('unknown', '超时')
-    }, SESSION_PROBE_TIMEOUT_MS)
-    request.on('response', (response) => {
-      clearTimeout(timer)
-      const raw = response.headers.location
-      const location = Array.isArray(raw) ? raw.at(-1) : raw
-      const target = location ? new URL(location, this.webvpnBase) : null
-      response.on('data', () => undefined)
-      response.on('end', () => undefined)
-      finish(
-        classifyProbe(response.statusCode, target?.hostname ?? null, target?.pathname ?? null, this.webvpnHost),
-        `status=${response.statusCode} location=${location ?? '(none)'}`,
-      )
-    })
-    // With redirect:'manual' Chromium reports the target and then cancels the
-    // request ("Redirect was cancelled"), so the redirect event *is* the response
-    // for a 3xx — there is no statusCode-only path to classify.
-    request.on('redirect', (statusCode, _method, redirectUrl) => {
-      clearTimeout(timer)
-      const target = new URL(redirectUrl, this.webvpnBase)
-      finish(
-        classifyProbe(statusCode, target.hostname, target.pathname, this.webvpnHost),
-        `status=${statusCode} location=${redirectUrl}`,
-      )
-    })
-    request.on('error', (error) => {
-      clearTimeout(timer)
-      finish('unknown', `失败 ${String(error)}`)
-    })
-    request.end()
-    return promise
-  }
-
+  /** Local timer until the ticket `expiresAt`. A missing expiry does not probe. */
   startMonitor(onExpired: () => void): void {
-    if (this.monitor) return
+    this.stopMonitor()
     this.probeGuard.startMonitor()
-    const configured = Number.parseInt(process.env.SWUFE_PROBE_INTERVAL_MS ?? '', 10)
-    const interval = Number.isFinite(configured) && configured > 0 ? configured : SESSION_PROBE_INTERVAL_MS
-    this.monitor = setInterval(() => {
-      void this.tick(onExpired)
-    }, interval)
+    if (!this.capturedLoggedIn || !this.expiresAtIso) return
+    const delay = Date.parse(this.expiresAtIso) - Date.now()
+    const revision = this.probeGuard.changeSession()
+    const fire = (): void => {
+      if (!this.probeGuard.isCurrentSession(revision) || !this.capturedLoggedIn) return
+      this.expiresAtIso = null
+      this.setLoggedIn(false)
+      onExpired()
+    }
+    if (!Number.isFinite(delay) || delay <= 0) {
+      fire()
+      return
+    }
+    this.monitor = setTimeout(fire, delay)
   }
 
   stopMonitor(): void {
     this.probeGuard.stopMonitor()
     if (!this.monitor) return
-    clearInterval(this.monitor)
+    clearTimeout(this.monitor)
     this.monitor = null
   }
 
@@ -215,20 +173,9 @@ export class SessionBroker {
     this.capturedCookies = []
     this.capturedAt = null
     this.lastValidatedAt = null
+    this.expiresAtIso = null
     await this.requirePartition().clearStorageData({ storages: ['cookies'] })
     this.setLoggedIn(false)
-  }
-
-  private async tick(onExpired: () => void): Promise<void> {
-    if (!this.capturedLoggedIn) return
-    await this.probeGuard.runMonitorProbe(
-      () => this.probe(),
-      () => { this.lastValidatedAt = new Date().toISOString() },
-      () => {
-        this.setLoggedIn(false)
-        onExpired()
-      },
-    )
   }
 
   private async handleNavigation(url: string): Promise<void> {

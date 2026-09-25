@@ -84,6 +84,7 @@ test('unrelated and malformed lines are ignored', () => {
   assert.equal(parseSidecarLine('swufe-ready {not json'), null)
   assert.equal(parseSidecarLine('swufe-debug [1,2]'), null)
   assert.equal(parseSidecarLine('swufe-error '), null)
+  assert.deepEqual(parseSidecarLine('swufe-session expired'), { kind: 'session-expired' })
 })
 
 test('sidecar failures map onto the two UI error codes', () => {

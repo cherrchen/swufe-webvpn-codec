@@ -8,7 +8,7 @@ import { ProxyOrchestrator, type OrchestratorDeps } from '../../src/main/orchest
 import type { ProxyEntry, CertManager, SystemProxy } from '../../src/main/platform/types'
 import type { CaptureReport, DebugLogEvent } from '../../src/shared/types'
 import type { Sidecar } from '../../src/main/sidecar'
-import type { ProbeResult, SessionCookie, SessionLike } from '../../src/main/session-types'
+import type { SessionCookie, SessionLike } from '../../src/main/session-types'
 import { AppStore } from '../../src/main/store'
 
 export function tempUserDataDir(): string {
@@ -26,7 +26,6 @@ export class FakeSession implements SessionLike {
     { name: 'wrdvpn_session', value: 'STUB-SESSION', domain: 'webvpn.swufe.edu.cn', path: '/' },
   ]
   expiresAt: string | null = null
-  probeResult: ProbeResult = 'valid'
   monitorCallback: (() => void) | null = null
   monitoring = false
 
@@ -34,11 +33,6 @@ export class FakeSession implements SessionLike {
 
   getSession(): { loggedIn: boolean; expiresAt?: string | null } {
     return { loggedIn: this.loggedIn, expiresAt: this.expiresAt }
-  }
-
-  async probe(): Promise<ProbeResult> {
-    this.calls.push('session.probe')
-    return this.probeResult
   }
 
   async clear(): Promise<void> {
@@ -133,6 +127,7 @@ export class FakeSidecar implements Sidecar {
   exitHandler: ((code: number | null, signal: string | null) => void) | null = null
   debugHandler: ((event: DebugLogEvent) => void) | null = null
   captureHandler: ((report: CaptureReport) => void) | null = null
+  sessionExpiredHandler: (() => void) | null = null
 
   constructor(private readonly calls: string[]) {}
 
@@ -156,6 +151,10 @@ export class FakeSidecar implements Sidecar {
 
   onCapture(cb: (report: CaptureReport) => void): void {
     this.captureHandler = cb
+  }
+
+  onSessionExpired(cb: () => void): void {
+    this.sessionExpiredHandler = cb
   }
 
   /** Emit a `swufe-capture` line as the sidecar would. */

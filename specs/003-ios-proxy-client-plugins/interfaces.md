@@ -56,6 +56,7 @@ export interface SessionRecordV1 {
   cookieHeader: string
   capturedAt: string
   lastConfirmedAt: string | null
+  expiresAt: string | null
   status: "captured" | "valid"
 }
 

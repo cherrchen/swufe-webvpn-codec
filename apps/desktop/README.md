@@ -61,7 +61,7 @@ SWUFE_RENDERER_URL=http://127.0.0.1:5173 pnpm start           # 终端 B：Main 
 | ---- | ---- |
 | `SWUFE_REPO_ROOT` | 覆盖仓库根路径（默认取 Electron 应用目录的上两级） |
 | `SWUFE_PYTHON` | 指定运行 sidecar / CA 生成入口的解释器（默认 `<repo>/bridges/python/.venv/bin/python`，缺失则 `uv run --project <repo>/bridges/python python`） |
-| `SWUFE_PROBE_INTERVAL_MS` | 会话过期探测间隔（默认 30000ms；手工验证时可调小） |
+| `SWUFE_PROBE_INTERVAL_MS` | 已停用。登录态到期看票据 cookie 的过期时间 |
 | `SWUFE_USER_DATA_DIR` | 覆盖 `userData`（等价于 `--user-data-dir=<dir>`），用于隔离测试环境 |
 | `SWUFE_RENDERER_URL` | 仅开发期：渲染层改从该 Vite dev server 加载（如 `http://127.0.0.1:5173`）并使用开发期 CSP；未设置时加载 `dist/renderer/*.html` |
 

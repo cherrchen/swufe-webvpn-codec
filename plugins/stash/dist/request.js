@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 909a8b9 */
+/* swufe-webvpn stash 2e84f11 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -849,6 +849,7 @@
     notificationThrottle: "swufe.notification-throttle.v1",
     lastError: "swufe.last-error.v1"
   };
+  var TICKET_COOKIE_NAME = "wengine_vpn_ticketwebvpn_swufe_edu_cn";
   function createSessionStore(kv2) {
     return {
       load() {
@@ -885,7 +886,7 @@
     if (record.schemaVersion !== 1) {
       return typeof record.schemaVersion === "number" ? { kind: "incompatible" } : { kind: "corrupt" };
     }
-    if (typeof record.gatewayHost !== "string" || typeof record.cookieHeader !== "string" || typeof record.capturedAt !== "string" || record.lastConfirmedAt !== null && typeof record.lastConfirmedAt !== "string" || record.status !== "captured" && record.status !== "valid" || record.cookieHeader.length === 0) {
+    if (typeof record.gatewayHost !== "string" || typeof record.cookieHeader !== "string" || typeof record.capturedAt !== "string" || record.lastConfirmedAt !== null && typeof record.lastConfirmedAt !== "string" || record.expiresAt !== void 0 && record.expiresAt !== null && typeof record.expiresAt !== "string" || record.status !== "captured" && record.status !== "valid" || record.cookieHeader.length === 0) {
       return { kind: "corrupt" };
     }
     return {
@@ -896,6 +897,7 @@
         cookieHeader: record.cookieHeader,
         capturedAt: record.capturedAt,
         lastConfirmedAt: record.lastConfirmedAt,
+        expiresAt: typeof record.expiresAt === "string" ? record.expiresAt : null,
         status: record.status
       }
     };
@@ -927,6 +929,7 @@
         cookieHeader: cookie,
         capturedAt: input.nowIso,
         lastConfirmedAt: null,
+        expiresAt: null,
         status: "captured"
       }
     };
@@ -938,11 +941,28 @@
     if (current.cookieHeader === captured.cookieHeader) {
       return current;
     }
+    const sameTicket = cookiePairValue(current.cookieHeader, TICKET_COOKIE_NAME) === cookiePairValue(captured.cookieHeader, TICKET_COOKIE_NAME);
     return {
       ...captured,
+      expiresAt: sameTicket ? captured.expiresAt ?? current.expiresAt : captured.expiresAt,
       status: current.status === "valid" ? "valid" : "captured",
       lastConfirmedAt: current.status === "valid" ? current.lastConfirmedAt : null
     };
+  }
+  function sessionExpiredByClock(session, nowIso) {
+    if (!session.expiresAt) return false;
+    const expires = Date.parse(session.expiresAt);
+    const now = Date.parse(nowIso);
+    if (!Number.isFinite(expires) || !Number.isFinite(now)) return false;
+    return now >= expires;
+  }
+  function cookiePairValue(header2, name) {
+    for (const part of header2.split(";")) {
+      const eq = part.indexOf("=");
+      if (eq <= 0) continue;
+      if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+    }
+    return null;
   }
   function sessionMatchesGateway(session, gatewayHost2) {
     if (!session) {
@@ -989,7 +1009,7 @@
       return { kind: "pass" };
     }
     const usable = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
-    if (!usable) {
+    if (!usable || sessionExpiredByClock(usable, nowIso)) {
       return { kind: "login_required" };
     }
     const path = parsed.pathname || "/";
@@ -1866,7 +1886,17 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     }
     const rewriteSettings = toRewriteSettingsFromV2(settings);
     const store = createSessionStore(kv(runtime));
-    const session = store.load();
+    let session = store.load();
+    let clockExpired = false;
+    if (session && sessionExpiredByClock(session, runtime.nowIso)) {
+      const host2 = safeHost(runtime.request?.url ?? "");
+      store.clear();
+      writeLastError(runtime, "SESSION_EXPIRED", host2);
+      notifyThrottled(runtime, "session-expired");
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host: host2, direction: "request", action: "session-expired", code: "SESSION_EXPIRED", detail: "ticket-clock" });
+      session = null;
+      clockExpired = true;
+    }
     const compatible = session && sessionSchemaOk(runtime);
     const request = runtime.request;
     if (!request?.url) {
@@ -1896,8 +1926,10 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       return;
     }
     if (decision.kind === "login_required") {
-      notifyThrottled(runtime, "login-required");
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: "NOT_LOGGED_IN", detail });
+      if (!clockExpired) {
+        notifyThrottled(runtime, "login-required");
+        emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: "NOT_LOGGED_IN", detail });
+      }
       runtime.finishRequest({ decision: "pass" });
       return;
     }
@@ -1966,7 +1998,8 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     const parsed = parseSession(raw);
     if (parsed.kind === "incompatible") return "incompatible";
     if (parsed.kind !== "ok") return "logged-out";
-    return readLastError(runtime) === "SESSION_EXPIRED" ? "expired" : "logged-in";
+    if (sessionExpiredByClock(parsed.session, runtime.nowIso) || readLastError(runtime) === "SESSION_EXPIRED") return "expired";
+    return "logged-in";
   }
   function kv(runtime) {
     return { read: (key) => runtime.read(key), write: (key, value) => runtime.write(key, value) };

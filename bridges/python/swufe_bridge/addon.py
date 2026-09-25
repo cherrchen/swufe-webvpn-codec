@@ -35,6 +35,7 @@ from swufe_bridge.rewrite import (
     rewrite_body_text,
     rewrite_location,
     rewrite_set_cookie_attrs,
+    ticket_revoked,
 )
 from swufe_bridge.wrd_codec import WrdCodec, WrdCodecError
 
@@ -99,6 +100,11 @@ class DebugLogger:
 
 def report_error(code: str, message: str) -> None:
     print(f"swufe-error {code} {message}", file=sys.stderr, flush=True)
+
+
+def report_session_expired() -> None:
+    """Traffic showed a dead ticket. No cookie value is included."""
+    print("swufe-session expired", file=sys.stderr, flush=True)
 
 
 def _format_address(address: Sequence[object] | None) -> str | None:
@@ -307,6 +313,13 @@ class BridgeAddon:
         logger = DebugLogger(cfg.debug)
         codec = WrdCodec(cfg.wrd_key, cfg.wrd_iv, cfg.webvpn_host)
         original_host = (urlsplit(original_url).hostname or "").lower()
+        if ticket_revoked(
+            flow.response.status_code,
+            flow.response.headers.get("location"),
+            flow.response.headers.get("set-cookie"),
+            cfg.webvpn_host,
+        ):
+            report_session_expired()
 
         if flow.metadata.get(METADATA_GATEWAY_ROOT):
             return  # gateway-owned resource: nothing to reverse-rewrite

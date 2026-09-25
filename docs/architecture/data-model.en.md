@@ -52,7 +52,8 @@ The entities are mutually independent and have no relationship diagram: `Allowli
   | --------- | ---- | -------- | ---------- | ----- |
   | cookies | Cookie[] | yes | sensitive; must never enter logs | WebVPN session Cookies |
   | capturedAt | string | yes | — | capture time |
-  | lastValidatedAt | string \| null | no | — | last expiry-detection time |
+  | lastValidatedAt | string \| null | no | — | last time the ticket was accepted |
+  | expiresAt | string \| null | no | ticket `wengine_vpn_ticketwebvpn_swufe_edu_cn` only | ticket expiry; missing means the lifetime is unknown and is not treated as expired |
 
   Cookie sub-structure:
 
@@ -68,7 +69,7 @@ The entities are mutually independent and have no relationship diagram: `Allowli
   | sameSite | string \| null | — | — |
 
 - Invariants: Cookies and bodies never enter logs (INV-001).
-- Lifecycle: created by capture after a successful login; updated on re-capture/validation; deleted on logout, expiry or bridge session reset.
+- Lifecycle: created when login capture sees the ticket. A reached `expiresAt` expires the session locally, with no timed portal request. Server-side revocation before that time still comes from real traffic: `302 → /login` or a `Set-Cookie` that clears the ticket (Q-001 stays open). Deleted on logout, expiry or bridge session reset.
 - Owner: cherrchen.
 - Related requirements: REQ-002, REQ-009.
 

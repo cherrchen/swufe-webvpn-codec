@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STORAGE_KEYS } from "webvpn-core-js";
+import { STORAGE_KEYS, TICKET_COOKIE_NAME } from "webvpn-core-js";
 import { handleStashRequest, handleStashResponse, handleStashTile, nativeGatewayRedirect, type StashRuntime } from "../src/adapter.ts";
 
 const NOW = "2026-09-24T08:00:00.000Z";
@@ -314,6 +314,53 @@ describe("Stash adapter", () => {
     expect(handleStashTile(expired).content).toContain("打开网页登录");
     expect(handleStashTile(expired).content).toContain("失效");
     expect(handleStashTile(expired).url).toBe("https://webvpn.swufe.edu.cn");
+  });
+
+  it("stores the ticket lifetime from a gateway Set-Cookie and expires on the clock", () => {
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: {} },
+      response: {
+        status: 200,
+        headers: { "set-cookie": `show_faq=1; Max-Age=30\n${TICKET_COOKIE_NAME}=fake; Max-Age=3600` },
+      },
+    });
+    handleStashResponse(rt);
+    const saved = JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}") as { expiresAt?: string; cookieHeader?: string };
+    expect(saved.expiresAt).toBe("2026-09-24T09:00:00.000Z");
+    expect(saved.cookieHeader).toBe(`${TICKET_COOKIE_NAME}=fake`);
+    expect(saved.cookieHeader).not.toContain("show_faq");
+
+    const later = runtime({
+      nowIso: "2026-09-24T09:00:00.000Z",
+      request: { url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} },
+    });
+    later.store[STORAGE_KEYS.session] = rt.store[STORAGE_KEYS.session] ?? "";
+    handleStashRequest(later);
+    expect(later.store[STORAGE_KEYS.session]).toBeUndefined();
+    expect(later.requests[0]).toEqual({ decision: "pass" });
+    expect(handleStashTile(later).content).toContain("失效");
+  });
+
+  it("clears a stored ticket when the gateway answers 302 to /login", () => {
+    const rt = runtime({
+      request: {
+        url: "https://webvpn.swufe.edu.cn/",
+        method: "GET",
+        headers: { cookie: `${TICKET_COOKIE_NAME}=fake` },
+      },
+      response: { status: 302, headers: { location: "https://webvpn.swufe.edu.cn/login" } },
+    });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: "webvpn.swufe.edu.cn",
+      cookieHeader: `${TICKET_COOKIE_NAME}=fake`,
+      capturedAt: NOW,
+      lastConfirmedAt: null,
+      expiresAt: null,
+      status: "valid",
+    });
+    handleStashResponse(rt);
+    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
   });
 
   it("serves settings HTML without capturing the session", () => {

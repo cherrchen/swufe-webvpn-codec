@@ -15,14 +15,19 @@ export {
 export type { RouteDecision, RoutingPolicy } from "./routing/allowlist.ts";
 export {
   STORAGE_KEYS,
+  TICKET_COOKIE_NAME,
   applyNewerCookie,
+  applyTicketSetCookie,
   captureSession,
+  cookiePairValue,
   createSessionStore,
   headerValue,
   memoryKv,
   parseSession,
   promoteSession,
+  sessionExpiredByClock,
   sessionMatchesGateway,
+  ticketLifetimeFromSetCookie,
 } from "./session/session.ts";
 export type {
   KeyValueStore,
@@ -31,6 +36,8 @@ export type {
   SessionParseResult,
   SessionRecordV1,
   SessionStore,
+  TicketLifetime,
+  TicketSetCookieResult,
 } from "./session/session.ts";
 export {
   DEFAULT_BODY_REWRITE_MAX_BYTES,

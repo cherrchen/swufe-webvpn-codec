@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 909a8b9 */
+/* swufe-webvpn stash 2e84f11 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -849,6 +849,7 @@
     notificationThrottle: "swufe.notification-throttle.v1",
     lastError: "swufe.last-error.v1"
   };
+  var TICKET_COOKIE_NAME = "wengine_vpn_ticketwebvpn_swufe_edu_cn";
   function createSessionStore(kv2) {
     return {
       load() {
@@ -885,7 +886,7 @@
     if (record.schemaVersion !== 1) {
       return typeof record.schemaVersion === "number" ? { kind: "incompatible" } : { kind: "corrupt" };
     }
-    if (typeof record.gatewayHost !== "string" || typeof record.cookieHeader !== "string" || typeof record.capturedAt !== "string" || record.lastConfirmedAt !== null && typeof record.lastConfirmedAt !== "string" || record.status !== "captured" && record.status !== "valid" || record.cookieHeader.length === 0) {
+    if (typeof record.gatewayHost !== "string" || typeof record.cookieHeader !== "string" || typeof record.capturedAt !== "string" || record.lastConfirmedAt !== null && typeof record.lastConfirmedAt !== "string" || record.expiresAt !== void 0 && record.expiresAt !== null && typeof record.expiresAt !== "string" || record.status !== "captured" && record.status !== "valid" || record.cookieHeader.length === 0) {
       return { kind: "corrupt" };
     }
     return {
@@ -896,6 +897,7 @@
         cookieHeader: record.cookieHeader,
         capturedAt: record.capturedAt,
         lastConfirmedAt: record.lastConfirmedAt,
+        expiresAt: typeof record.expiresAt === "string" ? record.expiresAt : null,
         status: record.status
       }
     };
@@ -927,9 +929,99 @@
         cookieHeader: cookie,
         capturedAt: input.nowIso,
         lastConfirmedAt: null,
+        expiresAt: null,
         status: "captured"
       }
     };
+  }
+  function sessionExpiredByClock(session, nowIso) {
+    if (!session.expiresAt) return false;
+    const expires = Date.parse(session.expiresAt);
+    const now = Date.parse(nowIso);
+    if (!Number.isFinite(expires) || !Number.isFinite(now)) return false;
+    return now >= expires;
+  }
+  function ticketLifetimeFromSetCookie(raw, nowIso) {
+    const now = Date.parse(nowIso);
+    for (const line of raw.split("\n")) {
+      const parsed = parseSetCookieLine(line);
+      if (!parsed || parsed.name !== TICKET_COOKIE_NAME) continue;
+      if (!parsed.value) return { kind: "expired" };
+      const maxAge = parsed.attrs.get("max-age");
+      if (maxAge !== void 0) {
+        const seconds = Number(maxAge);
+        if (!Number.isFinite(seconds) || seconds <= 0) return { kind: "expired" };
+        if (!Number.isFinite(now)) return { kind: "unknown", value: parsed.value };
+        return { kind: "expires", expiresAt: new Date(now + seconds * 1e3).toISOString(), value: parsed.value };
+      }
+      const expires = parsed.attrs.get("expires");
+      if (expires) {
+        const at = Date.parse(expires);
+        if (!Number.isFinite(at) || !Number.isFinite(now) || at <= now) return { kind: "expired" };
+        return { kind: "expires", expiresAt: new Date(at).toISOString(), value: parsed.value };
+      }
+      return { kind: "unknown", value: parsed.value };
+    }
+    return { kind: "absent" };
+  }
+  function applyTicketSetCookie(session, raw, nowIso, gatewayHost2) {
+    const lifetime = ticketLifetimeFromSetCookie(raw, nowIso);
+    if (lifetime.kind === "absent") return { kind: "absent" };
+    if (lifetime.kind === "expired") return { kind: "expired" };
+    const expiresAt = lifetime.kind === "expires" ? lifetime.expiresAt : null;
+    const header = `${TICKET_COOKIE_NAME}=${lifetime.value}`;
+    if (!session) {
+      return {
+        kind: "update",
+        session: {
+          schemaVersion: 1,
+          gatewayHost: gatewayHost2,
+          cookieHeader: header,
+          capturedAt: nowIso,
+          lastConfirmedAt: null,
+          expiresAt,
+          status: "captured"
+        }
+      };
+    }
+    return {
+      kind: "update",
+      session: {
+        ...session,
+        cookieHeader: replaceCookiePair(session.cookieHeader, TICKET_COOKIE_NAME, lifetime.value),
+        expiresAt
+      }
+    };
+  }
+  function cookiePairValue(header, name) {
+    for (const part of header.split(";")) {
+      const eq = part.indexOf("=");
+      if (eq <= 0) continue;
+      if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+    }
+    return null;
+  }
+  function replaceCookiePair(header, name, value) {
+    const kept = header.split(";").map((part) => part.trim()).filter((part) => {
+      const eq = part.indexOf("=");
+      return eq > 0 && part.slice(0, eq).trim() !== name;
+    });
+    return [...kept, `${name}=${value}`].join("; ");
+  }
+  function parseSetCookieLine(line) {
+    const parts = line.split(";");
+    const first = (parts[0] ?? "").trim();
+    const eq = first.indexOf("=");
+    if (eq <= 0) return null;
+    const attrs = /* @__PURE__ */ new Map();
+    for (const part of parts.slice(1)) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const at = trimmed.indexOf("=");
+      if (at === -1) attrs.set(trimmed.toLowerCase(), "");
+      else attrs.set(trimmed.slice(0, at).trim().toLowerCase(), trimmed.slice(at + 1).trim());
+    }
+    return { name: first.slice(0, eq).trim(), value: first.slice(eq + 1).trim(), attrs };
   }
   function sessionMatchesGateway(session, gatewayHost2) {
     if (!session) {
@@ -979,7 +1071,7 @@
       return { kind: "pass" };
     }
     const usable = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
-    if (!usable) {
+    if (!usable || sessionExpiredByClock(usable, nowIso)) {
       return { kind: "login_required" };
     }
     const path = parsed.pathname || "/";
@@ -1797,6 +1889,7 @@
       runtime.finishResponse({});
       return;
     }
+    observeGatewayTicket(runtime, settings.gatewayBase);
     const rewriteSettings = toRewriteSettingsFromV2(settings);
     const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
     if (context && !context.gatewayOwned && isNativeGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
@@ -1916,6 +2009,53 @@
       };
     } catch {
       return null;
+    }
+  }
+  function observeGatewayTicket(runtime, gatewayBase) {
+    const request = runtime.request;
+    const response = runtime.response;
+    if (!request?.url || !response) return;
+    let host = "";
+    try {
+      host = new URL(request.url).hostname;
+    } catch {
+      return;
+    }
+    const gateway = gatewayHost(gatewayBase);
+    if (host.toLowerCase() !== gateway) return;
+    const store = createSessionStore(kv(runtime));
+    const setCookie = headerValue(response.headers ?? {}, "set-cookie");
+    if (setCookie) {
+      const applied = applyTicketSetCookie(store.load(), setCookie, runtime.nowIso, gateway);
+      if (applied.kind === "expired") {
+        expireStoredSession(runtime, host);
+        return;
+      }
+      if (applied.kind === "update") store.save(applied.session);
+    }
+    if (requestCarriedTicket(request.headers) && gatewayLoginRedirect(response, request.url, gateway)) {
+      expireStoredSession(runtime, host);
+    }
+  }
+  function expireStoredSession(runtime, host) {
+    createSessionStore(kv(runtime)).clear();
+    writeLastError(runtime, "SESSION_EXPIRED", host);
+    notifyThrottled(runtime, "session-expired");
+    emit(runtime, false, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED", detail: "ticket" });
+  }
+  function requestCarriedTicket(headers) {
+    return cookiePairValue(headerValue(headers ?? {}, "cookie"), TICKET_COOKIE_NAME) !== null;
+  }
+  function gatewayLoginRedirect(response, requestUrl2, gateway) {
+    const status = response.status ?? 0;
+    if (status < 300 || status >= 400) return false;
+    const location = headerValue(response.headers ?? {}, "location");
+    if (!location) return false;
+    try {
+      const url = new URL(location, requestUrl2);
+      return url.hostname.toLowerCase() === gateway && url.pathname.startsWith("/login");
+    } catch {
+      return false;
     }
   }
   function kv(runtime) {

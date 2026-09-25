@@ -390,6 +390,9 @@ export class ProxyOrchestrator {
     })
     sidecar.onDebug((event) => this.emitDebug(event))
     sidecar.onCapture((report) => this.handleCaptureReport(report))
+    sidecar.onSessionExpired(() => {
+      void this.handleSessionExpired()
+    })
 
     try {
       await sidecar.start()

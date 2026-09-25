@@ -18,7 +18,7 @@
 | --------- | ---- | ------------------------- | ------------- | ------ |
 | App Shell | In-process module (Electron Main) | Windows/tray (optional), config persistence, and the Main-side orchestration entry exposing preload IPC | `apps/desktop/src/main/index.ts` (composition root, single-instance lock, quit cleanup in `shutdown.ts`), `apps/desktop/src/main/ipc.ts` (IF-001), `apps/desktop/src/main/store.ts`, the window registry `apps/desktop/src/main/window-registry.ts` and the window policy `apps/desktop/src/main/window-policy.ts` | Implemented (M2; no tray yet) |
 | Login WebView | In-process module (Electron Renderer / BrowserWindow) | Hosts the official WebVPN / CAS login and guarantees anti-loop | `apps/desktop/src/main/session-broker.ts` (`openLogin`, `persist:swufe-login` partition + `setProxy({mode:'direct'})`) | Implemented (M2) |
-| Session Broker | In-process module (Electron Main) | Cookie extraction, storage and expiry detection | `apps/desktop/src/main/session-broker.ts` (capture/clear/monitor), `apps/desktop/src/main/session-probe.ts` (expiry-signal classification, pure functions) | Implemented (M2; Q-001's other two signals remain M3/M4) |
+| Session Broker | In-process module (Electron Main) | Cookie extraction, storage and expiry from the ticket lifetime | `apps/desktop/src/main/session-broker.ts` (capture/clear/local deadline), `apps/desktop/src/main/session-probe.ts` (classification of a real `302 → /login`, pure functions) | Implemented (M2; no timed portal probe; Q-001's other two signals stay open) |
 | Proxy Orchestrator | In-process module (Electron Main) | Start/stop the mitm sidecar, set/clear the system proxy, switch between the two capture modes ("system proxy / selected apps"), detect proxy conflicts | `apps/desktop/src/main/orchestrator.ts`, `apps/desktop/src/main/state-machine.ts`, `apps/desktop/src/main/sidecar.ts`, `apps/desktop/src/main/platform/` (`exec.ts`, `parse.ts` and the darwin/win32 adapters) | Implemented (M2; Windows real-machine verification deferred to M4) |
 | WRD Codec | In-process library (shared by the App and the sidecar) | Hostname encryption/decryption and URL conversion (pure functions, no IO) | `bridges/python/swufe_bridge/wrd_codec.py` | Implemented (M1) |
 | Bridge Addon | Separate process (addon inside the mitmproxy sidecar) | Request rewrite, response reverse-rewrite and Cookie injection; gateway-owned root namespace passthrough; HTML that matches the gateway bootstrap predicate is promoted to the gateway-native URL space | `bridges/python/swufe_bridge/addon.py` (pure reverse-rewrite functions and the bootstrap predicate in `bridges/python/swufe_bridge/rewrite.py`; config surface in `bridges/python/swufe_bridge/config.py`; process entry `bridges/python/swufe_bridge/sidecar.py`) | Implemented (M1; M5 added passthrough and promotion) |
@@ -83,11 +83,11 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 
 - Responsibility: Cookie extraction, storage and expiry detection.
 - Not responsible for: URL rewriting; holding student IDs/passwords; allowlist decisions.
-- Input: the Login WebView session partition; responses from probe URLs (expiry signals).
+- Input: the Login WebView session partition (the ticket cookie and its expiry); a `swufe-session expired` line from the sidecar on real traffic.
 - Output: `SessionState` (Cookie set), login/expiry state; consumed by Proxy Orchestrator when pushing to the sidecar.
 - Dependencies: the Login WebView session.
 - Depended on by: App Shell, Proxy Orchestrator.
-- Key invariants: the only Cookie reader; Cookies must never enter logs (see INV-001); a captured login is accepted only after a valid portal probe, and stale probe results are ignored after monitoring stops or a new session begins.
+- Key invariants: the only Cookie reader; Cookies must never enter logs (see INV-001); a login without the ticket is not accepted; `expiresAt` comes only from the ticket and expires locally, with no timed portal request.
 - Related tests: TC-D01, TC-D02, TC-D03, TC-D04.
 - Related spec / ADR: [specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md).
 

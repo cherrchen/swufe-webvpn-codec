@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 909a8b9 */
+/* swufe-webvpn stash 2e84f11 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -615,7 +615,7 @@
     if (record.schemaVersion !== 1) {
       return typeof record.schemaVersion === "number" ? { kind: "incompatible" } : { kind: "corrupt" };
     }
-    if (typeof record.gatewayHost !== "string" || typeof record.cookieHeader !== "string" || typeof record.capturedAt !== "string" || record.lastConfirmedAt !== null && typeof record.lastConfirmedAt !== "string" || record.status !== "captured" && record.status !== "valid" || record.cookieHeader.length === 0) {
+    if (typeof record.gatewayHost !== "string" || typeof record.cookieHeader !== "string" || typeof record.capturedAt !== "string" || record.lastConfirmedAt !== null && typeof record.lastConfirmedAt !== "string" || record.expiresAt !== void 0 && record.expiresAt !== null && typeof record.expiresAt !== "string" || record.status !== "captured" && record.status !== "valid" || record.cookieHeader.length === 0) {
       return { kind: "corrupt" };
     }
     return {
@@ -626,9 +626,17 @@
         cookieHeader: record.cookieHeader,
         capturedAt: record.capturedAt,
         lastConfirmedAt: record.lastConfirmedAt,
+        expiresAt: typeof record.expiresAt === "string" ? record.expiresAt : null,
         status: record.status
       }
     };
+  }
+  function sessionExpiredByClock(session, nowIso) {
+    if (!session.expiresAt) return false;
+    const expires = Date.parse(session.expiresAt);
+    const now = Date.parse(nowIso);
+    if (!Number.isFinite(expires) || !Number.isFinite(now)) return false;
+    return now >= expires;
   }
 
   // ../../packages/webvpn-core-js/src/rewrite/body.ts
@@ -691,9 +699,10 @@
     const raw = runtime.read(STORAGE_KEYS.session);
     const parsed = raw ? parseSession(raw) : null;
     const last = readLastError(runtime);
+    const clockExpired = parsed?.kind === "ok" && sessionExpiredByClock(parsed.session, runtime.nowIso);
     const tile = stashTile({
       sessionReady: parsed?.kind === "ok",
-      expired: last === "SESSION_EXPIRED",
+      expired: last === "SESSION_EXPIRED" || clockExpired,
       incompatible: parsed?.kind === "incompatible"
     });
     return { ...tile, sessionState: parsed?.kind ?? "missing" };

@@ -50,7 +50,8 @@
   | ---- | ---- | ---- | ---- | ---- |
   | cookies | Cookie[] | 是 | 敏感；不得进入日志 | WebVPN 会话相关 Cookie |
   | capturedAt | string | 是 | — | 采集时间 |
-  | lastValidatedAt | string \| null | 否 | — | 最近一次失效检测时间 |
+  | lastValidatedAt | string \| null | 否 | — | 最近一次接受票据的时间 |
+  | expiresAt | string \| null | 否 | 只来自票据 `wengine_vpn_ticketwebvpn_swufe_edu_cn` | 票据过期时间；缺失表示时效未知，不据此判过期 |
 
   Cookie 子结构：
 
@@ -66,7 +67,7 @@
   | sameSite | string \| null | — | — |
 
 - 不变式：Cookie 与正文永不进入日志（INV-001）。
-- 生命周期：创建于登录成功后的采集；更新于重新采集/校验；删除于登出、过期或桥会话重置。
+- 生命周期：创建于登录成功后采到票据；`expiresAt` 到点后本地判失效，不再定时请求门户。服务端提前作废仍靠真实流量里的 `302 → /login` 或清空票据的 `Set-Cookie`（Q-001 不因此关闭）。删除于登出、过期或桥会话重置。
 - 所有者：cherrchen。
 - 关联需求：REQ-002、REQ-009。
 

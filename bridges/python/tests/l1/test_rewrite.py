@@ -7,12 +7,14 @@ from mitmproxy.net.http.cookies import CookieAttrs
 
 from swufe_bridge.rewrite import (
     REWRITABLE_CONTENT_TYPES,
+    TICKET_COOKIE_NAME,
     decode_wrd_reference,
     is_rewritable_content_type,
     rewrite_body_text,
     rewrite_location,
     rewrite_set_cookie_attrs,
     strip_wrd_prefix,
+    ticket_revoked,
 )
 from swufe_bridge.wrd_codec import WrdCodec
 
@@ -66,6 +68,13 @@ def test_non_wrd_or_undecodable_references_are_left_alone(
 ) -> None:
     assert decode_wrd_reference(reference, codec, WEBVPN_HOST) is None
     assert rewrite_location(reference, codec, WEBVPN_HOST) == (reference, False)
+
+
+def test_ticket_revoked_reads_login_redirect_and_cleared_ticket() -> None:
+    assert ticket_revoked(302, "https://webvpn.swufe.edu.cn/login", None, WEBVPN_HOST)
+    assert not ticket_revoked(302, "https://authserver.swufe.edu.cn/authserver/login", None, WEBVPN_HOST)
+    assert ticket_revoked(200, None, f"{TICKET_COOKIE_NAME}=; Max-Age=0", WEBVPN_HOST)
+    assert not ticket_revoked(200, None, "show_faq=1; Max-Age=0", WEBVPN_HOST)
 
 
 def test_rewrite_location_reports_change(codec: WrdCodec, token: str) -> None:

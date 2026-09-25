@@ -4,6 +4,7 @@ import { decideRoute, type RoutingPolicy } from "../routing/allowlist.ts";
 import {
   captureSession,
   headerValue,
+  sessionExpiredByClock,
   sessionMatchesGateway,
   type SessionRecordV1,
 } from "../session/session.ts";
@@ -74,7 +75,7 @@ export function rewriteRequest(
   }
 
   const usable = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
-  if (!usable) {
+  if (!usable || sessionExpiredByClock(usable, nowIso)) {
     return { kind: "login_required" };
   }
 

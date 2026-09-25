@@ -1,10 +1,14 @@
 import {
   STORAGE_KEYS,
+  TICKET_COOKIE_NAME,
   WrdCodec,
   applyNewerCookie,
+  applyTicketSetCookie,
+  cookiePairValue,
   createSessionStore,
   gatewayHost,
   handleSettingsRequest,
+  headerValue,
   isSettingsNamespaceUrl,
   loadSettingsV2,
   notificationFor,
@@ -12,6 +16,7 @@ import {
   promoteSession,
   rewriteRequest,
   rewriteResponse,
+  sessionExpiredByClock,
   safeDiagnostic,
   settingsErrorResponse,
   stashTile,
@@ -85,7 +90,17 @@ export function handleStashRequest(runtime: StashRuntime): void {
   }
   const rewriteSettings = toRewriteSettingsFromV2(settings);
   const store = createSessionStore(kv(runtime));
-  const session = store.load();
+  let session = store.load();
+  let clockExpired = false;
+  if (session && sessionExpiredByClock(session, runtime.nowIso)) {
+    const host = safeHost(runtime.request?.url ?? "");
+    store.clear();
+    writeLastError(runtime, "SESSION_EXPIRED", host);
+    notifyThrottled(runtime, "session-expired");
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-expired", code: "SESSION_EXPIRED", detail: "ticket-clock" });
+    session = null;
+    clockExpired = true;
+  }
   const compatible = session && sessionSchemaOk(runtime);
   const request = runtime.request;
   if (!request?.url) {
@@ -115,8 +130,10 @@ export function handleStashRequest(runtime: StashRuntime): void {
     return;
   }
   if (decision.kind === "login_required") {
-    notifyThrottled(runtime, "login-required");
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: "NOT_LOGGED_IN", detail });
+    if (!clockExpired) {
+      notifyThrottled(runtime, "login-required");
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "error", code: "NOT_LOGGED_IN", detail });
+    }
     runtime.finishRequest({ decision: "pass" });
     return;
   }
@@ -151,6 +168,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
     runtime.finishResponse({});
     return;
   }
+  observeGatewayTicket(runtime, settings.gatewayBase);
   const rewriteSettings = toRewriteSettingsFromV2(settings);
   const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv)
     ?? deriveOriginalRequestContext(runtime, rewriteSettings);
@@ -262,9 +280,10 @@ export function handleStashTile(runtime: StashRuntime): { title: "SWUFE WebVPN";
   const raw = runtime.read(STORAGE_KEYS.session);
   const parsed = raw ? parseSession(raw) : null;
   const last = readLastError(runtime);
+  const clockExpired = parsed?.kind === "ok" && sessionExpiredByClock(parsed.session, runtime.nowIso);
   const tile = stashTile({
     sessionReady: parsed?.kind === "ok",
-    expired: last === "SESSION_EXPIRED",
+    expired: last === "SESSION_EXPIRED" || clockExpired,
     incompatible: parsed?.kind === "incompatible",
   });
   return { ...tile, sessionState: parsed?.kind ?? "missing" };
@@ -352,7 +371,63 @@ function sessionStatus(runtime: StashRuntime): "logged-in" | "logged-out" | "exp
   const parsed = parseSession(raw);
   if (parsed.kind === "incompatible") return "incompatible";
   if (parsed.kind !== "ok") return "logged-out";
-  return readLastError(runtime) === "SESSION_EXPIRED" ? "expired" : "logged-in";
+  if (sessionExpiredByClock(parsed.session, runtime.nowIso) || readLastError(runtime) === "SESSION_EXPIRED") return "expired";
+  return "logged-in";
+}
+
+function observeGatewayTicket(runtime: StashRuntime, gatewayBase: string): void {
+  const request = runtime.request;
+  const response = runtime.response;
+  if (!request?.url || !response) return;
+  let host = "";
+  try {
+    host = new URL(request.url).hostname;
+  } catch {
+    return;
+  }
+  const gateway = gatewayHost(gatewayBase);
+  if (host.toLowerCase() !== gateway) return;
+  const store = createSessionStore(kv(runtime));
+  const setCookie = headerValue(response.headers ?? {}, "set-cookie");
+  if (setCookie) {
+    const applied = applyTicketSetCookie(store.load(), setCookie, runtime.nowIso, gateway);
+    if (applied.kind === "expired") {
+      expireStoredSession(runtime, host);
+      return;
+    }
+    if (applied.kind === "update") store.save(applied.session);
+  }
+  if (requestCarriedTicket(request.headers) && gatewayLoginRedirect(response, request.url, gateway)) {
+    expireStoredSession(runtime, host);
+  }
+}
+
+function expireStoredSession(runtime: StashRuntime, host: string): void {
+  createSessionStore(kv(runtime)).clear();
+  writeLastError(runtime, "SESSION_EXPIRED", host);
+  notifyThrottled(runtime, "session-expired");
+  emit(runtime, false, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED", detail: "ticket" });
+}
+
+function requestCarriedTicket(headers: Record<string, string> | undefined): boolean {
+  return cookiePairValue(headerValue(headers ?? {}, "cookie"), TICKET_COOKIE_NAME) !== null;
+}
+
+function gatewayLoginRedirect(
+  response: { status?: number; headers?: Record<string, string> },
+  requestUrl: string,
+  gateway: string,
+): boolean {
+  const status = response.status ?? 0;
+  if (status < 300 || status >= 400) return false;
+  const location = headerValue(response.headers ?? {}, "location");
+  if (!location) return false;
+  try {
+    const url = new URL(location, requestUrl);
+    return url.hostname.toLowerCase() === gateway && url.pathname.startsWith("/login");
+  } catch {
+    return false;
+  }
 }
 
 function kv(runtime: StashRuntime): KeyValueStore {

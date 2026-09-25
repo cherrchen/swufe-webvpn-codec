@@ -24,8 +24,8 @@ export const COMMAND_TIMEOUT_MS = 10_000
  * Touch ID prompt, and the Windows certificate dialogs that block `certutil -addstore Root`
  * ("安全警告") and `-delstore Root` ("根证书存储") until the user clicks 是(Y) (KI-021). */
 export const PRIVILEGE_PROMPT_TIMEOUT_MS = 120_000
-export const SESSION_PROBE_INTERVAL_MS = 30_000
-export const SESSION_PROBE_TIMEOUT_MS = 5_000
+/** Session ticket. Auxiliary cookies are not a lifetime. Matches webvpn-core-js. */
+export const TICKET_COOKIE_NAME = 'wengine_vpn_ticketwebvpn_swufe_edu_cn'
 export const STATUS_CACHE_TTL_MS = 2_000
 
 export const CA_BASENAME = 'mitmproxy'

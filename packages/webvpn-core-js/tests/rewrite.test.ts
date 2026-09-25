@@ -25,6 +25,7 @@ const SESSION: SessionRecordV1 = {
   cookieHeader: "route=fake; show_vpn=1",
   capturedAt: NOW,
   lastConfirmedAt: null,
+  expiresAt: null,
   status: "captured",
 };
 
@@ -294,6 +295,17 @@ describe("IOS-TC-E response rewrite", () => {
       settings(),
     );
     expect(result.sessionExpired).toBe(true);
+  });
+
+  it("an elapsed ticket clock does not inject the cookie", () => {
+    const expired = { ...SESSION, expiresAt: "2026-09-24T07:00:00.000Z" };
+    const decision = rewriteRequest(
+      { url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} },
+      settings(),
+      expired,
+      NOW,
+    );
+    expect(decision.kind).toBe("login_required");
   });
 
   it("login redirect from the gateway itself does not mark the session expired", () => {

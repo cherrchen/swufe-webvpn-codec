@@ -17,7 +17,7 @@
 | ---- | ---- | -------------- | -------- | ---- |
 | App Shell | 进程内模块（Electron Main） | 窗口/托盘（可选）、配置持久化，并作为 Main 侧编排入口暴露 preload IPC | `apps/desktop/src/main/index.ts`（组合根、单实例锁、退出清理 `shutdown.ts`）、`apps/desktop/src/main/ipc.ts`（IF-001）、`apps/desktop/src/main/store.ts`、窗口注册表 `apps/desktop/src/main/window-registry.ts` 与窗口策略 `apps/desktop/src/main/window-policy.ts` | Implemented (M2；托盘未实现) |
 | Login WebView | 进程内模块（Electron Renderer / BrowserWindow） | 承载官方 WebVPN / CAS 登录并保证防环 | `apps/desktop/src/main/session-broker.ts`（`openLogin`，`persist:swufe-login` 分区 + `setProxy({mode:'direct'})`） | Implemented (M2) |
-| Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与失效检测 | `apps/desktop/src/main/session-broker.ts`（采集/清除/监视）、`apps/desktop/src/main/session-probe.ts`（失效信号分类，纯函数） | Implemented (M2；Q-001 的另两个信号留 M3/M4) |
+| Session Broker | 进程内模块（Electron Main） | Cookie 的提取、存储与按票据过期时间失效 | `apps/desktop/src/main/session-broker.ts`（采集/清除/本地到点）、`apps/desktop/src/main/session-probe.ts`（真实流量上的 `302 → /login` 分类，纯函数） | Implemented (M2；不再定时探测门户；Q-001 的另两个信号仍开放) |
 | Proxy Orchestrator | 进程内模块（Electron Main） | 启停 mitm sidecar、设置/清除系统代理、在「系统代理 / 指定应用」两种捕获方式间切换、代理冲突检测 | `apps/desktop/src/main/orchestrator.ts`、`apps/desktop/src/main/state-machine.ts`、`apps/desktop/src/main/sidecar.ts`、`apps/desktop/src/main/platform/`（`exec.ts`、`parse.ts` 与 darwin/win32 适配） | Implemented (M2；Windows 真机验证待 M4) |
 | WRD Codec | 进程内库（App 与 sidecar 共享） | hostname 加解密与 URL 互转（纯函数，无 IO） | `bridges/python/swufe_bridge/wrd_codec.py` | Implemented (M1) |
 | Bridge Addon | 独立进程（mitmproxy sidecar 内的 addon） | 请求改写、响应反向改写与 Cookie 注入；网关自有根命名空间直通；命中网关 bootstrap 判据的 HTML 升级到网关原生 URL 空间 | `bridges/python/swufe_bridge/addon.py`（响应反向改写纯函数与 bootstrap 判据 `bridges/python/swufe_bridge/rewrite.py`；配置面 `bridges/python/swufe_bridge/config.py`；进程入口 `bridges/python/swufe_bridge/sidecar.py`） | Implemented (M1；M5 增加直通与升级) |
@@ -82,11 +82,11 @@ flowchart TD
 
 - 职责：Cookie 的提取、存储与失效检测。
 - 不负责：不做 URL 改写；不持有学号/密码；不做 allowlist 判定。
-- 输入：登录 WebView 的 session partition；探测 URL 的响应（失效信号）。
+- 输入：登录 WebView 的 session partition（票据 cookie 及其过期时间）；sidecar 在真实流量上报告的 `swufe-session expired`。
 - 输出：`SessionState`（Cookie 集合）、登录/过期状态；供 Proxy Orchestrator 推送 sidecar。
 - 依赖：Login WebView 的 session。
 - 被谁依赖：App Shell、Proxy Orchestrator。
-- 关键不变式：Cookie 的唯一读取点；Cookie 不得进入日志（见 INV-001）；登录采集须经门户探测确认有效，停止监测或开始新会话后忽略旧探测结果。
+- 关键不变式：Cookie 的唯一读取点；Cookie 不得进入日志（见 INV-001）；没有票据不算已登录；`expiresAt` 只取票据，到点本地失效，不再定时请求门户。
 - 相关测试：TC-D01、TC-D02、TC-D03、TC-D04。
 - 相关 Spec / ADR：[specs/001-phase1-local-bridge](../../specs/001-phase1-local-bridge/spec.md)。
 

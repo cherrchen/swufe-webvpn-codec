@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   applyNewerCookie,
+  applyTicketSetCookie,
   captureSession,
   createSessionStore,
   decideRoute,
   defaultRoutingPolicy,
   memoryKv,
   parseSession,
+  sessionExpiredByClock,
+  ticketLifetimeFromSetCookie,
+  TICKET_COOKIE_NAME,
   type RoutingPolicy,
+  type SessionRecordV1,
 } from "../src/index.ts";
 
 const NOW = "2026-09-24T08:00:00.000Z";
@@ -160,10 +165,66 @@ describe("IOS-TC-C session", () => {
       cookieHeader: "route=1",
       capturedAt: NOW,
       lastConfirmedAt: NOW,
+      expiresAt: null,
       status: "valid" as const,
     };
     const next = applyNewerCookie(current, { ...current, cookieHeader: "route=2", status: "captured", lastConfirmedAt: null });
     expect(next.cookieHeader).toBe("route=2");
     expect(next.status).toBe("valid");
+  });
+
+  it("C11 an old record without expiresAt stays usable and unknown", () => {
+    const raw = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: gateway,
+      cookieHeader: "route=1",
+      capturedAt: NOW,
+      lastConfirmedAt: null,
+      status: "captured",
+    });
+    const parsed = parseSession(raw);
+    expect(parsed.kind).toBe("ok");
+    if (parsed.kind !== "ok") return;
+    expect(parsed.session.expiresAt).toBeNull();
+    expect(sessionExpiredByClock(parsed.session, "2026-09-25T00:00:00.000Z")).toBe(false);
+  });
+
+  it("C12 ticket Max-Age, Expires, clear, and a shorter auxiliary cookie", () => {
+    const ticket = TICKET_COOKIE_NAME;
+    expect(ticketLifetimeFromSetCookie(`show_faq=1; Max-Age=60\n${ticket}=fake; Max-Age=120`, NOW)).toEqual({
+      kind: "expires",
+      expiresAt: "2026-09-24T08:02:00.000Z",
+      value: "fake",
+    });
+    expect(ticketLifetimeFromSetCookie(`${ticket}=fake; Expires=Thu, 24 Sep 2026 09:00:00 GMT`, NOW)).toMatchObject({
+      kind: "expires",
+      expiresAt: "2026-09-24T09:00:00.000Z",
+    });
+    expect(ticketLifetimeFromSetCookie(`${ticket}=fake; Max-Age=120; Expires=Thu, 24 Sep 2026 09:00:00 GMT`, NOW)).toMatchObject({
+      kind: "expires",
+      expiresAt: "2026-09-24T08:02:00.000Z",
+    });
+    expect(ticketLifetimeFromSetCookie(`${ticket}=; Max-Age=0`, NOW).kind).toBe("expired");
+    expect(ticketLifetimeFromSetCookie(`${ticket}=fake`, NOW).kind).toBe("unknown");
+    expect(ticketLifetimeFromSetCookie("show_faq=1; Max-Age=1", NOW).kind).toBe("absent");
+  });
+
+  it("C13 a later full cookie header keeps the ticket clock", () => {
+    const applied = applyTicketSetCookie(null, `${TICKET_COOKIE_NAME}=fake; Max-Age=3600`, NOW, gateway);
+    expect(applied.kind).toBe("update");
+    if (applied.kind !== "update") return;
+    const captured = captureSession({
+      url: "https://webvpn.swufe.edu.cn/",
+      headers: { cookie: `route=1; ${TICKET_COOKIE_NAME}=fake` },
+      nowIso: NOW,
+      gatewayHost: gateway,
+    });
+    expect(captured.kind).toBe("captured");
+    if (captured.kind !== "captured") return;
+    const next = applyNewerCookie(applied.session, captured.session);
+    expect(next.expiresAt).toBe(applied.session.expiresAt);
+    expect(next.cookieHeader).toContain("route=1");
+    const replaced: SessionRecordV1 = { ...captured.session, cookieHeader: `${TICKET_COOKIE_NAME}=other` };
+    expect(applyNewerCookie(next, replaced).expiresAt).toBeNull();
   });
 });

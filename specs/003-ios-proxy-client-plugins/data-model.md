@@ -38,11 +38,12 @@
   "cookieHeader": "<sensitive>",
   "capturedAt": "2026-09-24T08:00:00.000Z",
   "lastConfirmedAt": null,
+  "expiresAt": null,
   "status": "captured"
 }
 ```
 
-规则：`cookieHeader` 只进入 gateway 请求注入代码；不能进入 console、通知、snapshot；测试只用虚构 Cookie；gateway 改变时旧 Session 自动失效。
+规则：`cookieHeader` 只进入 gateway 请求注入代码；不能进入 console、通知、snapshot；测试只用虚构 Cookie；gateway 改变时旧 Session 自动失效。`expiresAt` 只来自票据 `wengine_vpn_ticketwebvpn_swufe_edu_cn` 的 `Max-Age` 或 `Expires`；旧记录缺该字段时按 `null`（时效未知）读取，不因此清会话。本地时钟到点后不再注入。没有过期属性时不编造时长。服务端提前作废仍只看真实流量（已确认会话后来跳到 CAS，或带着票据访问网关得到 `302 → /login` / 清空票据的 `Set-Cookie`）。Q-001 不因此关闭。
 
 ### 为什么 V1 保存 gateway Cookie header 而不是固定 Cookie 名
 

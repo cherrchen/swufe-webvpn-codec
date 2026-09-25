@@ -14,8 +14,8 @@ export interface SessionLike {
   readonly loggedIn: boolean
   readonly cookies: SessionCookie[]
   getSession(): { loggedIn: boolean; expiresAt?: string | null }
-  probe(): Promise<ProbeResult>
   clear(): Promise<void>
+  /** Arms a local timer for `expiresAt`. No network probe. */
   startMonitor(onExpired: () => void): void
   stopMonitor(): void
 }

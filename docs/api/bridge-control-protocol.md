@@ -90,11 +90,13 @@ swufe-debug {"ts":"2026-09-21T10:00:00+00:00","host":"jwxt.swufe.edu.cn","rewrit
 swufe-ready {"listen_host":"127.0.0.1","listen_port":8080,"config":"/abs/path.json","allowlist":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false,"cookies":1,"debug":false,"upstream_connect_timeout_ms":4000,"upstream_connect_attempts":2,"upstream_log":"/abs/path/bridge-upstream.log"}
 swufe-capture {"enabled":true,"processes":["/Applications/Google Chrome.app/"],"error":null}
 swufe-upstream {"ts":"2026-09-23T10:00:00+00:00","stage":"connect_timeout","host":"webvpn.swufe.edu.cn","addr":"202.115.115.140:443","ms":4013,"detail":"attempt=1"}
+swufe-session expired
 swufe-error CONFIG_INVALID <message>
 swufe-error ALLOWLIST_EMPTY allowlist 为空：请添加主机或启用 *.swufe.edu.cn
 swufe-error LISTEN_NOT_LOOPBACK <message>
 ```
 
+- `swufe-session expired`：已经改写出去的响应把票据带到了网关 `/login`，或 `Set-Cookie` 清空了票据。行上没有 Cookie 值。Electron 据此走会话过期停桥，不另发探测请求。
 - `swufe-debug` 键固定为 `ts` / `host` / `rewritten` / `direction` / `detail`；`detail` 仅取短标记（`not-allowlisted`、`encode-failed`、`location`、`set-cookie`、`body`、`body-skipped`、`no-wrd-match`），**禁止**出现 Cookie 值与请求/响应正文（INV-001）。
 - `swufe-ready` 在 addon `running()` 打印一次，报告生效的 `listen_host` / `listen_port`；`cookies` 只输出条数。`listen_port` 由 `--mode regular@<port>` 推导（sidecar 不传 `--listen-port`）。三个 `upstream_*` 键报告生效的上游建连上限（毫秒）、尝试次数与证据文件路径（`KI-019`）。
 - `swufe-capture`（M3）键固定为 `enabled` / `processes` / `error` 三个：首次应用捕获配置与配置变更后各上报一次。它**不参与就绪判定**（进程捕获是可选能力），失败后不自动重试，直到运行时配置被重写（界面「重试」即再次下发配置）。失败只影响 `BridgeStatus.captureError`，桥保持 `running`。

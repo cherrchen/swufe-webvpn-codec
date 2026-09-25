@@ -92,11 +92,13 @@ swufe-debug {"ts":"2026-09-21T10:00:00+00:00","host":"jwxt.swufe.edu.cn","rewrit
 swufe-ready {"listen_host":"127.0.0.1","listen_port":8080,"config":"/abs/path.json","allowlist":["jwxt.swufe.edu.cn"],"includeSwufeWildcard":false,"cookies":1,"debug":false,"upstream_connect_timeout_ms":4000,"upstream_connect_attempts":2,"upstream_log":"/abs/path/bridge-upstream.log"}
 swufe-capture {"enabled":true,"processes":["/Applications/Google Chrome.app/"],"error":null}
 swufe-upstream {"ts":"2026-09-23T10:00:00+00:00","stage":"connect_timeout","host":"webvpn.swufe.edu.cn","addr":"202.115.115.140:443","ms":4013,"detail":"attempt=1"}
+swufe-session expired
 swufe-error CONFIG_INVALID <message>
 swufe-error ALLOWLIST_EMPTY allowlist 为空：请添加主机或启用 *.swufe.edu.cn
 swufe-error LISTEN_NOT_LOOPBACK <message>
 ```
 
+- `swufe-session expired`: a rewritten response sent the ticket to the gateway `/login`, or a `Set-Cookie` cleared the ticket. The line carries no cookie value. Electron stops the bridge for session expiry and does not send a probe.
 - `swufe-debug` keys are fixed to `ts` / `host` / `rewritten` / `direction` / `detail`; `detail` only takes short markers (`not-allowlisted`, `encode-failed`, `location`, `set-cookie`, `body`, `body-skipped`, `no-wrd-match`), and cookie values and request/response bodies **must never** appear (INV-001).
 - `swufe-ready` is printed once from the addon's `running()` and reports the effective `listen_host` / `listen_port`; `cookies` reports the count only. `listen_port` is derived from `--mode regular@<port>` (the sidecar never passes `--listen-port`). The three `upstream_*` keys report the effective upstream connect bound (ms), the attempt count and the evidence file path (`KI-019`).
 - `swufe-capture` (M3) has exactly three keys — `enabled` / `processes` / `error` — and is printed once on first apply of the capture configuration and again after every change. It does **not** gate readiness (process capture is optional) and a failure is not retried until the runtime configuration is rewritten (the UI's retry button re-pushes it). A failure only fills `BridgeStatus.captureError`; the bridge stays `running`.

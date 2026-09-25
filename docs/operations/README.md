@@ -38,7 +38,7 @@
   - `<userData>/mitmproxy/`：MITM CA 的 confdir（私钥 `0600`），同时也是 sidecar 的 `--confdir`。
   - `<userData>/Partitions/swufe-login/`：登录会话（Electron 持久分区，不写 `session.bin`）；会话 Cookie 位置与加密见 [security/README.md](../security/README.md) 第 4 节。
 - **配置来源与优先级**：持久文件是唯一来源，构建期默认值只用于缺键/首次启动；`settings.bridgePort` 与 `settings.webvpnBase` 在开桥时读取并下发，运行期标记 `systemProxyManagedByApp` 由 Proxy Orchestrator 写入。配置如何下发到 sidecar 见 [bridge-control-protocol.md](../api/bridge-control-protocol.md)。
-- **开发期覆盖**：`--user-data-dir <dir>`（或 `SWUFE_USER_DATA_DIR`）覆盖 `userData`；`SWUFE_REPO_ROOT` 覆盖仓库根路径；`SWUFE_PYTHON` 指定运行 sidecar/CA 入口的解释器；`SWUFE_PROBE_INTERVAL_MS` 覆盖会话过期探测间隔。
+- **开发期覆盖**：`--user-data-dir <dir>`（或 `SWUFE_USER_DATA_DIR`）覆盖 `userData`；`SWUFE_REPO_ROOT` 覆盖仓库根路径；`SWUFE_PYTHON` 指定运行 sidecar/CA 入口的解释器。会话过期看票据 `expiresAt`，不再用 `SWUFE_PROBE_INTERVAL_MS` 定时探测。
 - **密钥处理**：见 [security/README.md](../security/README.md)。
 
 ## 3. 部署

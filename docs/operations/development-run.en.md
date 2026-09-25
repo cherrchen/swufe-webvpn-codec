@@ -48,7 +48,7 @@ pnpm start --user-data-dir=/tmp/swufe-dev         # isolated profile
 | `SWUFE_USER_DATA_DIR` | Equivalent to `--user-data-dir <dir>` |
 | `SWUFE_REPO_ROOT` | Overrides the repository root (defaults to two levels above the app directory, i.e. the repository root) |
 | `SWUFE_PYTHON` | Interpreter for the sidecar / CA entry point (default `<repo>/bridges/python/.venv/bin/python`, falling back to `uv run --project <repo>/bridges/python python`) |
-| `SWUFE_PROBE_INTERVAL_MS` | Session-expiry probe interval (default 30000ms; acceptance runs may lower it, e.g. 8000) |
+| `SWUFE_PROBE_INTERVAL_MS` | Retired. Session validity follows the ticket expiry; the app no longer probes the portal on a timer |
 | `SWUFE_RENDERER_URL` | Where the renderer is loaded from: when set, Main switches to `loadURL('<url>/<entry>.html')` with the development CSP (otherwise it loads the static output under `apps/desktop/dist/renderer/*.html`). It affects the renderer load path only — never the bridge, the sidecar or the system proxy |
 
 ### 3.1 Renderer development (HMR, from M6)
