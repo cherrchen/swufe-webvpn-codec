@@ -222,7 +222,7 @@ N01 已通过。N02 在 2026-09-25 的 tyxycg 真机尝试中观察到代理执�
 | N01 | Safari 完成 WebVPN 登录 | Stash 脚本捕获含核心 ticket 的 Gateway Cookie，并持久化为 `swufe.session.v1`；证据不包含 Cookie value | Passed（2026-09-25 最新 Stash M2 观察；详见 verification） |
 | N02 | 第三方 App/WKWebView 无 Gateway Cookie 直接请求 Gateway；stored Session ready；`WRAPPED_RESOURCE` 且 login intent 为 none | 代理层向 gateway request 注入 stored Gateway Session；同一客户端 Cookie Jar 不需要有 ticket；WebVPN 不应仅因客户端缺 Cookie 而重新进入 Gateway login | Failed（2026-09-25：Safari 页面与 Tile 均显示已登录后，执行注入仍跳 Gateway 登录；stored 内部状态为 `captured`） |
 | N03 | request 带 ticket B，stored ticket 为 A | 保留请求 Cookie B、不附加或替换为 A；capture/refresh B 到 store 并 PASS | Pending |
-| N04 | stored Gateway Session 已过期或核心 ticket 缺失 | 不注入；PASS/允许官方登录继续；不得只因出现 CAS 页面/redirect 清除 stored Gateway Session；只有独立 Gateway 失效证据才能清除 | Pending |
+| N04 | stored Gateway Session 已过期或核心 ticket 缺失；另测其它 App 无 ticket/不同 ticket 的 `/login` 响应删除 ticket | 过期/缺 ticket 时不注入，PASS/允许官方登录；CAS 页面/redirect 或与 stored ticket 不匹配的删除信号不得清除共享 Session；匹配的删除信号才清理 | Pending |
 | N05 | 用户确认的 Gateway `https://webvpn.swufe.edu.cn/logout` request（可带 query） | 不注入旧 Session；请求时清除 `swufe.session.v1`；响应不得重新存入 ticket；Stash 真机脚本命中与清理结果仍待取证 | Pending |
 | N06 | `https://webvpn.swufe.edu.cn/__swufe_bridge__/...` Settings Namespace | 本地 synthetic response；不注入、不 capture、不请求 upstream | Pending |
 | N07 | raw `authserver.swufe.edu.cn` request | PASS；无 Gateway Session 注入；无 CAS Cookie/credential 捕获或保存 | Pending |

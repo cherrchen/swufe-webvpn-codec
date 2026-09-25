@@ -107,6 +107,7 @@ describe("Stash adapter", () => {
     expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=B`);
     expect(logs.join("\n")).toContain("ticketSetCookie=rotated");
     expect(logs.join("\n")).not.toContain(`${TICKET_COOKIE_NAME}=B`);
+    rt.request = { url: "https://webvpn.swufe.edu.cn/http/opaque/path", headers: { cookie: `${TICKET_COOKIE_NAME}=B` } };
     rt.response = { status: 302, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=; Max-Age=0`, location: "/login" } };
     handleStashResponse(rt);
     expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
@@ -125,8 +126,32 @@ describe("Stash adapter", () => {
     expect(output).toContain("targetScheme=https responseVisibleTicket=missing");
     expect(output).toContain("locationGatewayKind=login");
     expect(output).toContain("locationGatewaySignal=-");
-    expect(output).toContain("ticketSetCookie=expired");
+    expect(output).toContain("ticketSetCookie=expired-ignored");
     expect(output).not.toMatch(/secret|\/https\/[a-z0-9]+|wengine_vpn_ticketwebvpn_swufe_edu_cn=/);
+  });
+
+  it("preserves Safari's stored ticket when another App receives a gateway ticket deletion", () => {
+    const logs: string[] = [];
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/login", headers: {} },
+      response: { status: 302, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=; Max-Age=0`, location: "https://authserver.swufe.edu.cn/authserver/login" } },
+      debug: (record) => logs.push(JSON.stringify(record)),
+    });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=safari-secret`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "captured" });
+    handleStashResponse(rt);
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=safari-secret`);
+    expect(logs.join("\n")).toContain("ticketSetCookie=expired-ignored");
+    expect(rt.store[STORAGE_KEYS.lastError]).toBeUndefined();
+
+    rt.request = { url: "https://webvpn.swufe.edu.cn/login", headers: { cookie: `${TICKET_COOKIE_NAME}=other-app-secret` } };
+    handleStashResponse(rt);
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=safari-secret`);
+    expect(logs.join("\n")).not.toMatch(/safari-secret|other-app-secret/);
+
+    rt.request = { url: "https://webvpn.swufe.edu.cn/login", headers: { cookie: `${TICKET_COOKIE_NAME}=safari-secret` } };
+    handleStashResponse(rt);
+    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+    expect(logs.join("\n")).toContain("ticketSetCookie=expired");
   });
 
   it("classifies an observed gateway failed redirect without logging request secrets", () => {

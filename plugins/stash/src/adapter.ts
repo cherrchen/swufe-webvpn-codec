@@ -414,7 +414,7 @@ function sessionStatus(runtime: StashRuntime): "logged-in" | "logged-out" | "exp
   return "logged-in";
 }
 
-type GatewayTicketEvent = "none" | "new" | "same" | "rotated" | "expired";
+type GatewayTicketEvent = "none" | "new" | "same" | "rotated" | "expired" | "expired-ignored";
 
 function observeGatewayTicket(runtime: StashRuntime, gatewayBase: string): GatewayTicketEvent {
   const request = runtime.request;
@@ -434,8 +434,15 @@ function observeGatewayTicket(runtime: StashRuntime, gatewayBase: string): Gatew
     const previous = store.load();
     const applied = applyTicketSetCookie(previous, setCookie, runtime.nowIso, gateway);
     if (applied.kind === "expired") {
-      expireStoredSession(runtime, host);
-      return "expired";
+      // A different App can receive a ticket deletion while Safari's stored
+      // ticket remains usable. Clear only when this request used that ticket.
+      const requestTicket = cookiePairValue(headerValue(request.headers ?? {}, "cookie"), TICKET_COOKIE_NAME);
+      const storedTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
+      if (requestTicket !== null && requestTicket === storedTicket) {
+        expireStoredSession(runtime, host);
+        return "expired";
+      }
+      return "expired-ignored";
     }
     if (applied.kind === "update") {
       store.save(applied.session);

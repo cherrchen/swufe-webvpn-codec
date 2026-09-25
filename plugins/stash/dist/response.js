@@ -1,4 +1,4 @@
-/* swufe-webvpn stash dd1140d */
+/* swufe-webvpn stash 0df0af9 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -2083,8 +2083,13 @@
       const previous = store.load();
       const applied = applyTicketSetCookie(previous, setCookie, runtime.nowIso, gateway);
       if (applied.kind === "expired") {
-        expireStoredSession(runtime, host);
-        return "expired";
+        const requestTicket = cookiePairValue(headerValue(request.headers ?? {}, "cookie"), TICKET_COOKIE_NAME);
+        const storedTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
+        if (requestTicket !== null && requestTicket === storedTicket) {
+          expireStoredSession(runtime, host);
+          return "expired";
+        }
+        return "expired-ignored";
       }
       if (applied.kind === "update") {
         store.save(applied.session);
