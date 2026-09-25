@@ -214,7 +214,7 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 ### Stash 请求诊断（2026-09-25）
 
-request/response 脚本新增安全摘要：每个被处理请求生成短 trace id；rewrite 请求把该 id 暂存供 response 脚本关联。POST body 仅记录存在性与 UTF-8 字节长度，当前 Stash `$done({url, headers})` 接口看不到改写后的 body，因此 `requestBodyPreserved=unknown`，不计算 body hash。此暂存关联只保留最近一条待响应记录；并发同路径请求可能无法可靠配对，日志不得据此认定关联成功，需结合时间、method、host/path核对。
+request/response 脚本新增安全摘要：每个被处理请求生成短 trace id；rewrite 请求把该 id 暂存供 response 脚本关联。request 规则启用 `require-body: true` 后，POST body 仅记录存在性与 UTF-8 字节长度，正文不输出且不计算 body hash。Stash `$done({url, headers})` 接口看不到改写后的 body，因此 `requestBodyPreserved=unknown`。启用 body 暴露会增加 Stash 缓冲内存占用。此暂存关联只保留最近一条待响应记录；并发同路径请求可能无法可靠配对，日志不得据此认定关联成功，需结合时间、method、host/path核对。
 
 响应摘要记录 body 类型与长度、Content-Type、Set-Cookie 名称及启发式来源分类。`bodyOriginGuess=upstream-api` 只表示 wrapped-resource JSON 的启发式判断，不证明响应一定由 bctest 生成；`applicationSessionCandidate` 也只表示响应出现疑似应用 Cookie 名，不代表 session 有效。Cookie、Set-Cookie、Authorization、UA 原文及请求/响应正文不得进入日志。
 

@@ -8,7 +8,7 @@ homepage: https://github.com/cherrchen/swufe-webvpn-codec
 icon: network
 category: SWUFE
 date: 2026-09-24
-version: 0.1.17-m2-diag
+version: 0.1.18-m2-bodydiag
 
 tiles:
   - name: swufe-webvpn-tile
@@ -22,13 +22,13 @@ tiles:
 
 script-providers:
   swufe-webvpn-request:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.17-m2-diag
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.18-m2-bodydiag
     interval: 86400
   swufe-webvpn-request-settings:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.17-m2-diag
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.18-m2-bodydiag
     interval: 86400
   swufe-webvpn-response:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/response.js?v=0.1.17-m2-diag
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/response.js?v=0.1.18-m2-bodydiag
     interval: 86400
   swufe-webvpn-tile:
     url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/tile.js?v=0.1.16-m2
@@ -61,7 +61,7 @@ http:
     - match: ^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn
       name: swufe-webvpn-request
       type: request
-      require-body: false
+      require-body: true
       timeout: 10
     - match: ^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn
       name: swufe-webvpn-response
