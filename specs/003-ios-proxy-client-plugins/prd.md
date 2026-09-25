@@ -278,7 +278,7 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 
 - Gateway Session 捕获时没有确认的 Gateway ticket：保持未登录，不写空或不完整 Session。
 - Session 中包含多个 Cookie：按 gateway scope 保存，后续由最小化测试决定是否可裁剪。
-- Gateway 请求带新的 ticket B 而 stored Session 是 A：保留请求的 B、不注入 A，并 capture/refresh 为 B。
+- Gateway WRD 请求解码到已选目标、请求带 ticket B 而 stored Session 是 A：代理发往 Gateway 的请求使用 A，保留其它请求 Cookie；不得把 B 因单次请求写入共享 store。Gateway 根页、登录、退出、Settings 与未知路径不得用 A 覆盖 B；根页携 B 获得 200 且没有未绑定的新 ticket 下发时，可确认新会话并切换 store。
 - Gateway 请求无 ticket 但有可用存储：只对允许注入的 Gateway Request Kind 注入；LOGIN/LOGOUT/Settings/unknown 按分类拒绝注入。
 - Logout endpoint 确认后：不注入旧 Session，并清理本地 Gateway Session；具体真实 pathname 未确认前保留 Pending。
 - CAS 页面再次出现：不能单独判定 Gateway Session 复用失败；可能是 Gateway 成功访问业务站点后，业务系统自行要求 CAS，而 WKWebView 没有 Safari CAS Cookie。

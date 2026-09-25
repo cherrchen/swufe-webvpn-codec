@@ -62,7 +62,7 @@
 ## Phase M2 Gateway Session Realm Follow-up
 
 - [x] T050 实现 Gateway Request Kind classifier 的已知路径部分；Settings/WRD/root/login/精确 `/logout`/other 分类与未知路径默认不注入已有单测，callback 真实路径仍归 T052 真机确认 — 依赖：T011,T040 — 验证：本地 classifier matrix；N02/N04/N05/N06/N10 真机 Pending — 关联：IOS-REQ-016/017
-- [x] T051 实现 direct Gateway Session injection：仅 webvpn.swufe.edu.cn、仅策略允许、request 无核心 ticket、stored session ready 时注入；请求 Cookie 同名值优先；ticket B capture/refresh 并 pass — 依赖：T010,T050 — 验证：本地 Core/Adapter；N02 真机 Failed（注入后仍由 Gateway 要求登录），N03–N04 Pending — 关联：IOS-REQ-016
+- [x] T051 实现 direct Gateway Session injection：仅 webvpn.swufe.edu.cn、仅策略允许的 WRD 资源且 stored session ready 时使用 stored ticket，即使 request 自带不同 ticket；其它 Gateway 路径不覆盖请求 ticket；根页 200 才确认不同的新 ticket — 依赖：T010,T050 — 验证：本地 Core/Adapter；新策略 N02/N03–N04 真机 Pending — 关联：IOS-REQ-016
 - [ ] T052 用户已确认正常 LOGOUT 为 `/logout`，本地已实现 request/response 双入口清理及不注入；仍需真机复核 Stash 脚本命中、LOGIN/AUTH_CALLBACK 路径、未知 pathname pass/no-injection — 依赖：T050,T051 — 验证：N04/N05/N10 — 关联：IOS-REQ-017
 - [ ] T053 实现 Safe Auth Trace allowlist 与本地脱敏输出；支持 login-intent classification、raw authserver / WRD-wrapped authserver / redirect host / CAS service target hostname / tyxycg 阶段诊断 — 依赖：T015,T050,T051 — 验证：N07–N09；敏感字段负向审计 — 关联：IOS-REQ-018
 - [ ] T054 Stash 真机验证 direct Gateway reuse、ticket precedence、过期、logout、login intent、Settings/authserver negative cases 与 tyxycg 诊断；记录宿主版本及脱敏证据 — 依赖：T051–T053,T058 — 验证：N02–N10 — 关联：AC-IOS-011..014

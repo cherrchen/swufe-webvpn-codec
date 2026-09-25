@@ -27,6 +27,7 @@ export const SETTINGS_PAGE_HTML = `<!DOCTYPE html>
 <body>
 <h1>SWUFE WebVPN</h1>
 <p id="status" class="meta">状态：读取中</p>
+<p class="meta">已选网站在同一 Stash 中共用当前 WebVPN 账号。</p>
 <p id="warning" class="banner" hidden>部分旧网站设置不再受支持，请检查当前列表</p>
 <p id="feedback" class="banner" hidden></p>
 <section id="builtin"></section>

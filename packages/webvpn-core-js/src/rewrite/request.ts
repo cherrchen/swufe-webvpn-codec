@@ -69,7 +69,19 @@ export function rewriteRequest(
     if (parsed.hostname.toLowerCase() !== gatewayHost(settings.gatewayBase)) return { kind: "pass" };
     const kind = classifyGatewayRequest(request.url);
     if (kind === "settings" || kind === "logout") return { kind: "pass" };
-    if (cookiePairValue(headerValue(request.headers, "cookie"), TICKET_COOKIE_NAME) !== null) {
+    const requestTicket = cookiePairValue(headerValue(request.headers, "cookie"), TICKET_COOKIE_NAME);
+    const usable = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) && !sessionExpiredByClock(session, nowIso) ? session : null;
+    const storedTicket = usable ? cookiePairValue(usable.cookieHeader, TICKET_COOKIE_NAME) : null;
+    const injectable = gatewayRequestAllowsInjection(kind) && (kind !== "gateway-root" || /^(GET|HEAD)$/i.test(request.method))
+      && (kind !== "wrapped-resource" || wrappedHostIsAllowed(request.url, settings));
+    // A WRD request for an enabled resource uses the shared Gateway ticket,
+    // even when this client carries a different ticket from its own Cookie Jar.
+    if (kind === "wrapped-resource" && injectable && usable && storedTicket !== null && requestTicket !== storedTicket) {
+      return { kind: "inject_gateway_session", headers: injectCookie(request.headers, usable.cookieHeader, true) };
+    }
+    // Conflicting client tickets on login/root/unknown endpoints keep their
+    // own flow, but cannot replace the shared session merely by being sent.
+    if (requestTicket !== null && (storedTicket === null || storedTicket === requestTicket)) {
       const captured = captureSession({
         url: request.url,
         headers: request.headers,
@@ -78,11 +90,7 @@ export function rewriteRequest(
       });
       if (captured.kind === "captured") return { kind: "capture_session", session: captured.session, pass: true };
     }
-    const usable = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
-    if (gatewayRequestAllowsInjection(kind) && (kind !== "gateway-root" || /^(GET|HEAD)$/i.test(request.method))
-      && (kind !== "wrapped-resource" || wrappedHostIsAllowed(request.url, settings))
-      && usable && !sessionExpiredByClock(usable, nowIso)
-      && cookiePairValue(usable.cookieHeader, TICKET_COOKIE_NAME) !== null) {
+    if (requestTicket === null && injectable && usable && storedTicket !== null) {
       return { kind: "inject_gateway_session", headers: injectCookie(request.headers, usable.cookieHeader) };
     }
     return { kind: "pass" };
@@ -130,7 +138,7 @@ export function rewriteRequest(
     return { kind: "error", code: "CODEC_FAILED" };
   }
 
-  const headers = injectCookie(request.headers, usable.cookieHeader);
+  const headers = injectCookie(request.headers, usable.cookieHeader, true);
   rewriteOrigin(headers, request.headers, route.originalHost, settings);
   rewriteReferer(headers, request.headers, settings, codec);
   return {
@@ -177,14 +185,16 @@ export function wrdPrefixOf(wrdUrl: string): string {
   return `/${parts.slice(0, 2).join("/")}`;
 }
 
-function injectCookie(headers: Record<string, string>, sessionCookie: string): Record<string, string> {
+function injectCookie(headers: Record<string, string>, sessionCookie: string, replaceTicket = false): Record<string, string> {
   const next: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
     if (key.toLowerCase() !== "cookie") {
       next[key] = value;
     }
   }
-  const existing = headerValue(headers, "cookie");
+  const existing = replaceTicket
+    ? parseCookies(headerValue(headers, "cookie")).filter((pair) => pair.name !== TICKET_COOKIE_NAME).map((pair) => `${pair.name}=${pair.value}`).join("; ")
+    : headerValue(headers, "cookie");
   next.cookie = mergeCookies(existing, sessionCookie);
   return next;
 }

@@ -114,6 +114,10 @@ N02 真机结果为 Failed，其余 N03–N10 仍 Pending。当前本地实现�
 
 这轮结果暴露 Scope 冲突：现行 N03 要求请求自带 ticket B 时 B 优先且立即更新唯一 store；一旦独立 App 已有自己的 B，即使它无法通过 Gateway，该规则也会阻止注入 Safari 的 A，并可能把 store 改成 B。仅拦截响应侧的无 ticket rotation 无法解决请求侧覆盖。是否允许在 Gateway 明确拒绝 B 后进行受限回退，或引入并行候选 Session/可信度与客户端关联，需单独设计；当前证据不足以安全地把 A 强行覆盖到已有 B 的请求。CAS Cookie 跨 App 共享仍不在 M2 范围。
 
+2026-09-25 用户明确授权推翻“客户端自带 ticket B 永远优先”的旧策略。0.1.16-m2 本地实现仅在 Gateway host、WRD 解码目标已选、stored Session 可用时，使用 stored 核心 ticket A 替换客户端不同的 B；其它客户端 Cookie 保留，URL 不变。login/logout/Settings/gateway-owned/unknown 不覆盖 B；root B 也保留，携 B 的 Gateway 根页 200 在没有未绑定的新 ticket 下发时才确认新 Session 并切换 store；已绑定的响应轮换 ticket 优先保留。冲突 B 的单次 request 不再把唯一 store 覆盖为 B，避免 0.1.15 日志中的 App Gateway-owned capture 污染。直接 `/logout`、时钟到期和匹配 ticket 删除仍清理；raw authserver 继续 PASS。该策略可能使浏览器已获得的较新 B 在 WRD 资源上被旧 A 暂时覆盖、导致浏览器访问失败；根页 200 确认或显式 logout 后重新登录是恢复路径。若 Gateway 绑定设备、连接或辅助 Cookie，仅替换核心 ticket 也可能不足。N02/N03 真机状态保持 Pending，不能以本地测试宣称 App 已可访问；CAS Cookie 跨 App 共享仍未实现。
+
+0.1.16-m2 本地回归（不是真机结论）：Core 75 个测试、Stash 35 个测试，两包 typecheck、Stash bundle scan、`docs:check`、`spec:check`、`git diff --check` 均通过。Core/Adapter 覆盖 WRD 冲突 ticket 替换、Gateway-only 边界、非 ticket Cookie 保留、root/login/gateway-owned 不覆盖、冲突单次请求不污染 store、root 302 不确认而 root 200 确认、logout 与已有防环流程。新增 `responseTicketRelation` 只输出 same/different/missing 分类，供真机判断响应脚本可见的 ticket 与修改前 store 的关系；它不证明上游收到或接受 stored ticket。
+
 2026-09-25 本地回归：`pnpm --filter webvpn-core-js test` 75 passed，`typecheck` 通过；`pnpm --filter swufe-webvpn-stash test` 30 passed，bundle scan 与 `typecheck` 通过。覆盖 gateway classifier、ticket B precedence、direct WRD 注入、Settings/authserver 排除、`/logout` 请求与响应清理、过期、Set-Cookie rotation、CAS-only redirect 与既有 bootstrap/response reverse rewrite 防环；新增原生 WRD response 的安全状态/轮换诊断测试。`pnpm docs:check`、`pnpm spec:check` 与 `git diff --check` 通过。Stash 官方 [Rewrite HTTP 文档](https://stash.wiki/en/script/rewrite-requests) 的 `$done(value)` 字段表允许只返回 `headers`；目标设备上的 headers-only 行为仍待验证。
 
 ## 执行的命令与结果

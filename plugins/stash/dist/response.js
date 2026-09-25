@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 7c3ab2a */
+/* swufe-webvpn stash 0bc1702 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -934,6 +934,21 @@
       }
     };
   }
+  function applyNewerCookie(current, captured) {
+    if (current.gatewayHost !== captured.gatewayHost) {
+      return captured;
+    }
+    if (current.cookieHeader === captured.cookieHeader) {
+      return current;
+    }
+    const sameTicket = cookiePairValue(current.cookieHeader, TICKET_COOKIE_NAME) === cookiePairValue(captured.cookieHeader, TICKET_COOKIE_NAME);
+    return {
+      ...captured,
+      expiresAt: sameTicket ? captured.expiresAt ?? current.expiresAt : captured.expiresAt,
+      status: current.status === "valid" ? "valid" : "captured",
+      lastConfirmedAt: current.status === "valid" ? current.lastConfirmedAt : null
+    };
+  }
   function sessionExpiredByClock(session, nowIso) {
     if (!session.expiresAt) return false;
     const expires = Date.parse(session.expiresAt);
@@ -1062,7 +1077,14 @@
       if (parsed.hostname.toLowerCase() !== gatewayHost(settings.gatewayBase)) return { kind: "pass" };
       const kind = classifyGatewayRequest(request.url);
       if (kind === "settings" || kind === "logout") return { kind: "pass" };
-      if (cookiePairValue(headerValue(request.headers, "cookie"), TICKET_COOKIE_NAME) !== null) {
+      const requestTicket = cookiePairValue(headerValue(request.headers, "cookie"), TICKET_COOKIE_NAME);
+      const usable2 = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) && !sessionExpiredByClock(session, nowIso) ? session : null;
+      const storedTicket = usable2 ? cookiePairValue(usable2.cookieHeader, TICKET_COOKIE_NAME) : null;
+      const injectable = gatewayRequestAllowsInjection(kind) && (kind !== "gateway-root" || /^(GET|HEAD)$/i.test(request.method)) && (kind !== "wrapped-resource" || wrappedHostIsAllowed(request.url, settings));
+      if (kind === "wrapped-resource" && injectable && usable2 && storedTicket !== null && requestTicket !== storedTicket) {
+        return { kind: "inject_gateway_session", headers: injectCookie(request.headers, usable2.cookieHeader, true) };
+      }
+      if (requestTicket !== null && (storedTicket === null || storedTicket === requestTicket)) {
         const captured = captureSession({
           url: request.url,
           headers: request.headers,
@@ -1071,8 +1093,7 @@
         });
         if (captured.kind === "captured") return { kind: "capture_session", session: captured.session, pass: true };
       }
-      const usable2 = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
-      if (gatewayRequestAllowsInjection(kind) && (kind !== "gateway-root" || /^(GET|HEAD)$/i.test(request.method)) && (kind !== "wrapped-resource" || wrappedHostIsAllowed(request.url, settings)) && usable2 && !sessionExpiredByClock(usable2, nowIso) && cookiePairValue(usable2.cookieHeader, TICKET_COOKIE_NAME) !== null) {
+      if (requestTicket === null && injectable && usable2 && storedTicket !== null) {
         return { kind: "inject_gateway_session", headers: injectCookie(request.headers, usable2.cookieHeader) };
       }
       return { kind: "pass" };
@@ -1115,7 +1136,7 @@
       }
       return { kind: "error", code: "CODEC_FAILED" };
     }
-    const headers = injectCookie(request.headers, usable.cookieHeader);
+    const headers = injectCookie(request.headers, usable.cookieHeader, true);
     rewriteOrigin(headers, request.headers, route.originalHost, settings);
     rewriteReferer(headers, request.headers, settings, codec);
     return {
@@ -1158,14 +1179,14 @@
     const parts = path.split("/");
     return `/${parts.slice(0, 2).join("/")}`;
   }
-  function injectCookie(headers, sessionCookie) {
+  function injectCookie(headers, sessionCookie, replaceTicket = false) {
     const next = {};
     for (const [key, value] of Object.entries(headers)) {
       if (key.toLowerCase() !== "cookie") {
         next[key] = value;
       }
     }
-    const existing = headerValue(headers, "cookie");
+    const existing = replaceTicket ? parseCookies(headerValue(headers, "cookie")).filter((pair) => pair.name !== TICKET_COOKIE_NAME).map((pair) => `${pair.name}=${pair.value}`).join("; ") : headerValue(headers, "cookie");
     next.cookie = mergeCookies(existing, sessionCookie);
     return next;
   }
@@ -1922,7 +1943,9 @@
       runtime.finishResponse({});
       return;
     }
+    const priorSession = createSessionStore(kv(runtime)).load();
     const ticketEvent = observeGatewayTicket(runtime, settings.gatewayBase);
+    confirmGatewayRootSession(runtime, settings.gatewayBase, ticketEvent);
     const rewriteSettings = toRewriteSettingsFromV2(settings);
     const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
     if (context && !context.gatewayOwned && isNativeGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
@@ -1931,7 +1954,7 @@
         host: safeHost(runtime.request.url),
         direction: "response",
         action: "pass",
-        detail: responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent)
+        detail: responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession)
       });
       runtime.finishResponse({});
       return;
@@ -1946,7 +1969,7 @@
       rewriteSettings
     );
     const host = context?.originalHost ?? safeHost(runtime.request.url);
-    const detail = responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent);
+    const detail = responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession);
     const store = createSessionStore(kv(runtime));
     const session = store.load();
     const confirmedExpiry = result.sessionExpired && session?.status === "valid";
@@ -2100,6 +2123,18 @@
     }
     return "none";
   }
+  function confirmGatewayRootSession(runtime, gatewayBase, ticketEvent) {
+    const request = runtime.request;
+    if (!request?.url || runtime.response?.status !== 200 || classifyGatewayRequest(request.url) !== "gateway-root" || safeHost(request.url) !== gatewayHost(gatewayBase) || ticketEvent === "expired" || ticketEvent === "expired-ignored" || ticketEvent === "unbound-ignored") return;
+    const captured = captureSession({ url: request.url, headers: request.headers ?? {}, nowIso: runtime.nowIso, gatewayHost: gatewayHost(gatewayBase) });
+    if (captured.kind !== "captured" || cookiePairValue(captured.session.cookieHeader, TICKET_COOKIE_NAME) === null) return;
+    const store = createSessionStore(kv(runtime));
+    const previous = store.load();
+    const next = ticketEvent !== "none" && previous ? previous : previous && cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) === cookiePairValue(captured.session.cookieHeader, TICKET_COOKIE_NAME) ? applyNewerCookie(previous, captured.session) : captured.session;
+    store.save(promoteSession(next, runtime.nowIso));
+    runtime.write(STORAGE_KEYS.lastError, null);
+    emit(runtime, false, { ts: runtime.nowIso, host: gatewayHost(gatewayBase), direction: "response", action: "session-captured", detail: "route=gateway gatewayKind=gateway-root sessionAction=confirm" });
+  }
   function expireStoredSession(runtime, host) {
     createSessionStore(kv(runtime)).clear();
     writeLastError(runtime, "SESSION_EXPIRED", host);
@@ -2158,7 +2193,7 @@
       return null;
     }
   }
-  function responseDetail(response, requestUrl2, requestHeaders, settings, ticketEvent) {
+  function responseDetail(response, requestUrl2, requestHeaders, settings, ticketEvent, priorSession) {
     const rawLocation = headerValue(response.headers ?? {}, "location");
     let locationUrl = null;
     try {
@@ -2173,8 +2208,11 @@
     const locationGatewayKind = locationUrl && locationHost === gatewayHost(settings.gatewayBase) ? classifyGatewayRequest(locationUrl) : "-";
     const locationGatewaySignal = locationUrl && locationGatewayKind === "gateway-owned" ? gatewayOwnedSignal(locationUrl) : "-";
     const responseVisibleTicket = requestHost === gatewayHost(settings.gatewayBase) ? cookiePairValue(headerValue(requestHeaders ?? {}, "cookie"), TICKET_COOKIE_NAME) !== null ? "present" : "missing" : "-";
+    const responseTicket = requestHost === gatewayHost(settings.gatewayBase) ? cookiePairValue(headerValue(requestHeaders ?? {}, "cookie"), TICKET_COOKIE_NAME) : null;
+    const storedTicket = priorSession ? cookiePairValue(priorSession.cookieHeader, TICKET_COOKIE_NAME) : null;
+    const responseTicketRelation = requestHost !== gatewayHost(settings.gatewayBase) ? "-" : responseTicket === null ? "missing" : storedTicket === null ? "no-stored-ticket" : responseTicket === storedTicket ? "same" : "different";
     const authKind = locationHost === "authserver.swufe.edu.cn" ? "raw-authserver" : wrapped?.originalHost === "authserver.swufe.edu.cn" ? "wrapped-authserver" : "none";
-    return `status=${response.status ?? 0} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} targetScheme=${requestGatewayKind === "wrapped-resource" ? wrappedSchemeOf(requestUrl2) : "-"} responseVisibleTicket=${responseVisibleTicket} ticketSetCookie=${ticketEvent} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationGatewaySignal=${locationGatewaySignal} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
+    return `status=${response.status ?? 0} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} targetScheme=${requestGatewayKind === "wrapped-resource" ? wrappedSchemeOf(requestUrl2) : "-"} responseVisibleTicket=${responseVisibleTicket} responseTicketRelation=${responseTicketRelation} ticketSetCookie=${ticketEvent} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationGatewaySignal=${locationGatewaySignal} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
   }
   function gatewayOwnedSignal(url) {
     try {

@@ -93,13 +93,13 @@
 | Q-007 | wildcard MitM、SWUFE 子域 script match、HTTP 子域 force-http-engine | 动态自定义 Domain | Open / Gate D | 是；失败时改用静态 interception 列表 |
 | Q-008 | `DOMAIN-SUFFIX,swufe.edu.cn` QUIC 规则在目标 iOS Override 真机命中与 TCP 回落 | 子域 HTTPS script | Open / Gate D | M2 发布前 |
 | Q-009 | Tile `$done({url})` 动态切换到 Settings 是否可靠 | Tile Journey | Open / M2 | 否；固定 Settings + 独立登录按钮为退化 |
-| Q-010 | 独立 App 已携带与 Safari 不同、且被 Gateway 拒绝的 ticket 时，如何在请求 Cookie 优先规则下复用 Safari Session；是否需要候选 Session 与可信度/客户端关联，或经明确失效证据后受限回退 | 跨 App Gateway Session 正确性及安全边界 | Open / M2；N02 真机失败 | 是；不得直接覆盖请求自带 ticket |
 | Q-010 | 16 KiB 以上 Settings POST 能否本地 413 且保证不被 Stash `max-size` 跳过后发往 upstream | Settings API 安全 | Open / Gate D | 是；失败则不能交付 POST API |
 
 | Q-011 | LOGIN、LOGOUT、AUTH_CALLBACK 与 GATEWAY_OWNED 的真实 pathname / request intent 是什么 | Gateway classifier 与登录/登出安全 | 部分确认：`/login` 已见于既有链路；用户真机确认正常 logout 为精确 `/logout`；callback 与其它 owned 路径仍 Open、默认不注入 | 是，未知路径默认 no-injection |
 | Q-012 | 独立 App/WKWebView 的 direct Gateway request 是否稳定进入 Stash HTTP Engine，以及哪些 Gateway Request Kind 可安全复用 Session | Inter-App Gateway Session Reuse | Open；按应用/宿主版本取证 | 是，N02 前不得宣称已支持 |
 | Q-013 | raw authserver、WRD-wrapped authserver 与 tyxycg 的 redirect/service 目标如何在 Safe Auth Trace 中区分 | Auth flow diagnosis / 隐私 | Open；service 仅抽取 target hostname | Trace 实现可先并行，解释业务因果需实机 |
 | Q-014 | tyxycg 在 Gateway 已认证后是否会自行要求 CAS，哪些响应组合才足以判定 Gateway Session 失效 | 登录解释与 expired 判定 | Open；不得仅因再次出现 CAS 清除 Session | 是，tyxycg E2E 前保留为未知 |
+| Q-015 | stored ticket A 覆盖 App 自带 ticket B 后，Gateway 是否接受 A；新网页登录的 B 何时可替换 A | 跨 App Session 复用与重新登录恢复 | Open / M2；用户授权改变 B 优先规则，本地实现待真机验证 | 是，N02 前不得宣称已支持 |
 
 ## Acceptance Criteria
 

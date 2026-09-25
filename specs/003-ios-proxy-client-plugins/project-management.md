@@ -63,10 +63,11 @@ body 压测、Session 过期、安全审计、文档、安装链接、rollback�
 | R-IOS-014 | Stash 不支持任意子域 force-http-engine/脚本命中或 QUIC suffix rule | 中 | 高 | 用当前官方语法导入真机验证；只拒绝 SWUFE suffix QUIC；必要时采用静态范围并要求更新 Override |
 | R-IOS-015 | Settings 路由错误 fall through 到真实 gateway | 低 | 高 | 保留命名空间全路径 short-circuit；未知路径合成本地 404/405；upstream capture 用例 |
 | R-IOS-016 | oversized POST 因宿主 `max-size` 行为绕过脚本而到达真实 gateway | 中 | 极高 | 禁用未经验证的 `max-size` shortcut；证明超限请求本地 413 且不上游，否则 POST API 不可发布 |
-| R-IOS-017 | direct Gateway request 无客户端 Cookie 时未注入 stored Gateway Session，App 重入登录流 | 高 | 高 | 只对经 classifier 明确许可、无请求 ticket 且 Session 可用的 Gateway request 注入；N02 设备验证通过后才能验收 |
-| R-IOS-018 | stored ticket 覆盖了 App 自带的新 ticket，导致登录/轮换流异常 | 中 | 高 | request Cookie 优先；请求带 ticket 时先 capture/refresh 并原样 PASS；覆盖测试 N03 |
+| R-IOS-017 | App 无 ticket 或自带被 Gateway 拒绝的不同 ticket 时未使用 stored Session，重入登录流 | 高 | 高 | 只对经 classifier 明确许可且解码目标已选的 WRD request 使用 stored ticket；N02 设备验证通过后才能验收 |
+| R-IOS-018 | stored ticket 覆盖 App 自带的新 ticket，导致新网页登录或轮换流异常 | 中 | 高 | 仅已选 WRD 资源替换核心 ticket；登录、根页、logout、Settings、gateway-owned 和未知路径不覆盖请求；根页 200 才确认不同的新 ticket；覆盖测试 N03 与真机回退路径 |
 | R-IOS-019 | Safe Auth Trace 输出 Cookie、CAS ticket、execution、query 或 WRD token | 中 | 极高 | 字段 allowlist、只记录 pathname class/service hostname、敏感字段负向验证；N08/N09 |
 | R-IOS-020 | 业务系统自身要求 CAS 被误诊为 Gateway Session 复用失败 | 中 | 中 | raw 与 WRD wrapped authserver 区分；Trace 同时记录 request host、decoded original host、Gateway Session 注入状态与 redirect host；真机 tyxycg 场景验证 |
+| R-IOS-021 | stored ticket A 覆盖 App 自带 B 后，该 App 可能以 A 所属账号访问已选校内资源，或旧 A 使浏览器新 B 暂时失效 | 中 | 极高 | 仅 Gateway host 上已选 WRD 资源替换核心 ticket；不触及 CAS/登录/登出；Gateway 根页 200 确认新会话，logout 可清理；首次启用前说明所有经同一 Stash 的已选 App 共用 Gateway 账号，N02/N03 真机复核 |
 
 ## 10. 决策 Gate
 

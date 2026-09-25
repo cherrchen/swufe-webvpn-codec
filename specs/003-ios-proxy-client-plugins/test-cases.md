@@ -59,7 +59,7 @@
 | D01 | allowlist + Session | gateway WRD + Cookie |
 | D02 | allowlist + no Session | login_required |
 | D03 | non-allowlist + Session | pass，无 Cookie |
-| D04 | 带 Gateway ticket 的 gateway request | 保留客户端 Cookie、capture/refresh + pass |
+| D04 | 带 Gateway ticket 的 gateway request | 已选 WRD 资源优先使用 stored ticket；其它路径保留客户端 ticket，冲突值不因单次请求更新共享 store |
 | D05 | auth request | pass，不读 body |
 | D06 | codec failure | fail-closed |
 | D07 | Origin | 与 desktop 契约一致 |
@@ -215,13 +215,13 @@
 
 ## N. Gateway Session Realm / Direct Gateway Reuse / Safe Auth Trace
 
-N01 已通过。N02 在 2026-09-25 的 tyxycg 真机尝试中观察到代理执行注入，但 Gateway 仍要求重新登录，故记录为 `Failed`；其它未取得完整脱敏证据的 N 组用例保持 `Pending`。用户已确认正常 Gateway logout 的实际 pathname 为 `/logout`；其余未确认 endpoint 使用分类 fixture，不把 fixture 名称写成 WebVPN 实际 pathname。
+N01 已通过。N02 在 2026-09-25 的 tyxycg 真机尝试中观察到代理执行注入，但 Gateway 仍要求重新登录，旧策略结果为 `Failed`；用户授权的新 ticket 优先策略尚待真机复核。其它未取得完整脱敏证据的 N 组用例保持 `Pending`。用户已确认正常 Gateway logout 的实际 pathname 为 `/logout`；其余未确认 endpoint 使用分类 fixture，不把 fixture 名称写成 WebVPN 实际 pathname。
 
 | ID | 场景 | 预期 | Status |
 | --- | --- | --- | --- |
 | N01 | Safari 完成 WebVPN 登录 | Stash 脚本捕获含核心 ticket 的 Gateway Cookie，并持久化为 `swufe.session.v1`；证据不包含 Cookie value | Passed（2026-09-25 最新 Stash M2 观察；详见 verification） |
-| N02 | 第三方 App/WKWebView 无 Gateway Cookie 直接请求 Gateway；stored Session ready；`WRAPPED_RESOURCE` 且 login intent 为 none | 代理层向 gateway request 注入 stored Gateway Session；同一客户端 Cookie Jar 不需要有 ticket；WebVPN 不应仅因客户端缺 Cookie 而重新进入 Gateway login | Failed（2026-09-25：Safari 页面与 Tile 均显示已登录后，执行注入仍跳 Gateway 登录；stored 内部状态为 `captured`） |
-| N03 | request 带 ticket B，stored ticket 为 A | 保留请求 Cookie B、不附加或替换为 A；capture/refresh B 到 store 并 PASS | Pending |
+| N02 | 第三方 App/WKWebView 无 Gateway Cookie 或自带不同 ticket 请求 Gateway；stored Session ready；`WRAPPED_RESOURCE` 且 login intent 为 none | 代理层向 gateway request 注入 stored Gateway Session；同一客户端 Cookie Jar 可缺 ticket 或带不同 ticket；WebVPN 不应仅因该差异重新进入 Gateway login | Failed（0.1.15 前的真机链仍跳 Gateway 登录）；0.1.16 新策略 Pending 真机复核 |
+| N03 | 已选 WRD request 带 ticket B，stored ticket 为 A；另测 root/login/gateway-owned 冲突 B | WRD 发往 Gateway 时仅把核心 ticket 换成 A，保留其它 Cookie，store 仍为 A；其它路径保留 B 且不因单次请求替换 A；root B 返回 200 且无未绑定新 ticket 时可确认并切换 store | Pending（新策略需真机验证） |
 | N04 | stored Gateway Session 已过期或核心 ticket 缺失；另测其它 App 无 ticket/不同 ticket 的 Gateway 响应下发新 ticket 或删除 ticket | 过期/缺 ticket 时不注入，PASS/允许官方登录；CAS 页面/redirect 或与 stored ticket 不匹配的删除信号不得清除共享 Session；无 ticket/不同 ticket 响应的新 ticket 不覆盖已有 stored ticket；与 stored ticket 匹配的请求才允许轮换或清理 | Pending |
 | N05 | 用户确认的 Gateway `https://webvpn.swufe.edu.cn/logout` request（可带 query） | 不注入旧 Session；请求时清除 `swufe.session.v1`；响应不得重新存入 ticket；Stash 真机脚本命中与清理结果仍待取证 | Pending |
 | N06 | `https://webvpn.swufe.edu.cn/__swufe_bridge__/...` Settings Namespace | 本地 synthetic response；不注入、不 capture、不请求 upstream | Pending |

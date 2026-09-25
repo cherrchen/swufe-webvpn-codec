@@ -308,7 +308,7 @@ Settings route 确认必须发生在 `captureSession()` 与 Core `rewriteRequest
 
 Gateway RequestKind 至少区分 SETTINGS_NAMESPACE、WRAPPED_RESOURCE、GATEWAY_ROOT、GATEWAY_STATIC/GATEWAY_OWNED、LOGIN、LOGOUT、AUTH_CALLBACK、OTHER。Settings 永不注入；WRAPPED_RESOURCE 可根据 Session 状态复用；GATEWAY_ROOT 仅在 classifier 确认 loginIntent=none 时原则上允许；explicit/unknown intent 必须绕过；其它 gateway-owned/login/logout/callback 路径按实机确认后逐类启用，未确认路径默认不注入。具体规则见 [domain.md](domain.md) 与 [interfaces.md](interfaces.md)。
 
-客户端请求 Cookie 中已有 Gateway ticket 时，不注入 stored Session、不覆盖请求值；capture/refresh 后 PASS。只有请求不含 ticket，且 RequestKind 策略允许、stored Session ready 时才注入。注入目标始终是 webvpn.swufe.edu.cn。
+已选 WRD 资源请求中，stored Session ready 时只替换与之不同的客户端核心 Gateway ticket，保留其它 Cookie，并防止单次冲突请求覆盖共享 store；请求无 ticket 时照常注入。Gateway root、login、logout、Settings、gateway-owned、unknown 路径不覆盖请求 ticket；root 上的新 ticket 在 200 响应且无未绑定的新 ticket 下发时才确认进 store；已绑定的服务端轮换不回滚到旧请求值。注入目标始终是 webvpn.swufe.edu.cn。
 
 ## 15. HTTP/3 / QUIC
 

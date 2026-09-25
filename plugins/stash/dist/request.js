@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 7c3ab2a */
+/* swufe-webvpn stash 0bc1702 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1000,7 +1000,14 @@
       if (parsed.hostname.toLowerCase() !== gatewayHost(settings.gatewayBase)) return { kind: "pass" };
       const kind = classifyGatewayRequest(request.url);
       if (kind === "settings" || kind === "logout") return { kind: "pass" };
-      if (cookiePairValue(headerValue(request.headers, "cookie"), TICKET_COOKIE_NAME) !== null) {
+      const requestTicket = cookiePairValue(headerValue(request.headers, "cookie"), TICKET_COOKIE_NAME);
+      const usable2 = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) && !sessionExpiredByClock(session, nowIso) ? session : null;
+      const storedTicket = usable2 ? cookiePairValue(usable2.cookieHeader, TICKET_COOKIE_NAME) : null;
+      const injectable = gatewayRequestAllowsInjection(kind) && (kind !== "gateway-root" || /^(GET|HEAD)$/i.test(request.method)) && (kind !== "wrapped-resource" || wrappedHostIsAllowed(request.url, settings));
+      if (kind === "wrapped-resource" && injectable && usable2 && storedTicket !== null && requestTicket !== storedTicket) {
+        return { kind: "inject_gateway_session", headers: injectCookie(request.headers, usable2.cookieHeader, true) };
+      }
+      if (requestTicket !== null && (storedTicket === null || storedTicket === requestTicket)) {
         const captured = captureSession({
           url: request.url,
           headers: request.headers,
@@ -1009,8 +1016,7 @@
         });
         if (captured.kind === "captured") return { kind: "capture_session", session: captured.session, pass: true };
       }
-      const usable2 = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
-      if (gatewayRequestAllowsInjection(kind) && (kind !== "gateway-root" || /^(GET|HEAD)$/i.test(request.method)) && (kind !== "wrapped-resource" || wrappedHostIsAllowed(request.url, settings)) && usable2 && !sessionExpiredByClock(usable2, nowIso) && cookiePairValue(usable2.cookieHeader, TICKET_COOKIE_NAME) !== null) {
+      if (requestTicket === null && injectable && usable2 && storedTicket !== null) {
         return { kind: "inject_gateway_session", headers: injectCookie(request.headers, usable2.cookieHeader) };
       }
       return { kind: "pass" };
@@ -1053,7 +1059,7 @@
       }
       return { kind: "error", code: "CODEC_FAILED" };
     }
-    const headers = injectCookie(request.headers, usable.cookieHeader);
+    const headers = injectCookie(request.headers, usable.cookieHeader, true);
     rewriteOrigin(headers, request.headers, route.originalHost, settings);
     rewriteReferer(headers, request.headers, settings, codec);
     return {
@@ -1096,14 +1102,14 @@
     const parts = path.split("/");
     return `/${parts.slice(0, 2).join("/")}`;
   }
-  function injectCookie(headers, sessionCookie) {
+  function injectCookie(headers, sessionCookie, replaceTicket = false) {
     const next = {};
     for (const [key, value] of Object.entries(headers)) {
       if (key.toLowerCase() !== "cookie") {
         next[key] = value;
       }
     }
-    const existing = headerValue(headers, "cookie");
+    const existing = replaceTicket ? parseCookies(headerValue(headers, "cookie")).filter((pair) => pair.name !== TICKET_COOKIE_NAME).map((pair) => `${pair.name}=${pair.value}`).join("; ") : headerValue(headers, "cookie");
     next.cookie = mergeCookies(existing, sessionCookie);
     return next;
   }
@@ -1770,6 +1776,7 @@
 <body>
 <h1>SWUFE WebVPN</h1>
 <p id="status" class="meta">\u72B6\u6001\uFF1A\u8BFB\u53D6\u4E2D</p>
+<p class="meta">\u5DF2\u9009\u7F51\u7AD9\u5728\u540C\u4E00 Stash \u4E2D\u5171\u7528\u5F53\u524D WebVPN \u8D26\u53F7\u3002</p>
 <p id="warning" class="banner" hidden>\u90E8\u5206\u65E7\u7F51\u7AD9\u8BBE\u7F6E\u4E0D\u518D\u53D7\u652F\u6301\uFF0C\u8BF7\u68C0\u67E5\u5F53\u524D\u5217\u8868</p>
 <p id="feedback" class="banner" hidden></p>
 <section id="builtin"></section>
@@ -2168,7 +2175,8 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     const serviceHost = serviceTargetHost(decoded?.originalUrl ?? url);
     const sourceScheme = schemeOf(url);
     const targetScheme = route === "rewrite" ? settings.hostSchemes?.[host] ?? "http" : gatewayKind === "wrapped-resource" ? wrappedSchemeOf(url) : "-";
-    return `route=${route} gatewayKind=${gatewayKind} decodedOriginalHost=${decoded?.originalHost ?? "-"} sourceScheme=${sourceScheme} targetScheme=${targetScheme} requestTicket=${ticket ? "present" : "missing"} ticketRelation=${ticketRelation} storedSession=${stored} sessionAction=${action} requestCookiePriority=${ticket ? "yes" : "not-applicable"} serviceHost=${serviceHost ?? "-"}`;
+    const cookiePriority = ticket ? decision === "inject_gateway_session" || decision === "rewrite" && route === "rewrite" ? "stored" : "request" : "not-applicable";
+    return `route=${route} gatewayKind=${gatewayKind} decodedOriginalHost=${decoded?.originalHost ?? "-"} sourceScheme=${sourceScheme} targetScheme=${targetScheme} requestTicket=${ticket ? "present" : "missing"} ticketRelation=${ticketRelation} storedSession=${stored} sessionAction=${action} requestCookiePriority=${cookiePriority} serviceHost=${serviceHost ?? "-"}`;
   }
   function schemeOf(url) {
     try {

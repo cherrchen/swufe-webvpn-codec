@@ -37,10 +37,23 @@ describe("direct gateway session", () => {
     expect(rewriteRequest({ url: "https://webvpn.swufe.edu.cn/", method: "POST", headers: {} }, settings, stored, now)).toEqual({ kind: "pass" });
   });
 
-  it("captures client ticket B and never replaces it with stored ticket A", () => {
-    const result = decide(wrapped("http"), { Cookie: `${TICKET_COOKIE_NAME}=B` });
-    expect(result.kind).toBe("capture_session");
-    if (result.kind === "capture_session") expect(result.session.cookieHeader).toBe(`${TICKET_COOKIE_NAME}=B`);
+  it("uses stored ticket A for allowed WRD resources when the client carries B", () => {
+    const result = decide(wrapped("http"), { Cookie: `${TICKET_COOKIE_NAME}=B; app=x` });
+    expect(result.kind).toBe("inject_gateway_session");
+    if (result.kind === "inject_gateway_session") expect(result.headers.cookie).toBe(`app=x; ${TICKET_COOKIE_NAME}=A; route=one`);
+    expect(decide("https://webvpn.swufe.edu.cn/", { cookie: `${TICKET_COOKIE_NAME}=B` })).toEqual({ kind: "pass" });
+    expect(decide("https://webvpn.swufe.edu.cn/login", { cookie: `${TICKET_COOKIE_NAME}=B` })).toEqual({ kind: "pass" });
+    expect(decide("https://webvpn.swufe.edu.cn/wengine-vpn/js/a.js", { cookie: `${TICKET_COOKIE_NAME}=B` })).toEqual({ kind: "pass" });
+    expect(decide("https://authserver.swufe.edu.cn/", { cookie: `${TICKET_COOKIE_NAME}=B` })).toEqual({ kind: "pass" });
+    expect(decide(wrapped("https", "authserver.swufe.edu.cn"), { cookie: `${TICKET_COOKIE_NAME}=B` })).toEqual({ kind: "pass" });
+    expect(decide(wrapped("http"), { cookie: `${TICKET_COOKIE_NAME}=B` }, null).kind).toBe("capture_session");
+    expect(decide(wrapped("http"), { cookie: `${TICKET_COOKIE_NAME}=A` }).kind).toBe("capture_session");
+    const ordinary = decide("http://jwxt.swufe.edu.cn/", { cookie: `${TICKET_COOKIE_NAME}=B; app=x` });
+    expect(ordinary.kind).toBe("rewrite");
+    if (ordinary.kind === "rewrite") {
+      expect(new URL(ordinary.url).hostname).toBe("webvpn.swufe.edu.cn");
+      expect(ordinary.headers.cookie).toBe(`app=x; ${TICKET_COOKIE_NAME}=A; route=one`);
+    }
     expect(mergeCookies(`${TICKET_COOKIE_NAME}=B; app=x`, stored.cookieHeader)).toBe(`${TICKET_COOKIE_NAME}=B; app=x; route=one`);
   });
 });

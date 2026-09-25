@@ -45,7 +45,7 @@
 
 规则：`cookieHeader` 只属于 `webvpn-gateway` Realm，只能进入目标为 `webvpn.swufe.edu.cn` 的合规 gateway 请求注入代码；不能进入普通源站、authserver、console、通知、snapshot 或 Trace。测试只用虚构 Cookie；gateway 改变时旧 Session 自动失效。核心票据名已确认是 `wengine_vpn_ticketwebvpn_swufe_edu_cn`；`expiresAt` 只来自该票据的 `Max-Age` 或 `Expires`。旧记录缺该字段时按 `null`（时效未知）读取，不因此清会话。本地时钟到点后不再注入。没有过期属性时不编造时长。服务端提前作废的真实信号与辅助 Cookie 最小集合仍待真机确认；再次出现 CAS 本身不能单独判定 Gateway Session 已失效。Q-001 保留为最小 Cookie 集与失效信号问题。
 
-Gateway Session 可通过代理层在不同 App、WKWebView 与 Safari 请求间复用；它不依赖客户端 Cookie Jar。`Browser Cookie Jar != Plugin Gateway Session Store`。注入时保留请求已有 Cookie 值；若请求已带核心 Gateway ticket，则不注入旧记录，并 capture/refresh 当前请求的 ticket。
+Gateway Session 可通过代理层在不同 App、WKWebView 与 Safari 请求间复用；它不依赖客户端 Cookie Jar。`Browser Cookie Jar != Plugin Gateway Session Store`。对解码到已选目标的 Gateway WRD 请求，stored 核心 ticket 优先于请求携带的不同 Gateway ticket；只替换核心 ticket，保留其它请求 Cookie。同名不同 ticket 的单次请求不覆盖共享 store；无 stored Session 时仍可 capture。Gateway 根页携新 ticket 返回 200 且没有未绑定的新 ticket 下发时可确认并切换 store；已绑定的服务端轮换 ticket 优先保留。
 
 ### 为什么 V1 保存 gateway Cookie header
 

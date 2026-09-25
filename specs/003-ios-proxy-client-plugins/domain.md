@@ -162,14 +162,14 @@ UI 可以把 `Captured`/`Valid` 都显示为“已登录”；内部保留差异
 | Kind | 注入策略 | 其它行为 |
 | --- | --- | --- |
 | `SETTINGS_NAMESPACE` | 永不注入 | 本地合成响应并终止，不访问 upstream，不捕获 Session |
-| `WRAPPED_RESOURCE` | 若 Session 可用且请求不含 Gateway ticket，则允许注入 | 只在目标仍为 Gateway 时适用；WRD 解码后的 original host 仅用于分类/trace，不扩大 routing scope |
+| `WRAPPED_RESOURCE` | 若 stored Session 可用且 WRD 解码目标已选，使用 stored Gateway ticket；可替换请求中不同的 Gateway ticket | 只在目标仍为 Gateway 时适用；保留请求其它 Cookie；WRD 解码后的 original host 仅用于分类/trace，不扩大 routing scope |
 | `GATEWAY_ROOT` | 仅 `loginIntent=none` 时原则上可复用现有 Gateway Session | `explicit` 或 `unknown` 时不注入；具体入口意图与 path 待真机确认 |
 | `GATEWAY_STATIC` / `GATEWAY_OWNED` | 按协议证据逐类启用；确认前默认不注入 | `/wengine-vpn/...` 可作为分类候选；不得从路径名称推断所有资源都需 ticket。desktop 已有 namespace 证据不自动成为 iOS 注入规则 |
-| `LOGIN` | 不注入 stored Session | 请求自带 ticket 时不覆盖；登录响应中的新 Gateway ticket 可按 capture/rotation 规则更新 |
+| `LOGIN` | 不注入 stored Session | 请求自带 ticket 时不覆盖；与 stored 不同的 ticket 不能仅凭 login 请求更新共享 Session |
 | `LOGOUT` | 不注入 | 识别到经确认的 logout 请求时清理本地 Gateway Session；具体 endpoint 待真机确认 |
 | `AUTH_CALLBACK` / `OTHER` | 默认不注入 | 保守 PASS；新增规则必须有真机证据及测试 |
 
-对所有允许注入的 Gateway Request Kind，只有 classifier 能确认无显式 login intent（`loginIntent=none`）时才可注入；意图为 `explicit` 或 `unknown` 时一律 PASS、不注入。请求 Cookie 中确认出现 `wengine_vpn_ticketwebvpn_swufe_edu_cn` 时，客户端 Cookie 优先：不改写请求 Cookie、不注入旧 Session，capture/refresh 当前 Cookie 后 PASS。若无 ticket，则只有安全分类允许且 stored Gateway Session 可用时才可注入；否则 PASS，让官方登录流程继续。注入时不得覆盖请求已有的任何同名 Cookie。对 raw `authserver.swufe.edu.cn` 请求始终 PASS 且不捕获 Cookie；WRD URL 即使解码出 `originalHost=authserver.swufe.edu.cn`，本次网络请求的 Gateway host 仍是 `webvpn.swufe.edu.cn`，Trace 应分别记录这两个事实。
+对所有允许注入的 Gateway Request Kind，只有 classifier 能确认无显式 login intent（`loginIntent=none`）时才可注入；意图为 `explicit` 或 `unknown` 时一律 PASS、不注入。已选 WRD 资源请求且 stored Gateway Session 可用时，stored 核心 ticket 优先于客户端不同的核心 ticket；只替换 Gateway ticket，保留其它请求 Cookie。请求没有 ticket 时同样按已确认分类注入。Gateway 根页、login、logout、Settings、gateway-owned 和 unknown 不覆盖请求 ticket；不同 ticket 的单次请求不能覆盖唯一共享 store。Gateway 根页携新 ticket 获得 200 且没有未绑定的新 ticket 下发时可确认并切换 store；已绑定的 Set-Cookie rotation 则保留服务端新 ticket；显式 logout 清理 store。对 raw `authserver.swufe.edu.cn` 请求始终 PASS 且不捕获 Cookie；WRD URL 即使解码出 `originalHost=authserver.swufe.edu.cn`，本次网络请求的 Gateway host 仍是 `webvpn.swufe.edu.cn`，Trace 应分别记录这两个事实。
 
 ## 9. Request 决策模型
 

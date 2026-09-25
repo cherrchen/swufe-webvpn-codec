@@ -166,7 +166,7 @@ export type RequestDecision =
 
 `rewriteRequest()` 不直接调用宿主 `$done()`。
 
-Gateway 直连分支顺序固定为：先识别并本地终结 Settings Namespace；再识别 Gateway Request Kind；logout 不注入并清 Session；请求已有核心 Gateway ticket 时不覆盖其 Cookie，capture/refresh 后 PASS；请求没有 ticket 时，只有分类策略允许且本地 Session 可用才注入，否则 PASS。可用性检查至少要求 schema 可读、gateway host 精确匹配、存在核心 ticket 且 `expiresAt` 未过；仅 `loginIntent="none"` 才允许注入；`explicit` 或 `unknown` 必须不注入旧 Session。
+Gateway 直连分支顺序固定为：先识别并本地终结 Settings Namespace；再识别 Gateway Request Kind；logout 不注入并清 Session；已选 WRD 资源且 stored Session 可用时，即使请求已有不同的核心 Gateway ticket，也只把该 ticket 替换为 stored ticket，保留其它 Cookie；其它路径不覆盖请求 ticket，且不同 ticket 的单次请求不更新共享 store。Gateway 根页带新 ticket 的 200 响应在没有未绑定的新 ticket 下发时可确认并切换 store；已绑定的服务端轮换 ticket 优先保留。无 stored Session 时 Gateway request 自带 ticket 仍可 capture。可用性检查至少要求 schema 可读、gateway host 精确匹配、存在核心 ticket 且 `expiresAt` 未过；仅 `loginIntent="none"` 才允许注入；`explicit` 或 `unknown` 必须不注入旧 Session。
 
 ## 6. Response DTO
 
