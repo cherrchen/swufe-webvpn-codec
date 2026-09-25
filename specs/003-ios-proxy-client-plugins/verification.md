@@ -95,6 +95,12 @@ I01–I04 已有 2026-09-24 真机结论，见下方。探测脚本没有把 Ses
 - `pnpm --filter swufe-webvpn-stash typecheck`：通过。
 - Gate B（向量全绿、Core 无宿主 API）在本地通过。T024 的 Stash 导入、T026 的 HTTP/3 回落（IOS-TC-H09）和 T027 教务 E2E 仍待真机。`.stoverride` 的 script URL 指向 `main` 上的 raw 路径；合并前导入会 404。
 
+2026-09-25 Settings V2 本地检查（不是真机结论）：
+
+- `pnpm --filter webvpn-core-js test` 与 `pnpm --filter webvpn-core-js typecheck` 通过。覆盖 L01–L08、K15–K17、K23、M01–M04，以及 Settings 404/405 与超限 POST 不写 v2。
+- `pnpm --filter swufe-webvpn-stash test` 与 `pnpm --filter swufe-webvpn-stash typecheck` 通过。Stash 请求在业务改写前返回合成 HTML/JSON；异常返回本地 500；未选主机 PASS 且不写 Session。bundle 扫描额外拒绝常见 CDN 主机名。
+- `.stoverride` 0.1.5-m2 写入了 `*.swufe.edu.cn:443`、`DOMAIN-SUFFIX` QUIC `REJECT`，以及覆盖子域的脚本匹配。`force-http-engine` 仍只有 `jwxt.swufe.edu.cn:80`。请求脚本改为 `require-body: true`，以便 Settings POST 能在脚本内按 16 KiB 上限本地拒绝。wildcard 导入、HTTP/3 回落和教务 E2E 仍未在设备上证实，AC-SETTINGS 保持 Pending。
+
 2026-09-24 Safari 安全连接失败已定位：把 `webvpn` / `authserver` / `jwxt` 的 `:443` 放进 `force-http-engine` 后，HTTPS 不进入 HTTP 脚本，Safari 显示无法建立安全连接。去掉该项后，23:36:22 起请求与响应脚本都有 `entered`，主机从 `webvpn.swufe.edu.cn` 到 `authserver.swufe.edu.cn`，用户可以打开 WebVPN。M2 覆盖已改回 GitHub raw 脚本、MitM，以及仅这三台主机的 QUIC `REJECT`，不再包含 `force-http-engine`。`$persistentStore.write` 按 Stash 文档使用 `(value, key)`。H09 与教务 E2E 仍未通过。
 
 ## P0 真机记录

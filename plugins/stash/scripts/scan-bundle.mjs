@@ -7,6 +7,10 @@ const banned = [
   /\bBuffer\b/,
   /from\s+["']fs["']/,
   /from\s+["']crypto["']/,
+  /https?:\/\/cdn\./,
+  /unpkg\.com/,
+  /jsdelivr\.net/,
+  /cdnjs\.cloudflare\.com/,
 ];
 const files = readdirSync("dist").filter((name) => name.endsWith(".js"));
 if (files.length < 3) {

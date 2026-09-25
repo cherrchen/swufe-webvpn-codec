@@ -32,6 +32,10 @@ function bindRuntime(): StashRuntime {
       console.log(JSON.stringify(record));
     },
     finishRequest: (result) => {
+      if (result.decision === "respond" && result.response) {
+        $done({ response: result.response });
+        return;
+      }
       const nativeUrl = nativeGatewayRedirect(typeof $request === "undefined" ? undefined : $request, result);
       if (nativeUrl) {
         $done({ response: { status: 302, headers: { location: nativeUrl, "cache-control": "no-store" } } });

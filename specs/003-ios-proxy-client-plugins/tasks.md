@@ -68,21 +68,21 @@
 
 ## Phase M2 Settings Feature Tasks
 
-以下任务均未实现，依赖顺序用于 Coding Agent 逐项执行；不得因已有 `RoutingPolicy.exactHosts` 就跳过宿主 Settings route。状态需在实现中逐项更新。
+不得因已有 `RoutingPolicy.exactHosts` 就跳过宿主 Settings route。本地单测已覆盖的任务标为「本地完成」；真机取证仍未完成。
 
-| Task | 内容 / 输出 | 依赖 | 验收 / 证据 | AC |
-| --- | --- | --- | --- | --- |
-| T036 | Core hostname normalize/validate：hostname-only、SWUFE suffix、reserved host/IP/wildcard/URL 拒绝 | T006,T009 | L01–L03、K15–K17 | 004–006 |
-| T037 | 定义 SettingsV2 + defaults + builtin catalog（首期仅 jwxt）+ compile enabled sites → exact RoutingPolicy | T036 | B 系列 + M01–M04 | 003,008–010 |
-| T038 | 实现纯 V1→V2 migration 与 migration warnings；保持 session key 隔离 | T037 | L04–L08；检查 session key unchanged | 014–015 |
-| T039 | 验证 Stash 安全 nonce 来源、Origin/Referer 可见性、request body 表示/上限；记录设备/版本 | 无 | K18–K20；得出可行/退化决定 | 前置条件 |
-| T040 | Stash Settings namespace route classifier + request entry 优先 short-circuit，API host adapter interface；namespace error catch 本地 synthetic 4xx/5xx | T039 | K10/K21/K22/M05；mock 证实业务 handler 未调用、异常不 fall through | 001,011 |
-| T041 | 构建 Settings HTML/CSS/JS 本地 bundle（无框架/CDN），实现 iOS/Dark Mode/safe-area UI | T040 | K01–K03；bundle 无远程 runtime UI | 001–002 |
-| T042 | 实现 GET synthetic HTML + GET settings + one-use local nonce 响应 | T040,T041 | K11–K12/K19；确认 no upstream | 001–002,011 |
-| T043 | 实现 POST parse/size/origin/token/schema/host validation + persistentStore write/errors | T036–T039,T042 | K13–K20；日志无 raw body | 005–007,011 |
-| T044 | Tile state/count/URL；动态 URL 若不稳定使用固定 Settings + 独立登录按钮 | T042 | K08–K09，记录 Stash version | 001 |
-| T045 | 每个业务请求将最新 V2 Settings 编译为精确 RoutingPolicy；未选项 PASS | T037,T043 | M01–M04 + cookie negative case | 008–010,017 |
-| T046 | 复核 wildcard MitM、HTTP force-engine、request regex、SWUFE suffix QUIC Override | T039,T040 | M06–M07；导入及真机证据；无全局 UDP/443 | 016–017 |
-| T047 | Settings 安全回归：CSRF/origin/token/replay/size/reserved/upstream/cookie/log/migration/error fail-closed | T038,T043,T045,T046 | K14–K23、M05–M09、L08 | 005–017 |
-| T048 | Stash Settings device E2E + update persistence；记录 App/iOS/Override/bundle 版本 | T041–T047 | K01–K09、M01–M09 | 001–017 |
-| T049 | 同步 README、UI/security/update/rollback guide 与发布制品清单 | T048 | links/review；安全披露清楚 | 002,016–017 |
+| Task | 状态 | 内容 / 输出 | 依赖 | 验收 / 证据 | AC |
+| --- | --- | --- | --- | --- | --- |
+| T036 | 本地完成 | Core hostname normalize/validate：hostname-only、SWUFE suffix、reserved host/IP/wildcard/URL 拒绝 | T006,T009 | L01–L03、K15–K17 | 004–006 |
+| T037 | 本地完成 | 定义 SettingsV2 + defaults + builtin catalog（首期仅 jwxt）+ compile enabled sites → exact RoutingPolicy | T036 | B 系列 + M01–M04 | 003,008–010 |
+| T038 | 本地完成 | 实现纯 V1→V2 migration 与 migration warnings；保持 session key 隔离 | T037 | L04–L08；检查 session key unchanged | 014–015 |
+| T039 | 未完成 | 验证 Stash 安全 nonce 来源、Origin/Referer 可见性、request body 表示/上限；记录设备/版本 | 无 | K18–K20；得出可行/退化决定 | 前置条件 |
+| T040 | 本地完成 | Stash Settings namespace route classifier + request entry 优先 short-circuit，API host adapter interface；namespace error catch 本地 synthetic 4xx/5xx | T039 | K10/K21/K22/M05；mock 证实业务 handler 未调用、异常不 fall through | 001,011 |
+| T041 | 本地完成 | 构建 Settings HTML/CSS/JS 本地 bundle（无框架/CDN），实现 iOS/Dark Mode/safe-area UI | T040 | K01–K03；bundle 无远程 runtime UI | 001–002 |
+| T042 | 本地完成 | 实现 GET synthetic HTML + GET settings + one-use local nonce 响应 | T040,T041 | K11–K12/K19；确认 no upstream | 001–002,011 |
+| T043 | 本地完成 | 实现 POST parse/size/origin/token/schema/host validation + persistentStore write/errors | T036–T039,T042 | K13–K20；日志无 raw body | 005–007,011 |
+| T044 | 本地完成 | Tile state/count/URL；动态 URL 若不稳定使用固定 Settings + 独立登录按钮 | T042 | K08–K09，记录 Stash version | 001 |
+| T045 | 本地完成 | 每个业务请求将最新 V2 Settings 编译为精确 RoutingPolicy；未选项 PASS | T037,T043 | M01–M04 + cookie negative case | 008–010,017 |
+| T046 | 未完成 | 复核 wildcard MitM、HTTP force-engine、request regex、SWUFE suffix QUIC Override | T039,T040 | M06–M07；导入及真机证据；无全局 UDP/443 | 016–017 |
+| T047 | 本地完成 | Settings 安全回归：CSRF/origin/token/replay/size/reserved/upstream/cookie/log/migration/error fail-closed | T038,T043,T045,T046 | K14–K23、M05–M09、L08 | 005–017 |
+| T048 | 未完成 | Stash Settings device E2E + update persistence；记录 App/iOS/Override/bundle 版本 | T041–T047 | K01–K09、M01–M09 | 001–017 |
+| T049 | 未完成 | 同步 README、UI/security/update/rollback guide 与发布制品清单 | T048 | links/review；安全披露清楚 | 002,016–017 |

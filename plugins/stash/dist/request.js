@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 2998d62 */
+/* swufe-webvpn stash 097ef3d */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -843,6 +843,8 @@
   var STORAGE_KEYS = {
     schema: "swufe.plugin.schema",
     settings: "swufe.settings.v1",
+    settingsV2: "swufe.settings.v2",
+    settingsCsrf: "swufe.settings.csrf.v1",
     session: "swufe.session.v1",
     notificationThrottle: "swufe.notification-throttle.v1",
     lastError: "swufe.last-error.v1"
@@ -1061,11 +1063,11 @@
     const kept = parseCookies(existing).filter((pair) => !sessionPairs.some((item) => item.name === pair.name));
     return [...kept, ...sessionPairs].map((pair) => `${pair.name}=${pair.value}`).join("; ");
   }
-  function parseCookies(header) {
-    if (!header.trim()) {
+  function parseCookies(header2) {
+    if (!header2.trim()) {
       return [];
     }
-    return header.split(";").map((part) => {
+    return header2.split(";").map((part) => {
       const eq = part.indexOf("=");
       if (eq <= 0) {
         return null;
@@ -1233,20 +1235,6 @@
     }
     return settings;
   }
-  function toRewriteSettings(settings) {
-    return {
-      gatewayBase: settings.gatewayBase,
-      wrdKey: settings.wrdKeyOverride ?? DEFAULT_KEY,
-      wrdIv: settings.wrdIvOverride ?? DEFAULT_IV,
-      routing: {
-        ...defaultRoutingPolicy(),
-        exactHosts: settings.exactHosts,
-        includeSwufeWildcard: settings.includeSwufeWildcard
-      },
-      debug: settings.debug,
-      bodyRewriteMaxBytes: settings.bodyRewriteMaxBytes
-    };
-  }
   function uniqueHosts(hosts) {
     const out = [];
     for (const host of hosts) {
@@ -1262,19 +1250,571 @@
     return out.length > 0 ? out : ["jwxt.swufe.edu.cn"];
   }
 
+  // ../../packages/webvpn-core-js/src/runtime/settings-v2.ts
+  var SETTINGS_ORIGIN = "https://webvpn.swufe.edu.cn";
+  var SETTINGS_PREFIX = "/__swufe_bridge__";
+  var SETTINGS_BODY_MAX_BYTES = 16 * 1024;
+  var SETTINGS_NONCE_TTL_MS = 12e4;
+  var MIGRATION_WARNING = "DROPPED_INVALID_OR_OUT_OF_SCOPE_HOST";
+  var IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+  var NONCE_RE = /^[0-9a-f]{32,}$/;
+  var BUILTIN_SITES = [
+    { id: "jwxt", name: "\u6559\u52A1\u7CFB\u7EDF", host: "jwxt.swufe.edu.cn" }
+  ];
+  function defaultSettingsV2() {
+    return {
+      schemaVersion: 2,
+      enabled: true,
+      gatewayBase: SETTINGS_ORIGIN,
+      builtinSiteStates: { jwxt: true },
+      customHosts: [],
+      debug: false,
+      bodyRewriteMaxBytes: DEFAULT_BODY_REWRITE_MAX_BYTES,
+      migrationWarnings: []
+    };
+  }
+  function validateSettingsHostname(input) {
+    if (typeof input !== "string") {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    const trimmed = input.trim();
+    if (!trimmed || /[\s/?#@:*]|:\\?\/\//.test(trimmed) || trimmed.includes(":")) {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    let candidate = trimmed.toLowerCase().replace(/\.+$/, "");
+    if (!candidate || candidate === "localhost" || IPV4.test(candidate)) {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    try {
+      candidate = normalizeHost(candidate);
+    } catch {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    if (candidate === GATEWAY_HOST || candidate === AUTH_HOST) {
+      return { ok: false, code: "RESERVED_HOST" };
+    }
+    if (candidate === "swufe.edu.cn" || !candidate.endsWith(".swufe.edu.cn")) {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    return { ok: true, value: candidate, normalizedHosts: [candidate] };
+  }
+  function compileRoutingPolicy(settings) {
+    const exactHosts = [];
+    for (const site of BUILTIN_SITES) {
+      if (settings.builtinSiteStates[site.id] !== true) continue;
+      const checked = validateSettingsHostname(site.host);
+      if (checked.ok && !exactHosts.includes(checked.value)) exactHosts.push(checked.value);
+    }
+    for (const host of settings.customHosts) {
+      const checked = validateSettingsHostname(host);
+      if (checked.ok && !exactHosts.includes(checked.value)) exactHosts.push(checked.value);
+    }
+    return {
+      ...defaultRoutingPolicy(),
+      exactHosts,
+      includeSwufeWildcard: false,
+      excludedHosts: [...EXCLUDED_HOSTS]
+    };
+  }
+  function toRewriteSettingsFromV2(settings) {
+    return {
+      gatewayBase: settings.gatewayBase,
+      wrdKey: settings.wrdKeyOverride ?? DEFAULT_KEY,
+      wrdIv: settings.wrdIvOverride ?? DEFAULT_IV,
+      routing: compileRoutingPolicy(settings),
+      debug: settings.debug,
+      bodyRewriteMaxBytes: settings.bodyRewriteMaxBytes
+    };
+  }
+  function migrateV1ToV2(v1) {
+    const builtinSiteStates = {};
+    for (const site of BUILTIN_SITES) builtinSiteStates[site.id] = false;
+    const customHosts = [];
+    let dropped = v1.includeSwufeWildcard === true;
+    for (const raw of v1.exactHosts) {
+      const checked = validateSettingsHostname(raw);
+      if (!checked.ok) {
+        dropped = true;
+        continue;
+      }
+      const builtin = BUILTIN_SITES.find((site) => site.host === checked.value);
+      if (builtin) {
+        builtinSiteStates[builtin.id] = true;
+        continue;
+      }
+      if (!customHosts.includes(checked.value)) customHosts.push(checked.value);
+    }
+    return {
+      schemaVersion: 2,
+      enabled: v1.enabled,
+      gatewayBase: v1.gatewayBase,
+      builtinSiteStates,
+      customHosts,
+      debug: v1.debug,
+      ...v1.wrdKeyOverride ? { wrdKeyOverride: v1.wrdKeyOverride } : {},
+      ...v1.wrdIvOverride ? { wrdIvOverride: v1.wrdIvOverride } : {},
+      bodyRewriteMaxBytes: v1.bodyRewriteMaxBytes,
+      migrationWarnings: dropped ? [MIGRATION_WARNING] : []
+    };
+  }
+  function loadSettingsV2(kv2) {
+    const rawV2 = kv2.read(STORAGE_KEYS.settingsV2);
+    if (rawV2) {
+      const parsed = parseStoredV2(rawV2);
+      if (parsed === "incompatible") return { kind: "incompatible" };
+      if (parsed) return { kind: "ready", settings: parsed };
+      return { kind: "fail-closed", settings: defaultSettingsV2() };
+    }
+    const rawV1 = kv2.read(STORAGE_KEYS.settings);
+    if (rawV1) {
+      const v1 = readMigratableV1(rawV1);
+      if (!v1) return { kind: "fail-closed", settings: defaultSettingsV2() };
+      return persistOrFailClosed(kv2, migrateV1ToV2(v1));
+    }
+    return persistOrFailClosed(kv2, defaultSettingsV2());
+  }
+  function toPublicSettings(settings) {
+    const builtinSiteStates = {};
+    for (const site of BUILTIN_SITES) builtinSiteStates[site.id] = settings.builtinSiteStates[site.id] === true;
+    return { schemaVersion: 2, builtinSiteStates, customHosts: [...settings.customHosts] };
+  }
+  function pageFromSettings(settings, status) {
+    const settingsDto2 = toPublicSettings(settings);
+    const enabledSiteCount = Object.values(settingsDto2.builtinSiteStates).filter(Boolean).length + settingsDto2.customHosts.length;
+    const page = { settings: settingsDto2, status, enabledSiteCount };
+    if (settings.migrationWarnings?.includes(MIGRATION_WARNING)) page.migrationWarnings = [MIGRATION_WARNING];
+    return page;
+  }
+  function validateSettingsUpdate(input, catalogHosts) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return { ok: false, code: "INVALID_SETTINGS" };
+    }
+    const record = input;
+    if (record.schemaVersion !== 2 || !record.builtinSiteStates || typeof record.builtinSiteStates !== "object" || Array.isArray(record.builtinSiteStates)) {
+      return { ok: false, code: "INVALID_SETTINGS" };
+    }
+    if (!Array.isArray(record.customHosts)) return { ok: false, code: "INVALID_SETTINGS" };
+    const states = record.builtinSiteStates;
+    const known = new Set(BUILTIN_SITES.map((site) => site.id));
+    const keys = Object.keys(states);
+    if (keys.length !== known.size || keys.some((key) => !known.has(key) || typeof states[key] !== "boolean")) {
+      return { ok: false, code: "INVALID_SETTINGS" };
+    }
+    const builtinSiteStates = {};
+    for (const site of BUILTIN_SITES) builtinSiteStates[site.id] = states[site.id] === true;
+    const customHosts = [];
+    for (const item of record.customHosts) {
+      if (typeof item !== "string") return { ok: false, code: "INVALID_DOMAIN" };
+      const checked = validateSettingsHostname(item);
+      if (!checked.ok) return checked;
+      if (catalogHosts.includes(checked.value) || customHosts.includes(checked.value)) {
+        return { ok: false, code: "DUPLICATE_HOST" };
+      }
+      customHosts.push(checked.value);
+    }
+    return {
+      ok: true,
+      value: { schemaVersion: 2, builtinSiteStates, customHosts },
+      normalizedHosts: customHosts
+    };
+  }
+  function classifySettingsRoute(input) {
+    const method = input.method.toUpperCase();
+    const path = normalizeSettingsPath(input.path);
+    if (path === null) return { kind: "business-request" };
+    if (path === "/") return method === "GET" ? { kind: "settings-page" } : { kind: "settings-method-not-allowed" };
+    if (path === "/api/settings") {
+      if (method === "GET") return { kind: "settings-get" };
+      if (method === "POST") return { kind: "settings-post" };
+      return { kind: "settings-method-not-allowed" };
+    }
+    return { kind: "settings-not-found" };
+  }
+  function isSettingsNamespaceUrl(url) {
+    try {
+      const parsed = new URL(url);
+      return parsed.hostname.toLowerCase() === GATEWAY_HOST && normalizeSettingsPath(parsed.pathname) !== null;
+    } catch {
+      return false;
+    }
+  }
+  function handleSettingsRequest(input, dependencies) {
+    const decision = classifySettingsRoute(input);
+    if (decision.kind === "business-request") {
+      return json(404, "INVALID_SETTINGS");
+    }
+    if (decision.kind === "settings-not-found") return json(404, "INVALID_SETTINGS");
+    if (decision.kind === "settings-method-not-allowed") return json(405, "METHOD_NOT_ALLOWED");
+    if (decision.kind === "settings-page") {
+      clearNonce(dependencies.kv);
+      return {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+        body: dependencies.pageHtml
+      };
+    }
+    if (decision.kind === "settings-post" && bodyByteLength(input.body) > SETTINGS_BODY_MAX_BYTES) {
+      return json(413, "BODY_TOO_LARGE");
+    }
+    const loaded = loadSettingsV2(dependencies.kv);
+    if (decision.kind === "settings-get") return settingsGet(input, dependencies, loaded);
+    return settingsPost(input, dependencies, loaded);
+  }
+  function settingsErrorResponse(status, code) {
+    return json(status, code);
+  }
+  function settingsGet(input, dependencies, loaded) {
+    if (!input.freshNonce || !NONCE_RE.test(input.freshNonce)) return json(503, "SETTINGS_UNAVAILABLE");
+    if (!dependencies.kv.write(STORAGE_KEYS.settingsCsrf, JSON.stringify({ token: input.freshNonce, issuedAt: input.nowIso }))) {
+      return json(500, "STORAGE_FAILED");
+    }
+    const settings = loaded.kind === "incompatible" ? defaultSettingsV2() : loaded.settings;
+    const status = loaded.kind === "incompatible" ? "incompatible" : dependencies.statusProvider.getStatus();
+    return {
+      status: 200,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+      body: JSON.stringify({ ok: true, data: pageFromSettings(settings, status), token: input.freshNonce })
+    };
+  }
+  function settingsPost(input, dependencies, loaded) {
+    const size = bodyByteLength(input.body);
+    if (size > SETTINGS_BODY_MAX_BYTES) return json(413, "BODY_TOO_LARGE");
+    if (!originAllowed(input.origin, input.referer)) return json(401, "UNAUTHORIZED");
+    if (!jsonContentType(input.contentType)) return json(400, "INVALID_SETTINGS");
+    if (!consumeNonce(dependencies.kv, input.token, input.nowIso)) return json(401, "UNAUTHORIZED");
+    if (loaded.kind === "incompatible") return json(400, "INVALID_SETTINGS");
+    const text = bodyText(input.body);
+    if (text === null) return json(400, "INVALID_JSON");
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return json(400, "INVALID_JSON");
+    }
+    const update = validateSettingsUpdate(parsed, BUILTIN_SITES.map((site) => site.host));
+    if (!update.ok) return json(400, update.code);
+    const current = loaded.settings;
+    const next = {
+      ...current,
+      schemaVersion: 2,
+      builtinSiteStates: update.value.builtinSiteStates,
+      customHosts: update.value.customHosts,
+      migrationWarnings: []
+    };
+    if (!dependencies.kv.write(STORAGE_KEYS.settingsV2, JSON.stringify(next))) return json(500, "STORAGE_FAILED");
+    return { status: 200, headers: jsonHeaders(), body: JSON.stringify({ ok: true }) };
+  }
+  function persistOrFailClosed(kv2, settings) {
+    if (!kv2.write(STORAGE_KEYS.settingsV2, JSON.stringify(settings))) {
+      return { kind: "fail-closed", settings: defaultSettingsV2() };
+    }
+    return { kind: "ready", settings };
+  }
+  function parseStoredV2(raw) {
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const record = data;
+    if (typeof record.schemaVersion === "number" && record.schemaVersion > 2) return "incompatible";
+    if (record.schemaVersion !== 2) return null;
+    const base = defaultSettingsV2();
+    if (typeof record.enabled !== "boolean" || typeof record.debug !== "boolean") return null;
+    if (typeof record.gatewayBase !== "string") return null;
+    try {
+      gatewayHost(record.gatewayBase);
+    } catch {
+      return null;
+    }
+    if (!record.builtinSiteStates || typeof record.builtinSiteStates !== "object" || Array.isArray(record.builtinSiteStates)) return null;
+    const states = record.builtinSiteStates;
+    const builtinSiteStates = {};
+    for (const site of BUILTIN_SITES) {
+      if (typeof states[site.id] !== "boolean") return null;
+      builtinSiteStates[site.id] = states[site.id] === true;
+    }
+    if (!Array.isArray(record.customHosts)) return null;
+    const customHosts = [];
+    for (const host of record.customHosts) {
+      if (typeof host !== "string") return null;
+      const checked = validateSettingsHostname(host);
+      if (!checked.ok || customHosts.includes(checked.value) || BUILTIN_SITES.some((site) => site.host === checked.value)) return null;
+      customHosts.push(checked.value);
+    }
+    const maxBytes = record.bodyRewriteMaxBytes;
+    if (typeof maxBytes !== "number" || !Number.isFinite(maxBytes) || maxBytes <= 0) return null;
+    const settings = {
+      schemaVersion: 2,
+      enabled: record.enabled,
+      gatewayBase: record.gatewayBase,
+      builtinSiteStates,
+      customHosts,
+      debug: record.debug === true,
+      bodyRewriteMaxBytes: maxBytes,
+      migrationWarnings: record.migrationWarnings === void 0 ? [] : []
+    };
+    if (Array.isArray(record.migrationWarnings) && record.migrationWarnings.includes(MIGRATION_WARNING)) {
+      settings.migrationWarnings = [MIGRATION_WARNING];
+    }
+    const key = readOverride(record.wrdKeyOverride);
+    const iv = readOverride(record.wrdIvOverride);
+    if (key === "invalid" || iv === "invalid") return null;
+    if (key) settings.wrdKeyOverride = key;
+    if (iv) settings.wrdIvOverride = iv;
+    if (settings.bodyRewriteMaxBytes <= 0) return base;
+    return settings;
+  }
+  function readMigratableV1(raw) {
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const record = data;
+    if (record.schemaVersion !== 1) return null;
+    const parsed = parseSettings(raw);
+    const exactHosts = Array.isArray(record.exactHosts) ? record.exactHosts.filter((item) => typeof item === "string") : parsed.exactHosts;
+    return {
+      ...parsed,
+      exactHosts,
+      includeSwufeWildcard: record.includeSwufeWildcard === true
+    };
+  }
+  function readOverride(value) {
+    if (value === void 0) return null;
+    if (typeof value !== "string" || new TextEncoder().encode(value).length !== 16) return "invalid";
+    return value;
+  }
+  function normalizeSettingsPath(path) {
+    if (!path.startsWith(SETTINGS_PREFIX)) return null;
+    const rest = path.slice(SETTINGS_PREFIX.length) || "/";
+    const cleaned = rest.split("?")[0]?.split("#")[0] ?? "/";
+    if (cleaned === "" || cleaned === "/") return "/";
+    return cleaned.endsWith("/") ? cleaned.slice(0, -1) : cleaned;
+  }
+  function originAllowed(origin, referer) {
+    if (origin && origin !== SETTINGS_ORIGIN) return false;
+    if (!referer) return true;
+    try {
+      return new URL(referer).origin === SETTINGS_ORIGIN;
+    } catch {
+      return false;
+    }
+  }
+  function jsonContentType(value) {
+    if (!value) return false;
+    return value.split(";")[0]?.trim().toLowerCase() === "application/json";
+  }
+  function consumeNonce(kv2, token, nowIso) {
+    const raw = kv2.read(STORAGE_KEYS.settingsCsrf);
+    clearNonce(kv2);
+    if (!raw || !token || !NONCE_RE.test(token)) return false;
+    try {
+      const data = JSON.parse(raw);
+      if (data.token !== token || typeof data.issuedAt !== "string") return false;
+      const issued = Date.parse(data.issuedAt);
+      const now = Date.parse(nowIso);
+      return Number.isFinite(issued) && Number.isFinite(now) && now - issued >= 0 && now - issued <= SETTINGS_NONCE_TTL_MS;
+    } catch {
+      return false;
+    }
+  }
+  function clearNonce(kv2) {
+    kv2.write(STORAGE_KEYS.settingsCsrf, null);
+  }
+  function bodyByteLength(body) {
+    if (body === void 0) return 0;
+    if (typeof body === "string") return new TextEncoder().encode(body).length;
+    return body.byteLength;
+  }
+  function bodyText(body) {
+    if (body === void 0) return "";
+    if (typeof body === "string") return body;
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(body);
+    } catch {
+      return null;
+    }
+  }
+  function json(status, code) {
+    return { status, headers: jsonHeaders(), body: JSON.stringify({ ok: false, code }) };
+  }
+  function jsonHeaders() {
+    return { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
+  }
+
+  // src/settings-page.ts
+  var SETTINGS_PAGE_HTML = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SWUFE WebVPN</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f2f2f7; --card: #fff; --text: #111; --muted: #6b6b70; --line: #e5e5ea; --ok: #1b7f3a; --bad: #b42318; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #000; --card: #1c1c1e; --text: #f2f2f7; --muted: #a1a1a6; --line: #333; --ok: #6dcc8a; --bad: #ff8a80; } }
+  body { margin: 0; font: 16px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 22px; margin: 0 0 12px; }
+  section { background: var(--card); border-radius: 12px; margin: 0 0 16px; overflow: hidden; }
+  .row, label.row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .meta { color: var(--muted); font-size: 13px; }
+  button, input { font: inherit; }
+  button { border: 0; background: transparent; color: #007aff; padding: 12px 14px; }
+  input { flex: 1; border: 0; background: transparent; color: inherit; min-width: 0; }
+  .error { color: var(--bad); font-size: 13px; padding: 0 14px 12px; }
+  .banner { font-size: 14px; padding: 10px 12px; border-radius: 10px; margin: 0 0 12px; }
+  .ok { background: color-mix(in srgb, var(--ok) 16%, transparent); }
+  .bad { background: color-mix(in srgb, var(--bad) 16%, transparent); }
+</style>
+</head>
+<body>
+<h1>SWUFE WebVPN</h1>
+<p id="status" class="meta">\u72B6\u6001\uFF1A\u8BFB\u53D6\u4E2D</p>
+<p id="warning" class="banner" hidden>\u90E8\u5206\u65E7\u7F51\u7AD9\u8BBE\u7F6E\u4E0D\u518D\u53D7\u652F\u6301\uFF0C\u8BF7\u68C0\u67E5\u5F53\u524D\u5217\u8868</p>
+<p id="feedback" class="banner" hidden></p>
+<section id="builtin"></section>
+<section>
+  <div id="custom"></div>
+  <label class="row"><input id="host" placeholder="name.swufe.edu.cn" autocapitalize="none" spellcheck="false"><button id="add" type="button">\u6DFB\u52A0\u7F51\u7AD9</button></label>
+  <p id="host-error" class="error" hidden>\u8BF7\u8F93\u5165 name.swufe.edu.cn \u683C\u5F0F\u7684\u4E3B\u673A\u540D</p>
+</section>
+<section>
+  <button id="save" type="button">\u4FDD\u5B58</button>
+  <button id="login" type="button">\u6253\u5F00\u7F51\u9875\u767B\u5F55</button>
+</section>
+<script>
+const origin = "https://webvpn.swufe.edu.cn";
+const api = origin + "/__swufe_bridge__/api/settings";
+const state = { token: "", builtin: { jwxt: true }, custom: [], status: "logged-out" };
+const statusText = { "logged-in": "\u5DF2\u767B\u5F55", "logged-out": "\u672A\u767B\u5F55", expired: "\u4F1A\u8BDD\u5DF2\u5931\u6548", incompatible: "\u63D2\u4EF6\u9700\u8981\u66F4\u65B0" };
+function show(id, text, kind) {
+  const node = document.getElementById(id);
+  node.hidden = !text;
+  node.textContent = text || "";
+  if (kind) node.className = "banner " + kind;
+}
+function render() {
+  document.getElementById("status").textContent = "\u72B6\u6001\uFF1A" + (statusText[state.status] || "\u672A\u767B\u5F55");
+  const builtin = document.getElementById("builtin");
+  builtin.replaceChildren();
+  const row = document.createElement("label");
+  row.className = "row";
+  const text = document.createElement("span");
+  text.append(document.createTextNode("\u6559\u52A1\u7CFB\u7EDF"));
+  text.append(document.createElement("br"));
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  meta.textContent = "jwxt.swufe.edu.cn";
+  text.append(meta);
+  const toggle = document.createElement("input");
+  toggle.type = "checkbox";
+  toggle.checked = state.builtin.jwxt === true;
+  toggle.setAttribute("aria-label", "\u6559\u52A1\u7CFB\u7EDF");
+  toggle.addEventListener("change", () => { state.builtin.jwxt = toggle.checked; });
+  row.append(text, toggle);
+  builtin.append(row);
+  const custom = document.getElementById("custom");
+  custom.replaceChildren();
+  state.custom.forEach((host, index) => {
+    const item = document.createElement("div");
+    item.className = "row";
+    const name = document.createElement("span");
+    name.textContent = host;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "\u5220\u9664";
+    remove.addEventListener("click", () => { state.custom.splice(index, 1); render(); });
+    item.append(name, remove);
+    custom.append(item);
+  });
+}
+async function load() {
+  const response = await fetch(api, { cache: "no-store" });
+  const body = await response.json();
+  if (!response.ok || !body.ok) {
+    show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad");
+    return;
+  }
+  state.token = body.token || "";
+  state.builtin = body.data.settings.builtinSiteStates;
+  state.custom = body.data.settings.customHosts.slice();
+  state.status = body.data.status;
+  show("warning", body.data.migrationWarnings && body.data.migrationWarnings.length ? "\u90E8\u5206\u65E7\u7F51\u7AD9\u8BBE\u7F6E\u4E0D\u518D\u53D7\u652F\u6301\uFF0C\u8BF7\u68C0\u67E5\u5F53\u524D\u5217\u8868" : "");
+  render();
+}
+document.getElementById("add").addEventListener("click", () => {
+  const value = document.getElementById("host").value.trim().toLowerCase().replace(/\\.+$/, "");
+  const ok = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(value) && value.endsWith(".swufe.edu.cn") && value !== "swufe.edu.cn";
+  document.getElementById("host-error").hidden = ok;
+  if (!ok || state.custom.includes(value) || value === "jwxt.swufe.edu.cn" || value === "webvpn.swufe.edu.cn" || value === "authserver.swufe.edu.cn") {
+    document.getElementById("host-error").hidden = false;
+    return;
+  }
+  state.custom.push(value);
+  document.getElementById("host").value = "";
+  render();
+});
+document.getElementById("save").addEventListener("click", async () => {
+  show("feedback", "\u6B63\u5728\u4FDD\u5B58", "");
+  const response = await fetch(api, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-swufe-settings-token": state.token },
+    body: JSON.stringify({ schemaVersion: 2, builtinSiteStates: state.builtin, customHosts: state.custom })
+  });
+  const body = await response.json().catch(() => ({}));
+  if (response.ok && body.ok) {
+    show("feedback", "\u5DF2\u4FDD\u5B58", "ok");
+    show("warning", "");
+    await load();
+    return;
+  }
+  show("feedback", "\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", "bad");
+});
+document.getElementById("login").addEventListener("click", () => { location.href = origin + "/"; });
+load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad"));
+<\/script>
+</body>
+</html>`;
+
   // src/adapter.ts
   var NOTIFY_GAP_MS = 6e4;
   function handleStashRequest(runtime) {
-    const settings = loadSettings(runtime);
+    if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
+      try {
+        const response = handleSettingsRequest(settingsDto(runtime), {
+          kv: kv(runtime),
+          statusProvider: { getStatus: () => sessionStatus(runtime) },
+          pageHtml: SETTINGS_PAGE_HTML
+        });
+        runtime.finishRequest({ decision: "respond", response });
+      } catch {
+        runtime.finishRequest({ decision: "respond", response: settingsErrorResponse(500, "STORAGE_FAILED") });
+      }
+      return;
+    }
+    const loaded = loadSettingsV2(kv(runtime));
+    if (loaded.kind === "incompatible") {
+      notifyThrottled(runtime, "runtime-incompatible");
+      emit(runtime, false, { ts: runtime.nowIso, host: safeHost(runtime.request?.url ?? ""), direction: "request", action: "error", code: "RUNTIME_INCOMPATIBLE" });
+      runtime.finishRequest({ decision: "pass" });
+      return;
+    }
+    const settings = loaded.settings;
     if (!settings.enabled) {
       emit(runtime, settings.debug, { ts: runtime.nowIso, host: null, direction: "request", action: "pass", detail: "disabled" });
       runtime.finishRequest({ decision: "pass" });
       return;
     }
-    const rewriteSettings = toRewriteSettings(settings);
+    const rewriteSettings = toRewriteSettingsFromV2(settings);
     const store = createSessionStore(kv(runtime));
-    const loaded = store.load();
-    const compatible = loaded && sessionSchemaOk(runtime);
+    const session = store.load();
+    const compatible = session && sessionSchemaOk(runtime);
     const request = runtime.request;
     if (!request?.url) {
       emit(runtime, settings.debug, { ts: runtime.nowIso, host: null, direction: "request", action: "pass", detail: "missing-url" });
@@ -1289,13 +1829,13 @@
         body: request.body
       },
       rewriteSettings,
-      compatible ? loaded : null,
+      compatible ? session : null,
       runtime.nowIso
     );
     const host = safeHost(request.url);
-    const detail = requestDetail(request.url, loaded ? "ready" : "missing", request.headers);
+    const detail = requestDetail(request.url, session ? "ready" : "missing", request.headers);
     if (decision.kind === "capture_session") {
-      const next = loaded ? applyNewerCookie(loaded, decision.session) : decision.session;
+      const next = session ? applyNewerCookie(session, decision.session) : decision.session;
       store.save(next);
       runtime.write(STORAGE_KEYS.lastError, null);
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-captured", detail });
@@ -1335,8 +1875,45 @@
     const accept = Object.entries(request.headers ?? {}).find(([key]) => key.toLowerCase() === "accept")?.[1] ?? "";
     return url.pathname === "/" || accept.toLowerCase().includes("text/html") ? result.url : null;
   }
-  function loadSettings(runtime) {
-    return parseSettings(runtime.read(STORAGE_KEYS.settings));
+  function settingsDto(runtime) {
+    const request = runtime.request;
+    let path = "/";
+    try {
+      path = request?.url ? new URL(request.url).pathname : "/";
+    } catch {
+      path = "/";
+    }
+    return {
+      method: request?.method ?? "GET",
+      path,
+      nowIso: runtime.nowIso,
+      origin: header(request?.headers, "origin"),
+      referer: header(request?.headers, "referer"),
+      contentType: header(request?.headers, "content-type"),
+      token: header(request?.headers, "x-swufe-settings-token"),
+      freshNonce: secureNonce() ?? void 0,
+      body: request?.body
+    };
+  }
+  function secureNonce() {
+    const cryptoObj = globalThis.crypto;
+    if (!cryptoObj?.getRandomValues) return null;
+    const bytes = new Uint8Array(16);
+    cryptoObj.getRandomValues(bytes);
+    return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  function header(headers, name) {
+    if (!headers) return void 0;
+    const found = Object.entries(headers).find(([key]) => key.toLowerCase() === name);
+    return found?.[1];
+  }
+  function sessionStatus(runtime) {
+    const raw = runtime.read(STORAGE_KEYS.session);
+    if (!raw) return readLastError(runtime) === "SESSION_EXPIRED" ? "expired" : "logged-out";
+    const parsed = parseSession(raw);
+    if (parsed.kind === "incompatible") return "incompatible";
+    if (parsed.kind !== "ok") return "logged-out";
+    return readLastError(runtime) === "SESSION_EXPIRED" ? "expired" : "logged-in";
   }
   function kv(runtime) {
     return { read: (key) => runtime.read(key), write: (key, value) => runtime.write(key, value) };
@@ -1371,6 +1948,16 @@
       STORAGE_KEYS.lastError,
       JSON.stringify({ schemaVersion: 1, code, ts: runtime.nowIso, host, detail: code === "CODEC_FAILED" ? "encode-failed" : code })
     );
+  }
+  function readLastError(runtime) {
+    const raw = runtime.read(STORAGE_KEYS.lastError);
+    if (!raw) return null;
+    try {
+      const data = JSON.parse(raw);
+      return typeof data.code === "string" ? data.code : null;
+    } catch {
+      return null;
+    }
   }
   function emit(runtime, debug, record) {
     const safe = safeDiagnostic(record, debug);
@@ -1465,6 +2052,10 @@
         console.log(JSON.stringify(record));
       },
       finishRequest: (result) => {
+        if (result.decision === "respond" && result.response) {
+          $done({ response: result.response });
+          return;
+        }
         const nativeUrl = nativeGatewayRedirect(typeof $request === "undefined" ? void 0 : $request, result);
         if (nativeUrl) {
           $done({ response: { status: 302, headers: { location: nativeUrl, "cache-control": "no-store" } } });

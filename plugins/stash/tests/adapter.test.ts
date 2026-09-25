@@ -254,10 +254,114 @@ describe("Stash adapter", () => {
       lastConfirmedAt: null,
       status: "valid",
     });
-    expect(handleStashTile(ready)).toMatchObject({ title: "SWUFE WebVPN", content: "已登录", url: "https://webvpn.swufe.edu.cn" });
+    expect(handleStashTile(ready)).toMatchObject({ title: "SWUFE WebVPN", content: "已登录", url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/" });
+    expect(handleStashTile(loggedOut).url).toBe("https://webvpn.swufe.edu.cn");
     const expired = runtime();
     expired.store[STORAGE_KEYS.lastError] = JSON.stringify({ schemaVersion: 1, code: "SESSION_EXPIRED", ts: NOW, host: "jwxt.swufe.edu.cn", detail: "SESSION_EXPIRED" });
     expect(handleStashTile(expired).content).toContain("打开网页登录");
     expect(handleStashTile(expired).content).toContain("失效");
+    expect(handleStashTile(expired).url).toBe("https://webvpn.swufe.edu.cn");
+  });
+
+  it("serves settings HTML without capturing the session", () => {
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/", method: "GET", headers: { cookie: "route=secret" } },
+    });
+    handleStashRequest(rt);
+    const result = rt.requests[0] as { decision: string; response: { status: number; headers: Record<string, string>; body: string } };
+    expect(result.decision).toBe("respond");
+    expect(result.response.status).toBe(200);
+    expect(result.response.headers["content-type"]).toContain("text/html");
+    expect(result.response.body).toContain("打开网页登录");
+    expect(result.response.body).not.toContain("cdn");
+    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+  });
+
+  it("returns a one-use settings token and writes only v2 on a valid post", () => {
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/api/settings", method: "GET", headers: {} },
+    });
+    handleStashRequest(rt);
+    const first = rt.requests[0] as { response: { body: string } };
+    const token = JSON.parse(first.response.body).token as string;
+    expect(JSON.parse(first.response.body).data.settings).not.toHaveProperty("wrdKeyOverride");
+    const post = runtime({
+      request: {
+        url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/api/settings",
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://webvpn.swufe.edu.cn", "x-swufe-settings-token": token },
+        body: JSON.stringify({ schemaVersion: 2, builtinSiteStates: { jwxt: false }, customHosts: ["lib.swufe.edu.cn"] }),
+      },
+      read: (key) => rt.store[key] ?? null,
+      write: (key, value) => {
+        if (value === null || value === "") delete rt.store[key];
+        else rt.store[key] = value;
+        return true;
+      },
+    });
+    handleStashRequest(post);
+    expect(post.requests[0]).toMatchObject({ decision: "respond", response: { status: 200 } });
+    expect(rt.store[STORAGE_KEYS.settingsV2]).toContain("lib.swufe.edu.cn");
+    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+    handleStashRequest(post);
+    expect(post.requests[1]).toMatchObject({ decision: "respond", response: { status: 401 } });
+  });
+
+  it("rejects a settings post that fails origin, json, or size checks", () => {
+    const rt = runtime({
+      request: {
+        url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/api/settings",
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://evil.example", "x-swufe-settings-token": "aa".repeat(16) },
+        body: "{}",
+      },
+    });
+    handleStashRequest(rt);
+    expect(rt.requests[0]).toMatchObject({ response: { status: 401 } });
+    const huge = runtime({
+      request: {
+        url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/api/settings",
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "x".repeat(16 * 1024 + 1),
+      },
+    });
+    handleStashRequest(huge);
+    expect(huge.requests[0]).toMatchObject({ response: { status: 413 } });
+    expect(JSON.stringify(huge.requests[0])).not.toContain("xxxxx");
+  });
+
+  it("returns a local 500 when the settings handler throws", () => {
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/api/settings", method: "GET", headers: {} },
+      read: () => { throw new Error("store down"); },
+    });
+    handleStashRequest(rt);
+    expect(rt.requests[0]).toMatchObject({ decision: "respond", response: { status: 500 } });
+  });
+
+  it("passes an unselected SWUFE host without injecting a cookie", () => {
+    const rt = runtime({
+      request: { url: "https://lib.swufe.edu.cn/home", method: "GET", headers: {} },
+    });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: "webvpn.swufe.edu.cn",
+      cookieHeader: "route=fake",
+      capturedAt: NOW,
+      lastConfirmedAt: NOW,
+      status: "valid",
+    });
+    handleStashRequest(rt);
+    expect(rt.requests[0]).toEqual({ decision: "pass" });
+  });
+
+  it("does not rewrite a settings response", () => {
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/", method: "GET", headers: {} },
+      response: { status: 200, headers: { "content-type": "text/html" }, body: "<p>local</p>" },
+    });
+    handleStashResponse(rt);
+    expect(rt.responses[0]).toEqual({});
   });
 });

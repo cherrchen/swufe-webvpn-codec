@@ -8,7 +8,7 @@ homepage: https://github.com/cherrchen/swufe-webvpn-codec
 icon: network
 category: SWUFE
 date: 2026-09-24
-version: 0.1.4-m2
+version: 0.1.5-m2
 
 tiles:
   - name: swufe-webvpn-tile
@@ -22,22 +22,21 @@ tiles:
 
 script-providers:
   swufe-webvpn-request:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.4-m2
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.5-m2
     interval: 86400
   swufe-webvpn-response:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/response.js?v=0.1.4-m2
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/response.js?v=0.1.5-m2
     interval: 86400
   swufe-webvpn-tile:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/tile.js?v=0.1.4-m2
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/tile.js?v=0.1.5-m2
     interval: 86400
 
-# HTTP/3 does not enter the Stash HTTP Engine. Reject QUIC only for these hosts
-# so clients fall back to TCP. Do not also list :443 under force-http-engine:
-# that kept HTTPS out of the HTTP script and Safari failed the TLS handshake.
+# HTTP/3 does not enter the Stash HTTP Engine. Reject QUIC only for the SWUFE
+# suffix so clients fall back to TCP. This is not a global UDP/443 reject.
+# Do not list :443 under force-http-engine: that kept HTTPS out of the HTTP
+# script and Safari failed the TLS handshake. Wildcard MitM still needs a device import check.
 rules:
-  - AND,((DOMAIN,jwxt.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
-  - AND,((DOMAIN,webvpn.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
-  - AND,((DOMAIN,authserver.swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
+  - AND,((DOMAIN-SUFFIX,swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
 
 http:
   # Safari's plain-HTTP jwxt entry may arrive through Stash Tunnel. Port 80
@@ -45,16 +44,16 @@ http:
   force-http-engine:
     - jwxt.swufe.edu.cn:80
   mitm:
-    - jwxt.swufe.edu.cn:443
+    - "*.swufe.edu.cn:443"
     - webvpn.swufe.edu.cn:443
     - authserver.swufe.edu.cn:443
   script:
-    - match: ^https?:\/\/(jwxt|webvpn|authserver)\.swufe\.edu\.cn
+    - match: ^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn
       name: swufe-webvpn-request
       type: request
-      require-body: false
+      require-body: true
       timeout: 10
-    - match: ^https?:\/\/(jwxt|webvpn|authserver)\.swufe\.edu\.cn
+    - match: ^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn
       name: swufe-webvpn-response
       type: response
       require-body: true

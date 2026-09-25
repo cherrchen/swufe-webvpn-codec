@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 2998d62 */
+/* swufe-webvpn stash 097ef3d */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -843,6 +843,8 @@
   var STORAGE_KEYS = {
     schema: "swufe.plugin.schema",
     settings: "swufe.settings.v1",
+    settingsV2: "swufe.settings.v2",
+    settingsCsrf: "swufe.settings.csrf.v1",
     session: "swufe.session.v1",
     notificationThrottle: "swufe.notification-throttle.v1",
     lastError: "swufe.last-error.v1"
@@ -1509,20 +1511,6 @@
     }
     return settings;
   }
-  function toRewriteSettings(settings) {
-    return {
-      gatewayBase: settings.gatewayBase,
-      wrdKey: settings.wrdKeyOverride ?? DEFAULT_KEY,
-      wrdIv: settings.wrdIvOverride ?? DEFAULT_IV,
-      routing: {
-        ...defaultRoutingPolicy(),
-        exactHosts: settings.exactHosts,
-        includeSwufeWildcard: settings.includeSwufeWildcard
-      },
-      debug: settings.debug,
-      bodyRewriteMaxBytes: settings.bodyRewriteMaxBytes
-    };
-  }
   function uniqueHosts(hosts) {
     const out = [];
     for (const host of hosts) {
@@ -1538,15 +1526,247 @@
     return out.length > 0 ? out : ["jwxt.swufe.edu.cn"];
   }
 
+  // ../../packages/webvpn-core-js/src/runtime/settings-v2.ts
+  var SETTINGS_ORIGIN = "https://webvpn.swufe.edu.cn";
+  var SETTINGS_PREFIX = "/__swufe_bridge__";
+  var SETTINGS_BODY_MAX_BYTES = 16 * 1024;
+  var MIGRATION_WARNING = "DROPPED_INVALID_OR_OUT_OF_SCOPE_HOST";
+  var IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+  var BUILTIN_SITES = [
+    { id: "jwxt", name: "\u6559\u52A1\u7CFB\u7EDF", host: "jwxt.swufe.edu.cn" }
+  ];
+  function defaultSettingsV2() {
+    return {
+      schemaVersion: 2,
+      enabled: true,
+      gatewayBase: SETTINGS_ORIGIN,
+      builtinSiteStates: { jwxt: true },
+      customHosts: [],
+      debug: false,
+      bodyRewriteMaxBytes: DEFAULT_BODY_REWRITE_MAX_BYTES,
+      migrationWarnings: []
+    };
+  }
+  function validateSettingsHostname(input) {
+    if (typeof input !== "string") {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    const trimmed = input.trim();
+    if (!trimmed || /[\s/?#@:*]|:\\?\/\//.test(trimmed) || trimmed.includes(":")) {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    let candidate = trimmed.toLowerCase().replace(/\.+$/, "");
+    if (!candidate || candidate === "localhost" || IPV4.test(candidate)) {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    try {
+      candidate = normalizeHost(candidate);
+    } catch {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    if (candidate === GATEWAY_HOST || candidate === AUTH_HOST) {
+      return { ok: false, code: "RESERVED_HOST" };
+    }
+    if (candidate === "swufe.edu.cn" || !candidate.endsWith(".swufe.edu.cn")) {
+      return { ok: false, code: "INVALID_DOMAIN" };
+    }
+    return { ok: true, value: candidate, normalizedHosts: [candidate] };
+  }
+  function compileRoutingPolicy(settings) {
+    const exactHosts = [];
+    for (const site of BUILTIN_SITES) {
+      if (settings.builtinSiteStates[site.id] !== true) continue;
+      const checked = validateSettingsHostname(site.host);
+      if (checked.ok && !exactHosts.includes(checked.value)) exactHosts.push(checked.value);
+    }
+    for (const host of settings.customHosts) {
+      const checked = validateSettingsHostname(host);
+      if (checked.ok && !exactHosts.includes(checked.value)) exactHosts.push(checked.value);
+    }
+    return {
+      ...defaultRoutingPolicy(),
+      exactHosts,
+      includeSwufeWildcard: false,
+      excludedHosts: [...EXCLUDED_HOSTS]
+    };
+  }
+  function toRewriteSettingsFromV2(settings) {
+    return {
+      gatewayBase: settings.gatewayBase,
+      wrdKey: settings.wrdKeyOverride ?? DEFAULT_KEY,
+      wrdIv: settings.wrdIvOverride ?? DEFAULT_IV,
+      routing: compileRoutingPolicy(settings),
+      debug: settings.debug,
+      bodyRewriteMaxBytes: settings.bodyRewriteMaxBytes
+    };
+  }
+  function migrateV1ToV2(v1) {
+    const builtinSiteStates = {};
+    for (const site of BUILTIN_SITES) builtinSiteStates[site.id] = false;
+    const customHosts = [];
+    let dropped = v1.includeSwufeWildcard === true;
+    for (const raw of v1.exactHosts) {
+      const checked = validateSettingsHostname(raw);
+      if (!checked.ok) {
+        dropped = true;
+        continue;
+      }
+      const builtin = BUILTIN_SITES.find((site) => site.host === checked.value);
+      if (builtin) {
+        builtinSiteStates[builtin.id] = true;
+        continue;
+      }
+      if (!customHosts.includes(checked.value)) customHosts.push(checked.value);
+    }
+    return {
+      schemaVersion: 2,
+      enabled: v1.enabled,
+      gatewayBase: v1.gatewayBase,
+      builtinSiteStates,
+      customHosts,
+      debug: v1.debug,
+      ...v1.wrdKeyOverride ? { wrdKeyOverride: v1.wrdKeyOverride } : {},
+      ...v1.wrdIvOverride ? { wrdIvOverride: v1.wrdIvOverride } : {},
+      bodyRewriteMaxBytes: v1.bodyRewriteMaxBytes,
+      migrationWarnings: dropped ? [MIGRATION_WARNING] : []
+    };
+  }
+  function loadSettingsV2(kv2) {
+    const rawV2 = kv2.read(STORAGE_KEYS.settingsV2);
+    if (rawV2) {
+      const parsed = parseStoredV2(rawV2);
+      if (parsed === "incompatible") return { kind: "incompatible" };
+      if (parsed) return { kind: "ready", settings: parsed };
+      return { kind: "fail-closed", settings: defaultSettingsV2() };
+    }
+    const rawV1 = kv2.read(STORAGE_KEYS.settings);
+    if (rawV1) {
+      const v1 = readMigratableV1(rawV1);
+      if (!v1) return { kind: "fail-closed", settings: defaultSettingsV2() };
+      return persistOrFailClosed(kv2, migrateV1ToV2(v1));
+    }
+    return persistOrFailClosed(kv2, defaultSettingsV2());
+  }
+  function isSettingsNamespaceUrl(url) {
+    try {
+      const parsed = new URL(url);
+      return parsed.hostname.toLowerCase() === GATEWAY_HOST && normalizeSettingsPath(parsed.pathname) !== null;
+    } catch {
+      return false;
+    }
+  }
+  function persistOrFailClosed(kv2, settings) {
+    if (!kv2.write(STORAGE_KEYS.settingsV2, JSON.stringify(settings))) {
+      return { kind: "fail-closed", settings: defaultSettingsV2() };
+    }
+    return { kind: "ready", settings };
+  }
+  function parseStoredV2(raw) {
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const record = data;
+    if (typeof record.schemaVersion === "number" && record.schemaVersion > 2) return "incompatible";
+    if (record.schemaVersion !== 2) return null;
+    const base = defaultSettingsV2();
+    if (typeof record.enabled !== "boolean" || typeof record.debug !== "boolean") return null;
+    if (typeof record.gatewayBase !== "string") return null;
+    try {
+      gatewayHost(record.gatewayBase);
+    } catch {
+      return null;
+    }
+    if (!record.builtinSiteStates || typeof record.builtinSiteStates !== "object" || Array.isArray(record.builtinSiteStates)) return null;
+    const states = record.builtinSiteStates;
+    const builtinSiteStates = {};
+    for (const site of BUILTIN_SITES) {
+      if (typeof states[site.id] !== "boolean") return null;
+      builtinSiteStates[site.id] = states[site.id] === true;
+    }
+    if (!Array.isArray(record.customHosts)) return null;
+    const customHosts = [];
+    for (const host of record.customHosts) {
+      if (typeof host !== "string") return null;
+      const checked = validateSettingsHostname(host);
+      if (!checked.ok || customHosts.includes(checked.value) || BUILTIN_SITES.some((site) => site.host === checked.value)) return null;
+      customHosts.push(checked.value);
+    }
+    const maxBytes = record.bodyRewriteMaxBytes;
+    if (typeof maxBytes !== "number" || !Number.isFinite(maxBytes) || maxBytes <= 0) return null;
+    const settings = {
+      schemaVersion: 2,
+      enabled: record.enabled,
+      gatewayBase: record.gatewayBase,
+      builtinSiteStates,
+      customHosts,
+      debug: record.debug === true,
+      bodyRewriteMaxBytes: maxBytes,
+      migrationWarnings: record.migrationWarnings === void 0 ? [] : []
+    };
+    if (Array.isArray(record.migrationWarnings) && record.migrationWarnings.includes(MIGRATION_WARNING)) {
+      settings.migrationWarnings = [MIGRATION_WARNING];
+    }
+    const key = readOverride(record.wrdKeyOverride);
+    const iv = readOverride(record.wrdIvOverride);
+    if (key === "invalid" || iv === "invalid") return null;
+    if (key) settings.wrdKeyOverride = key;
+    if (iv) settings.wrdIvOverride = iv;
+    if (settings.bodyRewriteMaxBytes <= 0) return base;
+    return settings;
+  }
+  function readMigratableV1(raw) {
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const record = data;
+    if (record.schemaVersion !== 1) return null;
+    const parsed = parseSettings(raw);
+    const exactHosts = Array.isArray(record.exactHosts) ? record.exactHosts.filter((item) => typeof item === "string") : parsed.exactHosts;
+    return {
+      ...parsed,
+      exactHosts,
+      includeSwufeWildcard: record.includeSwufeWildcard === true
+    };
+  }
+  function readOverride(value) {
+    if (value === void 0) return null;
+    if (typeof value !== "string" || new TextEncoder().encode(value).length !== 16) return "invalid";
+    return value;
+  }
+  function normalizeSettingsPath(path) {
+    if (!path.startsWith(SETTINGS_PREFIX)) return null;
+    const rest = path.slice(SETTINGS_PREFIX.length) || "/";
+    const cleaned = rest.split("?")[0]?.split("#")[0] ?? "/";
+    if (cleaned === "" || cleaned === "/") return "/";
+    return cleaned.endsWith("/") ? cleaned.slice(0, -1) : cleaned;
+  }
+
   // src/adapter.ts
   var NOTIFY_GAP_MS = 6e4;
   function handleStashResponse(runtime) {
-    const settings = loadSettings(runtime);
+    if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
+      runtime.finishResponse({});
+      return;
+    }
+    const loaded = loadSettingsV2(kv(runtime));
+    if (loaded.kind !== "ready" && loaded.kind !== "fail-closed") {
+      runtime.finishResponse({});
+      return;
+    }
+    const settings = loaded.settings;
     if (!settings.enabled || !runtime.request?.url || !runtime.response) {
       runtime.finishResponse({});
       return;
     }
-    const rewriteSettings = toRewriteSettings(settings);
+    const rewriteSettings = toRewriteSettingsFromV2(settings);
     const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
     if (context?.originalHost === "jwxt.swufe.edu.cn" && safeHost(runtime.request.url) === gatewayHost(rewriteSettings.gatewayBase)) {
       runtime.finishResponse({});
@@ -1645,9 +1865,6 @@
     } catch {
       return null;
     }
-  }
-  function loadSettings(runtime) {
-    return parseSettings(runtime.read(STORAGE_KEYS.settings));
   }
   function kv(runtime) {
     return { read: (key) => runtime.read(key), write: (key, value) => runtime.write(key, value) };

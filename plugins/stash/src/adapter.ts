@@ -3,17 +3,19 @@ import {
   WrdCodec,
   applyNewerCookie,
   createSessionStore,
-  defaultSettings,
   gatewayHost,
+  handleSettingsRequest,
+  isSettingsNamespaceUrl,
+  loadSettingsV2,
   notificationFor,
   parseSession,
-  parseSettings,
   promoteSession,
   rewriteRequest,
   rewriteResponse,
   safeDiagnostic,
+  settingsErrorResponse,
   stashTile,
-  toRewriteSettings,
+  toRewriteSettingsFromV2,
   wrdPrefixOf,
   type HostAdapter,
   type HostEnvironment,
@@ -25,6 +27,7 @@ import {
   type SafeDiagnosticRecord,
   type SessionRecordV1,
 } from "webvpn-core-js";
+import { SETTINGS_PAGE_HTML } from "./settings-page.ts";
 
 const NOTIFY_GAP_MS = 60_000;
 
@@ -54,16 +57,36 @@ export function createStashAdapter(runtime: StashRuntime): HostAdapter {
 }
 
 export function handleStashRequest(runtime: StashRuntime): void {
-  const settings = loadSettings(runtime);
+  if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
+    try {
+      const response = handleSettingsRequest(settingsDto(runtime), {
+        kv: kv(runtime),
+        statusProvider: { getStatus: () => sessionStatus(runtime) },
+        pageHtml: SETTINGS_PAGE_HTML,
+      });
+      runtime.finishRequest({ decision: "respond", response });
+    } catch {
+      runtime.finishRequest({ decision: "respond", response: settingsErrorResponse(500, "STORAGE_FAILED") });
+    }
+    return;
+  }
+  const loaded = loadSettingsV2(kv(runtime));
+  if (loaded.kind === "incompatible") {
+    notifyThrottled(runtime, "runtime-incompatible");
+    emit(runtime, false, { ts: runtime.nowIso, host: safeHost(runtime.request?.url ?? ""), direction: "request", action: "error", code: "RUNTIME_INCOMPATIBLE" });
+    runtime.finishRequest({ decision: "pass" });
+    return;
+  }
+  const settings = loaded.settings;
   if (!settings.enabled) {
     emit(runtime, settings.debug, { ts: runtime.nowIso, host: null, direction: "request", action: "pass", detail: "disabled" });
     runtime.finishRequest({ decision: "pass" });
     return;
   }
-  const rewriteSettings = toRewriteSettings(settings);
+  const rewriteSettings = toRewriteSettingsFromV2(settings);
   const store = createSessionStore(kv(runtime));
-  const loaded = store.load();
-  const compatible = loaded && sessionSchemaOk(runtime);
+  const session = store.load();
+  const compatible = session && sessionSchemaOk(runtime);
   const request = runtime.request;
   if (!request?.url) {
     emit(runtime, settings.debug, { ts: runtime.nowIso, host: null, direction: "request", action: "pass", detail: "missing-url" });
@@ -78,13 +101,13 @@ export function handleStashRequest(runtime: StashRuntime): void {
       body: request.body,
     },
     rewriteSettings,
-    compatible ? loaded : null,
+    compatible ? session : null,
     runtime.nowIso,
   );
   const host = safeHost(request.url);
-  const detail = requestDetail(request.url, loaded ? "ready" : "missing", request.headers);
+  const detail = requestDetail(request.url, session ? "ready" : "missing", request.headers);
   if (decision.kind === "capture_session") {
-    const next = loaded ? applyNewerCookie(loaded, decision.session) : decision.session;
+    const next = session ? applyNewerCookie(session, decision.session) : decision.session;
     store.save(next);
     runtime.write(STORAGE_KEYS.lastError, null);
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "session-captured", detail });
@@ -114,12 +137,21 @@ export function handleStashRequest(runtime: StashRuntime): void {
 }
 
 export function handleStashResponse(runtime: StashRuntime): void {
-  const settings = loadSettings(runtime);
+  if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
+    runtime.finishResponse({});
+    return;
+  }
+  const loaded = loadSettingsV2(kv(runtime));
+  if (loaded.kind !== "ready" && loaded.kind !== "fail-closed") {
+    runtime.finishResponse({});
+    return;
+  }
+  const settings = loaded.settings;
   if (!settings.enabled || !runtime.request?.url || !runtime.response) {
     runtime.finishResponse({});
     return;
   }
-  const rewriteSettings = toRewriteSettings(settings);
+  const rewriteSettings = toRewriteSettingsFromV2(settings);
   const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv)
     ?? deriveOriginalRequestContext(runtime, rewriteSettings);
   // After a browser navigation has reached the WebVPN URL, its bootstrap
@@ -190,7 +222,7 @@ export function nativeGatewayRedirect(request: StashRuntime["request"], result: 
 // Stash may expose the browser URL, rather than the rewritten upstream URL, to
 // a response script. Reconstruct only a request that our request script would
 // have rewritten with the current session.
-function deriveOriginalRequestContext(runtime: StashRuntime, settings: ReturnType<typeof toRewriteSettings>): RequestRewriteContext | null {
+function deriveOriginalRequestContext(runtime: StashRuntime, settings: ReturnType<typeof toRewriteSettingsFromV2>): RequestRewriteContext | null {
   const request = runtime.request;
   if (!request?.url) return null;
   const session = createSessionStore(kv(runtime)).load();
@@ -257,8 +289,48 @@ export function deriveRewriteContext(requestUrl: string, gatewayBase: string, ke
   }
 }
 
-function loadSettings(runtime: StashRuntime) {
-  return parseSettings(runtime.read(STORAGE_KEYS.settings));
+function settingsDto(runtime: StashRuntime) {
+  const request = runtime.request;
+  let path = "/";
+  try {
+    path = request?.url ? new URL(request.url).pathname : "/";
+  } catch {
+    path = "/";
+  }
+  return {
+    method: request?.method ?? "GET",
+    path,
+    nowIso: runtime.nowIso,
+    origin: header(request?.headers, "origin"),
+    referer: header(request?.headers, "referer"),
+    contentType: header(request?.headers, "content-type"),
+    token: header(request?.headers, "x-swufe-settings-token"),
+    freshNonce: secureNonce() ?? undefined,
+    body: request?.body,
+  };
+}
+
+function secureNonce(): string | null {
+  const cryptoObj = globalThis.crypto;
+  if (!cryptoObj?.getRandomValues) return null;
+  const bytes = new Uint8Array(16);
+  cryptoObj.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function header(headers: Record<string, string> | undefined, name: string): string | undefined {
+  if (!headers) return undefined;
+  const found = Object.entries(headers).find(([key]) => key.toLowerCase() === name);
+  return found?.[1];
+}
+
+function sessionStatus(runtime: StashRuntime): "logged-in" | "logged-out" | "expired" | "incompatible" {
+  const raw = runtime.read(STORAGE_KEYS.session);
+  if (!raw) return readLastError(runtime) === "SESSION_EXPIRED" ? "expired" : "logged-out";
+  const parsed = parseSession(raw);
+  if (parsed.kind === "incompatible") return "incompatible";
+  if (parsed.kind !== "ok") return "logged-out";
+  return readLastError(runtime) === "SESSION_EXPIRED" ? "expired" : "logged-in";
 }
 
 function kv(runtime: StashRuntime): KeyValueStore {
@@ -364,5 +436,3 @@ function safeHost(url: string): string | null {
     return null;
   }
 }
-
-export { defaultSettings };

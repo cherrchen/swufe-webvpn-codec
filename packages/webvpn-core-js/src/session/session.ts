@@ -3,6 +3,8 @@ import { tryNormalizeHost } from "../routing/allowlist.ts";
 export const STORAGE_KEYS = {
   schema: "swufe.plugin.schema",
   settings: "swufe.settings.v1",
+  settingsV2: "swufe.settings.v2",
+  settingsCsrf: "swufe.settings.csrf.v1",
   session: "swufe.session.v1",
   notificationThrottle: "swufe.notification-throttle.v1",
   lastError: "swufe.last-error.v1",

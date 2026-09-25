@@ -1,4 +1,4 @@
-/* swufe-webvpn stash f5f1aab */
+/* swufe-webvpn stash 097ef3d */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -595,6 +595,8 @@
   var STORAGE_KEYS = {
     schema: "swufe.plugin.schema",
     settings: "swufe.settings.v1",
+    settingsV2: "swufe.settings.v2",
+    settingsCsrf: "swufe.settings.csrf.v1",
     session: "swufe.session.v1",
     notificationThrottle: "swufe.notification-throttle.v1",
     lastError: "swufe.last-error.v1"
@@ -672,13 +674,17 @@
     } else if (input.sessionReady) {
       content = "\u5DF2\u767B\u5F55";
     }
+    const loggedIn = input.sessionReady && !input.expired && !input.incompatible;
     return {
       title: "SWUFE WebVPN",
       content,
-      url: "https://webvpn.swufe.edu.cn",
+      url: loggedIn ? "https://webvpn.swufe.edu.cn/__swufe_bridge__/" : "https://webvpn.swufe.edu.cn",
       icon: "network"
     };
   }
+
+  // ../../packages/webvpn-core-js/src/runtime/settings-v2.ts
+  var SETTINGS_BODY_MAX_BYTES = 16 * 1024;
 
   // src/adapter.ts
   function handleStashTile(runtime) {

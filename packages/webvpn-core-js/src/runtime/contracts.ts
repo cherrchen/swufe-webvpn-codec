@@ -9,9 +9,10 @@ export interface HostEnvironment {
 }
 
 export interface HostRequestResult {
-  decision: "pass" | "rewrite" | "reject";
+  decision: "pass" | "rewrite" | "reject" | "respond";
   url?: string;
   headers?: Record<string, string>;
+  response?: { status: number; headers: Record<string, string>; body: string };
 }
 
 export interface HostResponseResult {

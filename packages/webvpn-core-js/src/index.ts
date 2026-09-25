@@ -57,4 +57,38 @@ export { diagnosticContainsSensitive, notificationFor, redactText, safeDiagnosti
 export type { NotificationDTO, SafeDiagnosticRecord } from "./runtime/diagnostics.ts";
 export { defaultSettings, parseSettings, stashTile, toRewriteSettings } from "./runtime/settings.ts";
 export type { PluginSettingsV1, RuntimeCompatibility, StashTileViewModel } from "./runtime/settings.ts";
+export {
+  BUILTIN_SITES,
+  MIGRATION_WARNING,
+  SETTINGS_BODY_MAX_BYTES,
+  SETTINGS_ORIGIN,
+  SETTINGS_PAGE_URL,
+  SETTINGS_PREFIX,
+  classifySettingsRoute,
+  compileRoutingPolicy,
+  defaultSettingsV2,
+  handleSettingsRequest,
+  isSettingsNamespaceUrl,
+  loadSettingsV2,
+  migrateV1ToV2,
+  pageFromSettings,
+  settingsErrorResponse,
+  toPublicSettings,
+  toRewriteSettingsFromV2,
+  validateSettingsHostname,
+  validateSettingsUpdate,
+} from "./runtime/settings-v2.ts";
+export type {
+  BuiltinSite,
+  LoadedSettings,
+  SessionStatusProvider,
+  SettingsHttpResponse,
+  SettingsPageDTO,
+  SettingsPublicDTO,
+  SettingsRequestDTO,
+  SettingsRouteDecision,
+  SettingsV2,
+  SettingsValidationCode,
+  SettingsValidationResult,
+} from "./runtime/settings-v2.ts";
 export type { HostAdapter, HostEnvironment, HostRequestResult, HostResponseResult } from "./runtime/contracts.ts";

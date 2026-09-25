@@ -124,10 +124,11 @@ export function stashTile(input: {
   } else if (input.sessionReady) {
     content = "已登录";
   }
+  const loggedIn = input.sessionReady && !input.expired && !input.incompatible;
   return {
     title: "SWUFE WebVPN",
     content,
-    url: "https://webvpn.swufe.edu.cn",
+    url: loggedIn ? "https://webvpn.swufe.edu.cn/__swufe_bridge__/" : "https://webvpn.swufe.edu.cn",
     icon: "network",
   };
 }
