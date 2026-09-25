@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 0df0af9 */
+/* swufe-webvpn stash 7c3ab2a */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -2082,9 +2082,9 @@
     if (setCookie) {
       const previous = store.load();
       const applied = applyTicketSetCookie(previous, setCookie, runtime.nowIso, gateway);
+      const requestTicket = cookiePairValue(headerValue(request.headers ?? {}, "cookie"), TICKET_COOKIE_NAME);
+      const storedTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
       if (applied.kind === "expired") {
-        const requestTicket = cookiePairValue(headerValue(request.headers ?? {}, "cookie"), TICKET_COOKIE_NAME);
-        const storedTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
         if (requestTicket !== null && requestTicket === storedTicket) {
           expireStoredSession(runtime, host);
           return "expired";
@@ -2092,10 +2092,10 @@
         return "expired-ignored";
       }
       if (applied.kind === "update") {
+        if (previous && requestTicket !== storedTicket) return "unbound-ignored";
         store.save(applied.session);
-        const oldTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
         const newTicket = cookiePairValue(applied.session.cookieHeader, TICKET_COOKIE_NAME);
-        return oldTicket === null ? "new" : oldTicket === newTicket ? "same" : "rotated";
+        return storedTicket === null ? "new" : storedTicket === newTicket ? "same" : "rotated";
       }
     }
     return "none";

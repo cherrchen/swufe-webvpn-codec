@@ -414,7 +414,7 @@ function sessionStatus(runtime: StashRuntime): "logged-in" | "logged-out" | "exp
   return "logged-in";
 }
 
-type GatewayTicketEvent = "none" | "new" | "same" | "rotated" | "expired" | "expired-ignored";
+type GatewayTicketEvent = "none" | "new" | "same" | "rotated" | "unbound-ignored" | "expired" | "expired-ignored";
 
 function observeGatewayTicket(runtime: StashRuntime, gatewayBase: string): GatewayTicketEvent {
   const request = runtime.request;
@@ -433,11 +433,11 @@ function observeGatewayTicket(runtime: StashRuntime, gatewayBase: string): Gatew
   if (setCookie) {
     const previous = store.load();
     const applied = applyTicketSetCookie(previous, setCookie, runtime.nowIso, gateway);
+    const requestTicket = cookiePairValue(headerValue(request.headers ?? {}, "cookie"), TICKET_COOKIE_NAME);
+    const storedTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
     if (applied.kind === "expired") {
       // A different App can receive a ticket deletion while Safari's stored
       // ticket remains usable. Clear only when this request used that ticket.
-      const requestTicket = cookiePairValue(headerValue(request.headers ?? {}, "cookie"), TICKET_COOKIE_NAME);
-      const storedTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
       if (requestTicket !== null && requestTicket === storedTicket) {
         expireStoredSession(runtime, host);
         return "expired";
@@ -445,10 +445,12 @@ function observeGatewayTicket(runtime: StashRuntime, gatewayBase: string): Gatew
       return "expired-ignored";
     }
     if (applied.kind === "update") {
+      // A ticket minted for a no-ticket/different-ticket client must not
+      // replace an existing shared session captured from another client.
+      if (previous && requestTicket !== storedTicket) return "unbound-ignored";
       store.save(applied.session);
-      const oldTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
       const newTicket = cookiePairValue(applied.session.cookieHeader, TICKET_COOKIE_NAME);
-      return oldTicket === null ? "new" : oldTicket === newTicket ? "same" : "rotated";
+      return storedTicket === null ? "new" : storedTicket === newTicket ? "same" : "rotated";
     }
   }
   return "none";

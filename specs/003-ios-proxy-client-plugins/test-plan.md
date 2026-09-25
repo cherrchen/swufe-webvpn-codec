@@ -36,7 +36,7 @@ release bundle：单文件可解析、无 Node built-in、无 unresolved imports
 1. Safari 打开 Tile，完成 WebVPN/CAS/MFA 登录；确认 Tile 已登录，Safe Trace 显示 `sessionAction=capture`，不得保存或展示 Cookie 值。
 2. 在 Settings 将 `tyxycg.swufe.edu.cn` 加入 Routing Scope，并确认对应 Stash MitM/Script 实际命中；先确认 Safari 页面和 Tile 均显示已登录，再打开独立 App 的 WKWebView，触发该站点页面。记录脱敏链路：实际 host、route、gatewayKind、decodedOriginalHost、sourceScheme、targetScheme、requestTicket、ticketRelation、storedSession、sessionAction、首次原生 WRD response 的 status/responseVisibleTicket/ticketSetCookie/locationGatewayKind/locationGatewaySignal、locationHost/locationAuth、serviceHost，以及 WebVPN 是否再次跳 `/login`。`responseVisibleTicket` 仅是响应脚本看到的 request header，不是上游收到了 Cookie 的证明；若 Stash 能显示上游请求详情，只核对 Cookie header 是否存在，不记录值；若找不到，明确记为未确认。
 3. 分别复核解码目标已在 Routing Scope 的 `/http/<token>/...`、`/https/<token>/...` 和无 query 的 gateway 根路径 GET/HEAD；验证请求头注入后 URL 不变。解码失败或目标未入选的 WRD、Settings、raw authserver、`/login`、`/wengine-vpn/...`、未知路径与带 query 的根路径均不注入。对用户已确认的 gateway `/logout`，验证请求不注入、`swufe.session.v1` 清除，且响应不会重新保存 ticket。
-4. 验证 ticket B 请求遇到 stored ticket A 时 B 优先且 store 更新；核对 Set-Cookie rotation、请求 ticket 与 stored ticket 相同/不同/缺失时的删除信号、时钟过期、普通 jwxt 改写、响应反向改写和导航无重定向环。
+4. 验证 ticket B 请求遇到 stored ticket A 时 B 优先且 store 更新；核对 Set-Cookie rotation 仅由当前 stored ticket 对应请求触发、无 ticket/不同 ticket 响应下发新 ticket 不覆盖已有共享 Session、请求 ticket 与 stored ticket 相同/不同/缺失时的删除信号、时钟过期、普通 jwxt 改写、响应反向改写和导航无重定向环。
 5. 若注入后仍跳 gateway `/login`，检查网关所需 Cookie 集、path/domain、rotation 或其他绑定状态；若网关复用成功后 `tyxycg` 再跳 raw authserver，只记录为独立业务 CAS 流程，不在 M2 扩展 CAS Cookie 共享。
 6. 对照必须使用同一独立 App 的网络环境。Safari 中 `jwxt` 成功只证明 Safari 自身 Cookie 可用；它不是跨 App Gateway Session 复用对照。若 tyxycg 当前站点协议设为 HTTP，保持其它条件相同后改为 HTTPS 再试一次，记录首个 WRD response 的状态与安全分类；不记录 WRD token 或完整 URL。
 

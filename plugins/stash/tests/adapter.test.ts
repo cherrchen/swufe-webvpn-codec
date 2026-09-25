@@ -101,7 +101,7 @@ describe("Stash adapter", () => {
 
   it("rotates a gateway ticket and clears it only on an explicit deletion", () => {
     const logs: string[] = [];
-    const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/http/opaque/path", headers: {} }, response: { status: 200, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=B; Max-Age=3600` } }, debug: (record) => logs.push(JSON.stringify(record)) });
+    const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/http/opaque/path", headers: { cookie: `${TICKET_COOKIE_NAME}=A` } }, response: { status: 200, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=B; Max-Age=3600` } }, debug: (record) => logs.push(JSON.stringify(record)) });
     rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=A`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "valid" });
     handleStashResponse(rt);
     expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=B`);
@@ -112,6 +112,25 @@ describe("Stash adapter", () => {
     handleStashResponse(rt);
     expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
     expect(logs.join("\n")).toContain("ticketSetCookie=expired");
+  });
+
+  it("does not replace a stored Safari ticket with a response minted for a ticketless App", () => {
+    const logs: string[] = [];
+    const rt = runtime({
+      request: { url: "https://webvpn.swufe.edu.cn/wengine-vpn/failed", headers: {} },
+      response: { status: 200, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=app-secret; Max-Age=3600` } },
+      debug: (record) => logs.push(JSON.stringify(record)),
+    });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=safari-secret`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "captured" });
+    handleStashResponse(rt);
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=safari-secret`);
+    expect(logs.join("\n")).toContain("ticketSetCookie=unbound-ignored");
+    expect(logs.join("\n")).not.toMatch(/app-secret|safari-secret/);
+
+    rt.request = { url: "https://webvpn.swufe.edu.cn/wengine-vpn/failed", headers: { cookie: `${TICKET_COOKIE_NAME}=other-app-secret` } };
+    handleStashResponse(rt);
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=safari-secret`);
+    expect(logs.join("\n")).not.toMatch(/other-app-secret/);
   });
 
   it("traces a native WRD gateway response before the no-promotion return", () => {

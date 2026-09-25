@@ -104,6 +104,12 @@ N02 真机结果为 Failed，其余 N03–N10 仍 Pending。当前本地实现�
 
 0.1.14-m2 本地回归（不是真机结论）：Core 75 个测试与 typecheck、Stash 32 个测试与 typecheck、Stash bundle scan、`docs:check`、`spec:check` 和 `git diff --check` 均通过。新增 Adapter 测试证明无 ticket/不同 ticket 的删除响应不清 Safari stored Session，也不写失效状态；匹配的 ticket 删除仍清理。
 
+2026-09-25 0.1.14-m2 新一轮脱敏真机日志：约 22:00:14–15，tyxycg 源请求为 `sourceScheme=http targetScheme=http`，已改写；10 条 Gateway WRD 请求显示 `requestTicket=missing`、`storedSession=captured`、`sessionAction=inject`。首批 WRD 响应有 200，响应脚本看到请求 ticket `present`，但这仍不是上游实际收到 Cookie 的独立证明。约 22:00:16，一个 `gatewayKind=gateway-owned`、`responseVisibleTicket=missing` 的 200 响应下发新 ticket，旧 Adapter 将其记为 `ticketSetCookie=rotated` 并覆盖全局 stored Session；约 22:00:17 起 WRD 请求显示 ticket present/same，22:00:18–19 多条 tyxycg WRD 302 到 Gateway `/login`，后者 302 到 raw authserver，`serviceHost=webvpn.swufe.edu.cn`。约 22:00:25、39、41、47，无 ticket 的 `/login` 响应删除 ticket 均记为 `expired-ignored`；0.1.14 的误清修复已在真机生效。约 22:01:18 出现明确 `/logout` 请求/响应的 `sessionAction=clear`，之后 Tile 显示未登录属于预期清理。约 22:00:59–22:01:14 还有大量 tyxycg WRD 200，但日志没有客户端标识或请求关联 ID，不能断定这些与失败的 App API 属于同一链。浏览器可用而 App 失败仍为 N02 Failed；目前没有证据表明是 HTTP/HTTPS 配置不匹配，也没有证据把该 CAS 往返归为 tyxycg 业务 CAS。原始日志不写入仓库。
+
+新发现的独立问题：已有 stored ticket 时，另一客户端无 ticket 的 Gateway-owned 响应仍可下发新 ticket；旧 Adapter 无条件接受这次 Set-Cookie rotation，会把 Safari 捕获的共享 ticket 换成未绑定到它的 ticket。时间顺序与随后 Gateway `/login` 一致，但尚不足以证明这就是 App 失败的唯一原因。0.1.15-m2 要求新 ticket 只在响应对应请求携带当前 stored ticket 时更新共享 Session；无 ticket/不同 ticket 的响应记为 `ticketSetCookie=unbound-ignored`，不输出 ticket 值。请求自带 ticket 的优先规则仍维持。下轮真机须观察是否仍发生 WRD→Gateway `/login`；即使不再污染 store，若 App 仍失败，继续检查请求头实际送达、Gateway 对辅助 Cookie/客户端状态的要求和 App API 对 302/CAS 的处理。
+
+0.1.15-m2 本地回归（不是真机结论）：Core 75 个测试、Stash 33 个测试，两包 typecheck、Stash bundle scan、`docs:check`、`spec:check` 与 `git diff --check` 均通过。新增 Adapter 测试覆盖无 ticket/不同 ticket 请求的 Set-Cookie 不覆盖已有共享 Session，匹配的 ticket rotation 仍可更新。
+
 2026-09-25 本地回归：`pnpm --filter webvpn-core-js test` 75 passed，`typecheck` 通过；`pnpm --filter swufe-webvpn-stash test` 30 passed，bundle scan 与 `typecheck` 通过。覆盖 gateway classifier、ticket B precedence、direct WRD 注入、Settings/authserver 排除、`/logout` 请求与响应清理、过期、Set-Cookie rotation、CAS-only redirect 与既有 bootstrap/response reverse rewrite 防环；新增原生 WRD response 的安全状态/轮换诊断测试。`pnpm docs:check`、`pnpm spec:check` 与 `git diff --check` 通过。Stash 官方 [Rewrite HTTP 文档](https://stash.wiki/en/script/rewrite-requests) 的 `$done(value)` 字段表允许只返回 `headers`；目标设备上的 headers-only 行为仍待验证。
 
 ## 执行的命令与结果

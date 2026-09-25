@@ -69,7 +69,7 @@ type SessionRealm = "webvpn-gateway" | "cas-sso"
 
 ## 4.2 Gateway Session readiness 与 trace
 
-可注入的 Gateway Session 至少满足：记录可解析且 schema 可识别、`gatewayHost` 精确为 `webvpn.swufe.edu.cn`、`cookieHeader` 含核心 ticket、`expiresAt` 未到期。`captured` 表示已捕获且可用于 Gateway 请求，不等同于业务站点登录已端到端验证；`valid` 表示后续成功响应已确认。时钟到期、显式 `/logout` 或可归属于当前 stored ticket 的服务端删除信号才使这份共享 Session 失效；其它 App 的无 ticket/不同 ticket 请求收到删除信号，不证明 stored ticket 失效。
+可注入的 Gateway Session 至少满足：记录可解析且 schema 可识别、`gatewayHost` 精确为 `webvpn.swufe.edu.cn`、`cookieHeader` 含核心 ticket、`expiresAt` 未到期。`captured` 表示已捕获且可用于 Gateway 请求，不等同于业务站点登录已端到端验证；`valid` 表示后续成功响应已确认。时钟到期、显式 `/logout` 或可归属于当前 stored ticket 的服务端删除信号才使这份共享 Session 失效；其它 App 的无 ticket/不同 ticket 请求收到删除信号，不证明 stored ticket 失效。已有 stored ticket 时，Gateway 响应下发的新 ticket 也必须与请求所用 stored ticket 关联，才能更新这份共享记录；无 ticket/不同 ticket 请求下发的新 ticket 不替换它。
 
 Safe Auth Trace 为仅内存、短时的运行态诊断结构，不进入本数据模型的持久化对象。具体字段 allowlist 与禁止字段见 [interfaces.md §10](interfaces.md)。CAS `service` 参数只可抽取 target hostname；完整 service URL、Cookie value、CAS ticket、`execution`、完整 query、WRD token 与请求/响应正文均禁止记录。
 
