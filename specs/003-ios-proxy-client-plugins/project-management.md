@@ -3,7 +3,7 @@
 > Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
-> Last Reviewed: 2026-09-24
+> Last Reviewed: 2026-09-25
 
 ## 1. 交付策略
 
@@ -25,11 +25,11 @@ P0 Host capability PoC → M1 Shared Core → M2 Stash → M3 Loon → M4 E2E/Se
 
 ## 4. M2 — Stash Adapter（首发宿主）
 
-`.stoverride`、request/response、Tile、HTTP Engine/MitM、HTTP/3 处理、Settings UI/pseudo API、Settings V2 与 migration、动态精确路由及 E2E jwxt；制品与脚本经本仓库 **GitHub** 分发。退出：Stash 主路径和 Settings 安全边界通过；wildcard interception 真机验证通过，或静态域退化方案明确写入产品范围。
+已交付基线包括 Stash Adapter、Override、request/response/Tile bundles、Gateway Cookie capture/store、普通目标 WRD request 的 Gateway Session 注入、Settings UI/pseudo API、Settings V2 与 migration。新增 M2 follow-up 包含 direct Gateway classification/injection、ticket precedence、logout/login-intent 安全、CAS-only redirect 不清 Session 与 Safe Auth Trace；实现前须遵循本轮分类策略，不猜真实 pathname。设备验证仍有 wildcard/QUIC、Settings E2E、direct Gateway reuse 与教务 E2E。退出条件为 N02–N10 取证、Gateway/CAS 边界与 Settings 安全验证；动态 interception 不成立时需写明静态 fallback。制品与脚本经本仓库 GitHub 分发。
 
 ## 5. M3 — Loon Adapter
 
-`.plugin`、request/response bundle、persistent store、login-required notification、MitM/Rule、QUIC 路径、E2E jwxt；远程安装 URL 同样托管在 GitHub。退出：Loon 主路径、disable/update 冒烟通过。
+.plugin、request/response bundle、persistent store、login-required notification、MitM/Rule、QUIC 路径、Gateway Request Kind 与 direct Gateway Session reuse、Safe Auth Trace、E2E jwxt；远程安装 URL 同样托管在 GitHub。退出：Loon 主路径、跨 App Gateway Session、ticket precedence、CAS boundary、disable/update 冒烟通过。
 
 ## 6. M4 — Hardening & Release
 
@@ -63,6 +63,10 @@ body 压测、Session 过期、安全审计、文档、安装链接、rollback�
 | R-IOS-014 | Stash 不支持任意子域 force-http-engine/脚本命中或 QUIC suffix rule | 中 | 高 | 用当前官方语法导入真机验证；只拒绝 SWUFE suffix QUIC；必要时采用静态范围并要求更新 Override |
 | R-IOS-015 | Settings 路由错误 fall through 到真实 gateway | 低 | 高 | 保留命名空间全路径 short-circuit；未知路径合成本地 404/405；upstream capture 用例 |
 | R-IOS-016 | oversized POST 因宿主 `max-size` 行为绕过脚本而到达真实 gateway | 中 | 极高 | 禁用未经验证的 `max-size` shortcut；证明超限请求本地 413 且不上游，否则 POST API 不可发布 |
+| R-IOS-017 | direct Gateway request 无客户端 Cookie 时未注入 stored Gateway Session，App 重入登录流 | 高 | 高 | 只对经 classifier 明确许可、无请求 ticket 且 Session 可用的 Gateway request 注入；N02 设备验证通过后才能验收 |
+| R-IOS-018 | stored ticket 覆盖了 App 自带的新 ticket，导致登录/轮换流异常 | 中 | 高 | request Cookie 优先；请求带 ticket 时先 capture/refresh 并原样 PASS；覆盖测试 N03 |
+| R-IOS-019 | Safe Auth Trace 输出 Cookie、CAS ticket、execution、query 或 WRD token | 中 | 极高 | 字段 allowlist、只记录 pathname class/service hostname、敏感字段负向验证；N08/N09 |
+| R-IOS-020 | 业务系统自身要求 CAS 被误诊为 Gateway Session 复用失败 | 中 | 中 | raw 与 WRD wrapped authserver 区分；Trace 同时记录 request host、decoded original host、Gateway Session 注入状态与 redirect host；真机 tyxycg 场景验证 |
 
 ## 10. 决策 Gate
 
@@ -80,6 +84,10 @@ Python/JS vectors 未全绿，不进入真实账号 E2E。
 
 发现任意非 gateway 请求带 WebVPN Cookie，立即阻断发布。
 
+### Gate E — Gateway Session Realm / Direct Reuse
+
+M2 direct Gateway injection may be enabled only after Settings short-circuit, authserver pass-through, request Cookie precedence, session readiness and Gateway Request Kind classification are implemented. Login and logout must not be overridden by stored state; explicit or unknown login intent never receives stored injection; logout endpoint is unknown until captured on device and remains no-injection until then. A CAS page/redirect alone never clears the Gateway Session. The existing SessionRecordV1 remains Gateway-only. CAS Session Bridge is outside this gate and cannot be inferred from a repeated CAS page. N02–N10 device evidence is required; unit tests alone cannot close the gate.
+
 ### Gate D — Dynamic Scope / Settings Host Capabilities
 
 在编码 Settings POST 前确认 Stash runtime 可用的安全随机 token source、请求 Origin/Referer 透传字段、body 字节长度/大小上限、合成 response 语法；确认 wildcard MitM + HTTP script regex + suffix QUIC 规则在目标 Stash 版本可导入并命中。任一核心能力不成立时，先收敛为预声明静态 host 设置，不伪称动态拦截成立。
@@ -90,7 +98,8 @@ Python/JS vectors 未全绿，不进入真实账号 E2E。
 - [ ] Loon/Stash 制品可导入
 - [ ] 至少一个宿主完整 E2E
 - [ ] Python/JS parity
-- [ ] Session security tests
+- [ ] Session Realm isolation, direct Gateway injection, client ticket precedence and logout tests
+- [ ] Safe Auth Trace allowlist/redaction and tyxycg device diagnosis
 - [ ] 过期/重登
 - [ ] QUIC 路径验证
 - [ ] Settings pseudo UI/API、自包含与 V1→V2 migration

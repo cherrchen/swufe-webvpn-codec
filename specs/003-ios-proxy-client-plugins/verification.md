@@ -3,7 +3,7 @@
 > Spec ID: 003  
 > Status: In Progress  
 > Owner: cherrchen  
-> Last Updated: 2026-09-24
+> Last Updated: 2026-09-25
 
 ## 映射表
 
@@ -11,11 +11,14 @@
 | --- | --- | --- |
 | IOS-REQ-001 | G01/H01 + disable/update cases | Pending |
 | IOS-REQ-002 | I01/I03 + G07/H04 | Pending |
-| IOS-REQ-003 | C01..C10 + I02/I04 | Pending |
+| IOS-REQ-003 | C01..C10 + I02/I04 + N01/N07 | Pending |
 | IOS-REQ-004 | B01..B09 + K04–K06 + M01–M04 | Pending |
 | IOS-REQ-013 | K01..K21 | Pending |
 | IOS-REQ-014 | M01..M09 | Pending |
 | IOS-REQ-015 | K18..K23 + security review | Pending |
+| IOS-REQ-016 | N01..N07 + Gateway host / Realm security review | Pending |
+| IOS-REQ-017 | N02/N04/N05/N06/N10 + classifier matrix | Pending |
+| IOS-REQ-018 | N08/N09 + Trace allowlist / leakage review | Pending |
 | IOS-REQ-005 | A01..A09 | Passed |
 | IOS-REQ-006 | D01..D09 | Passed |
 | IOS-REQ-007 | E01..E11 | Passed |
@@ -52,6 +55,10 @@ M3 Loon 新增回归门槛：G13（HTTP/80 与 WRD `/http/`）、G14/G15（首�
 | AC-IOS-008 | G01/G10/G11 + H01/H10/H11 | Pending |
 | AC-IOS-009 | J01 | Pending |
 | AC-IOS-010 | I01..I04 已记录；I05/I06 仍 Pending | Passed |
+| AC-IOS-011 | N01/N02，Safari capture 与无 ticket direct Gateway injection 分开取证 | Pending |
+| AC-IOS-012 | N03–N06/N10，ticket precedence / login intent / logout / Settings safety | Pending |
+| AC-IOS-013 | N06–N08，Gateway/CAS Realm 隔离与 authserver pass-through | Pending |
+| AC-IOS-014 | N08/N09，raw 与 WRD authserver 区分、tyxycg flow diagnosis | Pending |
 
 ## Settings Feature Requirement → Evidence
 
@@ -74,6 +81,12 @@ M3 Loon 新增回归门槛：G13（HTTP/80 与 WRD `/http/`）、G14/G15（首�
 | AC-SETTINGS-015 | L08 before/after session value equality | Pending |
 | AC-SETTINGS-016 | config review + separate M06 interception and M01/M02 routing evidence | Pending |
 | AC-SETTINGS-017 | M02/M03/M06/M07 selected vs unselected SWUFE host capture | Pending |
+
+## Gateway Session Realm 新增验证记录
+
+2026-09-25 最新 Stash M2 真机观察：Safari 完成 WebVPN 登录后，request/response 脚本捕获 Gateway ticket，并持久化到 `swufe.session.v1`；日志不包含 Cookie value。此证据支持 test case N01 = Passed，只确认 Safari 流量到 Plugin Gateway Session Store。它不证明第三方 App 的 direct Gateway request 已注入。
+
+N02–N10 全部 Pending。当前代码对无 Cookie 的 direct Gateway request 仍 pass-through，故 N02 是新增待实现行为。endpoint pathname、LOGOUT 与 callback 分类仍需真机确认；单元测试不能提升设备 Pending 项。
 
 ## 执行的命令与结果
 
@@ -193,7 +206,7 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 2026-09-24 登录态本地检查（不是真机结论）：
 
-- 普通 `webvpn` 响应 302 到 `authserver` 不再把会话标成失效，也不再 `clear()`。已改写的教务响应再跳回 CAS 仍会清会话。
+- 普通 `webvpn` 响应 302 到 `authserver` 不再把会话标成失效，也不再 `clear()`。当时的本地记录称已改写的教务响应再跳回 CAS 会清会话；这条历史实现观察与本次冻结的设计冲突，不能作为接受行为。T058 要求回归为：仅 CAS 页面/redirect 不清除 Gateway Session，失效必须有独立 Gateway 证据。
 - `pnpm --filter webvpn-core-js test`：48 passed。`pnpm --filter swufe-webvpn-stash test`：7 passed，并重新生成 `plugins/stash/dist/{request,response,tile}.js`。
 - Tile `interval` 改为 30 秒，脚本只读本机会话。真机仍须重新导入 Override 后，登录并打开教务，确认 Tile 变为「已登录」、`jwxt` 走 rewrite。不要记录 Cookie 值。
 

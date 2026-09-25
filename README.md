@@ -10,6 +10,7 @@ SWUFE WebVPN Bridge 是面向 macOS 和 Windows 的桌面工具：用户在应�
 
 - macOS 和 Windows 的第一期真机验收及教务浏览器操作均已通过；实现与未解决事项见 [验收记录](specs/001-phase1-local-bridge/verification.md) 和 [已知问题](specs/001-phase1-local-bridge/known-issues.md)。
 - `KI-019` 仍为 `Open`：经桥访问教务偶发无响应，现场记录已定位到桥的上游请求/响应阶段，但尚无报文级根因证据。遇到时可重载页面；这不等于问题已修复。
+- iOS Stash/Loon 插件属于独立的 [Spec 003](specs/003-ios-proxy-client-plugins/spec.md)，当前为 In Progress：Stash M2 基础实现已交付，direct Gateway Session 注入、安全 Trace 与真机验证仍在开发/验证中；尚无面向用户的发布制品。
 - 当前仓库提供源码和开发运行方式，**没有面向普通用户的安装包、签名/公证产物或正式发行渠道**。开源准备不代表已经发布可直接安装的版本。
 - 许可：[MIT](LICENSE)。
 
@@ -19,7 +20,7 @@ SWUFE WebVPN Bridge 是面向 macOS 和 Windows 的桌面工具：用户在应�
 
 使用者必须有权登录学校 WebVPN 并访问相应资源。应用不保存学校密码、不绕过 CAS/MFA，也不提供未授权访问。运行时需能连接学校 WebVPN；校园外的教务主机通常不能直接解析或访问，教务请使用应用默认的“系统代理”模式。若浏览器把教务入口自动升级到 HTTPS，学校网关可能无法处理该入口；相关操作限制见[运行说明](docs/operations/development-run.md)。
 
-目前支持目标是 macOS 与 Windows。Linux、应用商店分发、批量部署、与其它系统代理/TUN 工具同时工作、证书钉扎客户端及任意 TCP/UDP 均不在当前范围内。
+桌面应用目前支持目标是 macOS 与 Windows。iOS 插件仍按 Spec 003 单独开发，尚未发行。Linux、应用商店分发、批量部署、与其它系统代理/TUN 工具同时工作、证书钉扎客户端及任意 TCP/UDP 均不在当前范围内。
 
 ## 普通使用者
 
@@ -55,7 +56,7 @@ pnpm --filter swufe-webvpn-bridge run test:ui
 | 用户可见行为、边界与术语 | [项目概览](docs/overview/project-overview.md)、[目标与非目标](docs/overview/goals-and-non-goals.md)、[术语表](docs/overview/glossary.md) |
 | 安装 CA 的风险、数据与安全边界 | [安全说明](docs/security/README.md) |
 | 本地运行、系统权限和常见问题 | [开发运行说明](docs/operations/development-run.md) |
-| 功能实现与验收情况 | [Spec 001](specs/001-phase1-local-bridge/spec.md)、[Spec 002](specs/002-desktop-ui-multiwindow/spec.md)、[验收记录](specs/001-phase1-local-bridge/verification.md) |
+| 功能实现与验收情况 | [Spec 001](specs/001-phase1-local-bridge/spec.md)、[Spec 002](specs/002-desktop-ui-multiwindow/spec.md)、[Spec 003](specs/003-ios-proxy-client-plugins/spec.md)、[验收记录](specs/001-phase1-local-bridge/verification.md) |
 | 架构和接口 | [架构索引](docs/architecture/README.md)、[API 索引](docs/api/README.md) |
 | 开发流程与文档规范 | [贡献指南](CONTRIBUTING.md)、[文档索引](docs/README.md) |
 

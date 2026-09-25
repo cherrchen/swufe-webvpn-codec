@@ -122,7 +122,9 @@ flowchart LR
 
 ## 11. 移动代理插件安全边界（Spec 003）
 
-Stash/Loon 插件复用宿主 Network Extension、HTTP Engine、MitM CA 和 Script；这些能力由用户在代理客户端内配置。移动插件不接收账号密码/MFA；WebVPN Session 仅在本机宿主持久化，只能注入已选择目标改写后的 gateway upstream 请求。
+Stash/Loon 插件复用宿主 Network Extension、HTTP Engine、MitM CA 和 Script。M2 只存储 webvpn-gateway Gateway Session；它可经安全分类在代理层供其他 App/WKWebView 的 Gateway request 复用，Session 只发送到 webvpn.swufe.edu.cn。普通源站、raw authserver、Settings Namespace 永不接收；客户端已有 Gateway ticket 时保留并 capture/refresh，不由旧 store 覆盖。Safari/WKWebView Cookie Jar 不共享也不被修改。CAS Cookie 当前不捕获、不存储、不注入。
+
+Safe Auth Trace 只记录本地 allowlist 字段：timestamp、host 和 pathname 分类、route/request kind、ticket/session 状态、injection 与 client precedence、WRD original host、redirect host、必要 Cookie names、CAS service target hostname。禁止 Cookie value、CAS ticket、execution、Authorization、账号/密码/MFA、完整 query/service URL、长 WRD token 与 request/response body。Trace 不进入 Settings、通知、云端或 Session Store；实现契约见 [ADR-0015](../architecture/adr/ADR-0015-session-realm-and-proxy-reuse.md) 与 [Spec 003 interfaces](../../specs/003-ios-proxy-client-plugins/interfaces.md)。
 
 Stash 为支持保存后动态启用新的 SWUFE 子域，Interception Scope 可能宽于 Routing Scope：`*.swufe.edu.cn` 可在设备本地进入 HTTP Engine/MitM；Routing Scope 仍只包含 Settings 中启用的精确 hostname。被拦截不代表会经 WebVPN。未选中 host 必须原样 PASS，不改 URL/header/body、不注入 Cookie、不请求 gateway；用户说明必须明确这一点以及 Stash 本地可解密范围。Wildcard 配置当前仍待项目目标 Stash 版本实机验证。
 

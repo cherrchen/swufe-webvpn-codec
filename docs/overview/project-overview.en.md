@@ -1,6 +1,4 @@
-# Project Overview
-
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-25
 >
 > Chinese source of truth: [project-overview.md](project-overview.md)
 
@@ -14,6 +12,9 @@ It is the first document a newcomer or agent should read, and expands the Projec
 `SWUFE WebVPN Bridge`: an Electron desktop app for macOS / Windows. After the user completes the official Wengine WebVPN login (CAS/MFA) inside the app, local HTTP/HTTPS traffic whose target matches the allowlist is rewritten by the local bridge ([本机桥](glossary.md)) into WebVPN URLs carrying the session, so that a normal local browser can open and operate the academic-affairs site `jwxt.swufe.edu.cn`. It is not a real VPN.
 
 ## Background
+
+The iOS proxy-client plugin is a separate delivery track under Spec 003. Its current status is In Progress; it is not part of the desktop release target. Gateway/CAS Session boundaries are defined in [ADR-0015](../architecture/adr/ADR-0015-session-realm-and-proxy-reuse.en.md).
+
 
 - Off-campus access to campus web resources relies on the Wengine WebVPN at `webvpn.swufe.edu.cn`; identity goes through `authserver.swufe.edu.cn` (CAS, possibly with MFA).
 - WebVPN is an **application-layer reverse proxy**, not an SSLVPN/TUN. URL coding is AES-128-CFB (`segment_size=128`) with default `key = iv = wrdvpnisthebest!` and the shape
@@ -74,6 +75,6 @@ Owner:            cherrchen
 
 | ID | Question | Impact | Status |
 | -- | -------- | ------ | ------ |
-| Q-001 | WebVPN session cookie names and expiry signals must be confirmed against the real system | Session Broker session extraction and expiry detection | Open |
+| Q-001 | The minimum required M2 Gateway Session cookie set and server-side expiry behavior still need confirmation from complete real-device protocol observations. | Stash / device verification |
 | Q-002 | Distribution shape of the mitm sidecar is undecided: embedded Python vs. external mitmproxy executable | Bundle size, install flow, cross-platform shipping | Open |
 | Q-003 | The product name "SWUFE WebVPN Bridge" is flagged as provisional in the source package | Documentation, package name and release material | Open |

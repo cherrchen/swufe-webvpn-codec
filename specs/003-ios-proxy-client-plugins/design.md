@@ -53,7 +53,7 @@ Desktop 当前由 Electron + mitmproxy + Python `WrdCodec` 实现。Loon/Stash �
 
 ## Security Considerations
 
-核心约束：不存密码；Session 只注入 gateway；authserver 不持久化认证 Cookie/表单；日志脱敏；Stash Interception Scope 与 WebVPN Routing Scope 分开；无自建云端后端。Settings synthetic route、CSRF 防护与 wildcard MITM 的安全边界见 [architecture.md §12–14](architecture.md)。
+核心约束：M2 只实现 webvpn-gateway Session Realm。Gateway Session 只发送给 webvpn.swufe.edu.cn：普通目标 WRD upstream 与通过 Gateway Request Kind 分类的直接 Gateway 请求均可按策略注入；authserver/普通源站/Settings namespace 不得接收。客户端已有 ticket 时保留并 capture/refresh；LOGIN/LOGOUT 不被旧 Session injection 破坏。CAS Cookie、密码和 MFA 不持久化。未来 cas-sso 仅为默认关闭、独立威胁建模/存储/生命周期的研究项，不属于 M2。日志使用 Safe Auth Trace allowlist。Stash Interception Scope 与 WebVPN Routing Scope 分开；无自建云端后端。Settings synthetic route、CSRF 防护与 wildcard MITM 的安全边界见 [architecture.md §12–14](architecture.md)。
 
 ## Performance Considerations
 

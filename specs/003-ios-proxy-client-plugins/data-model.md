@@ -3,7 +3,7 @@
 > Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
-> Last Reviewed: 2026-09-24
+> Last Reviewed: 2026-09-25
 
 ## 1. 原则
 
@@ -43,15 +43,35 @@
 }
 ```
 
-规则：`cookieHeader` 只进入 gateway 请求注入代码；不能进入 console、通知、snapshot；测试只用虚构 Cookie；gateway 改变时旧 Session 自动失效。`expiresAt` 只来自票据 `wengine_vpn_ticketwebvpn_swufe_edu_cn` 的 `Max-Age` 或 `Expires`；旧记录缺该字段时按 `null`（时效未知）读取，不因此清会话。本地时钟到点后不再注入。没有过期属性时不编造时长。服务端提前作废仍只看真实流量（已确认会话后来跳到 CAS，或带着票据访问网关得到 `302 → /login` / 清空票据的 `Set-Cookie`）。Q-001 不因此关闭。
+规则：`cookieHeader` 只属于 `webvpn-gateway` Realm，只能进入目标为 `webvpn.swufe.edu.cn` 的合规 gateway 请求注入代码；不能进入普通源站、authserver、console、通知、snapshot 或 Trace。测试只用虚构 Cookie；gateway 改变时旧 Session 自动失效。核心票据名已确认是 `wengine_vpn_ticketwebvpn_swufe_edu_cn`；`expiresAt` 只来自该票据的 `Max-Age` 或 `Expires`。旧记录缺该字段时按 `null`（时效未知）读取，不因此清会话。本地时钟到点后不再注入。没有过期属性时不编造时长。服务端提前作废的真实信号与辅助 Cookie 最小集合仍待真机确认；再次出现 CAS 本身不能单独判定 Gateway Session 已失效。Q-001 保留为最小 Cookie 集与失效信号问题。
 
-### 为什么 V1 保存 gateway Cookie header 而不是固定 Cookie 名
+Gateway Session 可通过代理层在不同 App、WKWebView 与 Safari 请求间复用；它不依赖客户端 Cookie Jar。`Browser Cookie Jar != Plugin Gateway Session Store`。注入时保留请求已有 Cookie 值；若请求已带核心 Gateway ticket，则不注入旧记录，并 capture/refresh 当前请求的 ticket。
 
-当前 desktop 文档也把具体 Cookie 名视为需实机确认的外部事实。移动端不应一开始就猜单一 Cookie 名。第一阶段在严格 gateway scope 内保存请求发送的 Cookie 集合；真机确认最小必要集后再考虑结构化 V2。
+### 为什么 V1 保存 gateway Cookie header
+
+核心票据名已确认，但最小可用辅助 Cookie 集仍需真机收敛。因此 V1 仍保存 Gateway host 请求携带的 Cookie header，且 Realm 隐含为 `webvpn-gateway`；不为本次设计引入 schema 迁移。Gateway host 限定和 ticket 存在性校验是硬约束。真机确认最小必要集合后，再评估结构化 V2。
 
 ## 4. SessionRecordV2 候选
 
 只有在真机证据足够后才定义结构化 cookies（name/value/path）。V2 不是当前承诺。
+
+## 4.1 Session Realm
+
+领域类型：
+
+```ts
+type SessionRealm = "webvpn-gateway" | "cas-sso"
+```
+
+当前 M2 只实现 `webvpn-gateway`。现有 `SessionRecordV1` 与 `swufe.session.v1` 保持不变并隐含该 Realm；本轮不强制新增 `realm` 字段。
+
+未来 `cas-sso` 只能作为单独评审的可选高风险能力：默认关闭、独立威胁建模、独立存储 key、独立生命周期，只能发送给 `authserver.swufe.edu.cn`。它不得与 Gateway Cookie 拼接、复用或迁移进 `swufe.session.v1`，也不是 M2 的隐含任务。
+
+## 4.2 Gateway Session readiness 与 trace
+
+可注入的 Gateway Session 至少满足：记录可解析且 schema 可识别、`gatewayHost` 精确为 `webvpn.swufe.edu.cn`、`cookieHeader` 含核心 ticket、`expiresAt` 未到期。`captured` 表示已捕获且可用于 Gateway 请求，不等同于业务站点登录已端到端验证；`valid` 表示后续成功响应已确认。明确服务端失效信号或 ticket 清除才转为 `expired`。
+
+Safe Auth Trace 为仅内存、短时的运行态诊断结构，不进入本数据模型的持久化对象。具体字段 allowlist 与禁止字段见 [interfaces.md §10](interfaces.md)。CAS `service` 参数只可抽取 target hostname；完整 service URL、Cookie value、CAS ticket、`execution`、完整 query、WRD token 与请求/响应正文均禁止记录。
 
 ## 5. NotificationThrottleV1
 
@@ -127,12 +147,13 @@ Session 若无法安全迁移，直接清除并要求重新登录，不猜测转
 | 数据 | 持久化 | 可日志 | 可通知 |
 | --- | ---: | ---: | ---: |
 | 学号/密码/MFA | 否 | 否 | 否 |
-| CAS Cookie | 否 | 否 | 否 |
-| WebVPN Cookie | 是 | 否 | 否 |
+| CAS Cookie / CAS ticket | 否 | 否 | 否 |
+| Gateway Session Cookie（含核心 ticket） | 是，仅 `webvpn.swufe.edu.cn` Realm | 否 | 否 |
 | WRD key/iv 默认常量 | 可配置 | 只记录默认/覆盖状态，不记录值 | 否 |
 | Allowlist | 是 | 可 | 可摘要 |
 | host | 可 | 可 | 必要时可 |
-| path/query | 默认否 | 默认否 | 否 |
+| path/query | 默认否 | 仅 pathname 分类，不留原始路径或 query | 否 |
+| Safe Auth Trace | 否，仅内存短时 | 仅 allowlist 字段 | 否 |
 | response body | 否 | 否 | 否 |
 
 ## 14. 卸载与清除

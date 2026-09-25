@@ -59,6 +59,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0012](ADR-0012-react-antd-multiwindow-renderer.en.md) | Migrate the renderer to React + Ant Design 6 and turn the desktop UI into a four-window layout | Proposed | 2026-09-23 | Supersedes no existing ADR: it only constrains the renderer framework, the build and the window structure (ADR-0003's Electron decision still stands) |
 | [ADR-0013](ADR-0013-js-core-aes-cfb128.en.md) | Shared JS core for iOS plugins, with aes-js as the AES block primitive | Accepted | 2026-09-24 | Does not supersede ADR-0005: desktop keeps the Python codec; this decision only constrains the mobile JS backend |
 | [ADR-0014](ADR-0014-stash-local-settings-and-routing-scope.en.md) | Stash uses a local pseudo WebUI to manage exact WebVPN sites | Accepted | 2026-09-25 | Does not supersede existing ADRs; defines Spec 003 Stash Settings and Interception/Routing Scope boundaries |
+| [ADR-0015](ADR-0015-session-realm-and-proxy-reuse.en.md) | Separate Session Realms and proxy-layer Gateway Session reuse | Accepted | 2026-09-25 | Does not change desktop ADR-0007; defines Spec 003 Gateway/CAS boundaries and Inter-App reuse |
 
 ## Rules
 

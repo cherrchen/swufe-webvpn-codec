@@ -20,6 +20,8 @@
 
 移动端是独立部署形态：Stash（首发）/Loon 插件复用第三方代理客户端的 Network Extension、HTTP Engine、MitM 与 Script，不属于桌面 Electron/mitmproxy 部署单元。移动端组件与流量边界由 [Spec 003](../../specs/003-ios-proxy-client-plugins/architecture.md) 描述。Stash 的 Settings 设计见 [ADR-0014](adr/ADR-0014-stash-local-settings-and-routing-scope.md)：Interception Scope 可以宽于精确 Routing Scope，未选择目标仍原样 PASS。
 
+Spec 003 的 Gateway Session 属于 webvpn-gateway Realm，在 Stash/Loon 代理层本地保存，并可被安全分类的 direct Gateway request 复用；它与 Safari/WKWebView 各自的 Cookie Jar 解耦。authserver CAS Cookie 当前不进入 Gateway Store。未来 cas-sso 若研究，必须独立、默认关闭并单独威胁建模，见 [ADR-0015](adr/ADR-0015-session-realm-and-proxy-reuse.md)。
+
 ## 上下文图（System Context）
 
 ```mermaid

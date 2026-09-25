@@ -3,17 +3,17 @@
 > Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
-> Last Reviewed: 2026-09-24
+> Last Reviewed: 2026-09-25
 
 ## 1. 目标
 
-证明：JS Core 与 desktop Python 协议一致；Loon/Stash Adapter 正确映射宿主 API；真实 iOS 能完成 CAS/MFA → Session Capture → 教务访问；安全边界成立。
+证明：JS Core 与 desktop Python 协议一致；Loon/Stash Adapter 正确映射宿主 API；Gateway Session Realm 可由代理层跨客户端安全复用；真实 iOS 的 Gateway 登录与业务访问流程可区分 CAS/SSO 跳转；安全边界成立。
 
 ## 2. 测试层级
 
 ### L0 Pure Unit
 
-Node 环境执行：codec、allowlist、session parser、request decision、response rewrite、schema validation、redact。追加 Settings hostname normalize/validate、Builtin/custom compile、V1→V2 migration、Settings namespace route priority、pseudo response machine code 与 body size/token checks。纯 Core suite 不引用 Stash globals。
+Node 环境执行：codec、allowlist、session parser、request decision、Gateway Request Kind classifier、stored-session readiness、Cookie merge precedence、response rewrite、schema validation、Safe Auth Trace redaction、CAS-only redirect 不清除 Gateway Session、explicit/unknown login intent 不注入。追加 Settings hostname normalize/validate、Builtin/custom compile、V1→V2 migration、Settings namespace route priority、pseudo response machine code 与 body size/token checks。覆盖 N02–N10 的纯逻辑部分，但单元测试不能替代对应真机用例。
 
 ### L1 Cross-language Contract
 
@@ -39,7 +39,7 @@ Stash Settings E2E 另验证 synthetic HTML、同源 API GET/POST、pseudo endpo
 
 ### L6 End-to-end
 
-校外网络：Safari 访问教务、至少完成一项真实只读/低风险操作、redirect/Cookie/body rewrite、失效后重登、Wi-Fi/Cellular 冒烟。
+校外网络：Safari 登录后确认 Gateway Session 写入 plugin store；再从没有自身 Gateway ticket 的独立 App/WKWebView 发起 direct Gateway request，验证分类允许且 login intent 确认为 none 时的代理层注入；覆盖显式/未知 login intent 不注入、新 ticket 优先、过期、logout、CAS-only redirect 不清 Session 和 Settings namespace；访问 tyxycg 时用 Safe Auth Trace 判别 Gateway 登录跳转与业务系统发起的 CAS。至少完成一项真实只读/低风险教务操作、redirect/Cookie/body rewrite、失效后重登、Wi-Fi/Cellular 冒烟。尚未在设备验证的场景在 verification 中保持 Pending。
 
 Loon M3 执行时，按 [G13–G18](test-cases.md) 顺序记录：先确认 HTTP/80 命中与 `/http/` 上游，再覆盖首次 CAS 往返、原生 WebVPN bootstrap、Header-only 响应和更新后的日志可见性。对重定向记录脱敏的来源/目标主机与路径类别，并确认目标不是当前浏览器 URL；不得保存完整 WRD token。Stash M2 的对应修复只作为风险线索，Loon 的宿主行为须独立取证。
 
@@ -63,6 +63,10 @@ Loon M3 执行时，按 [G13–G18](test-cases.md) 顺序记录：先确认 HTTP
 
 - 非 allowlist 绝无 WebVPN Cookie；
 - authserver 不保存认证 Cookie/body；
+- raw authserver 必须 PASS，不注入 Gateway Session；WRD-wrapped authserver 只记录网关请求与解码 original host 的关系，不扩大普通 Routing Scope；
+- Gateway ticket B 存在时 stored ticket A 不得覆盖 B；注入只对无客户端 ticket 且策略允许的 Gateway request kind 开放；
+- logout 不注入旧 Session 并清本地 Gateway Session；CAS-only 页面/redirect 不清除 Gateway Session；explicit/unknown login intent 不注入；Settings Namespace 本地终结且不 capture、不注入、不 upstream；
+- Safe Auth Trace 区分 raw authserver、WRD-wrapped authserver 和 tyxycg 业务跳转；只记录 service target hostname 与安全分类字段；
 - log redact；
 - notification 无 Session；
 - corrupt storage 不 dump；
@@ -75,6 +79,7 @@ Loon M3 执行时，按 [G13–G18](test-cases.md) 顺序记录：先确认 HTTP
 - API、日志和错误中没有 Session/CAS Cookie、Authorization、MFA、WRD secret 或 POST 原文。
 - V1→V2 migration 不改变 Session key；invalid hostname 不能扩大 Routing Scope。
 - MitM interception wildcard 语义在用户说明中可见；证明只有选中项经 WebVPN。
+- 新 Gateway Session Realm 用例见 [test-cases.md §N](test-cases.md)：除已经观察到的 Safari capture/persist 外，所有真实设备注入、logout、Settings/Authserver 与 tyxycg 诊断项必须单独取证。
 
 ## 7. P0 Login 记录模板
 

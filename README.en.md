@@ -10,6 +10,7 @@ SWUFE WebVPN Bridge is a desktop tool for macOS and Windows. After the user sign
 
 - Phase 1 real-machine acceptance and browser interaction with the academic-affairs site have passed on macOS and Windows. See the [acceptance record](specs/001-phase1-local-bridge/verification.md) and [known issues](specs/001-phase1-local-bridge/known-issues.md).
 - `KI-019` remains `Open`: occasional requests to the academic-affairs site stop responding through the bridge. Field records locate the issue in the bridge's upstream request/response stage, but there is no packet-level evidence establishing the root cause. Reloading the page may recover; the issue is not fixed.
+- The iOS Stash/Loon plugin is a separate [Spec 003](specs/003-ios-proxy-client-plugins/spec.md) track, currently In Progress. The Stash M2 foundation is delivered; direct Gateway Session injection, Safe Auth Trace, and device verification remain in progress. There is no user release artifact yet.
 - The repository currently provides source code and developer run instructions. It has **no end-user installer, signed/notarised build, or official distribution channel**. Open-source preparation does not mean an installable release is available.
 - License: [MIT](LICENSE).
 
@@ -19,7 +20,7 @@ The app uses a local MITM CA to decrypt and rewrite HTTPS. This capability is av
 
 Users must be authorised to sign in to the university's WebVPN and access the relevant sites. The app does not store university passwords, bypass CAS/MFA, or provide unauthorised access. The machine needs access to the university's WebVPN. Outside campus, the academic-affairs host may not resolve or be reachable directly; use the app's default “system proxy” mode for it. If the browser upgrades the entry URL to HTTPS, the university gateway may not handle that entry. See the [run guide](docs/operations/development-run.en.md) for operational limitations.
 
-The current platform targets are macOS and Windows. Linux, app-store distribution, bulk deployment, simultaneous use with another system-proxy/TUN tool, certificate-pinned clients, and arbitrary TCP/UDP are outside the current scope.
+The desktop app currently targets macOS and Windows. The iOS plugin is being developed separately under Spec 003 and is not released yet. Linux, app-store distribution, bulk deployment, simultaneous use with another system-proxy/TUN tool, certificate-pinned clients, and arbitrary TCP/UDP are outside the current scope.
 
 ## For users
 
@@ -55,7 +56,7 @@ See [CONTRIBUTING.en.md](CONTRIBUTING.en.md) for contribution flow. Before makin
 | User-visible behaviour, boundaries, and terms | [Project overview](docs/overview/project-overview.en.md), [goals and non-goals](docs/overview/goals-and-non-goals.en.md), [glossary](docs/overview/glossary.en.md) |
 | Risks of CA installation, data, and security boundaries | [Security notes](docs/security/README.en.md) |
 | Local run, system permissions, and common problems | [Development run guide](docs/operations/development-run.en.md) |
-| Implementation and acceptance status | [Spec 001](specs/001-phase1-local-bridge/spec.md), [Spec 002](specs/002-desktop-ui-multiwindow/spec.md), [acceptance record](specs/001-phase1-local-bridge/verification.md) |
+| Implementation and acceptance status | [Spec 001](specs/001-phase1-local-bridge/spec.md), [Spec 002](specs/002-desktop-ui-multiwindow/spec.md), [Spec 003](specs/003-ios-proxy-client-plugins/spec.md), [acceptance record](specs/001-phase1-local-bridge/verification.md) |
 | Architecture and interfaces | [Architecture index](docs/architecture/README.en.md), [API index](docs/api/README.en.md) |
 | Contribution process and documentation conventions | [Contributing](CONTRIBUTING.en.md), [documentation index](docs/README.en.md) |
 

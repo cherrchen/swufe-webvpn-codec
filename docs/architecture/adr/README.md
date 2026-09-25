@@ -57,6 +57,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0012](ADR-0012-react-antd-multiwindow-renderer.md) | 渲染层迁移到 React + Ant Design 6，桌面界面改为四窗口结构 | Proposed | 2026-09-23 | 不取代任何既有 ADR：只约束渲染层框架、构建方式与窗口结构（ADR-0003 的 Electron 选择仍有效） |
 | [ADR-0013](ADR-0013-js-core-aes-cfb128.md) | iOS 插件用共享 JS Core，AES-CFB128 以 aes-js 为块加密 | Accepted | 2026-09-24 | 不取代 ADR-0005：desktop 仍用 Python codec；本决策只约束移动端 JS backend |
 | [ADR-0014](ADR-0014-stash-local-settings-and-routing-scope.md) | Stash 使用本地 pseudo WebUI 管理精确 WebVPN 站点 | Accepted | 2026-09-25 | 不取代既有 ADR；定义 Spec 003 Stash Settings 与 Interception/Routing Scope 边界 |
+| [ADR-0015](ADR-0015-session-realm-and-proxy-reuse.md) | Session Realm 分离并在代理层复用 Gateway Session | Accepted | 2026-09-25 | 不修改 ADR-0007 桌面行为；定义 Spec 003 的 Gateway/CAS 边界与 Inter-App reuse |
 
 ## 规则
 

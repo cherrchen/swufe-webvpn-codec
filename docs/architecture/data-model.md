@@ -71,6 +71,12 @@
 - 所有者：cherrchen。
 - 关联需求：REQ-002、REQ-009。
 
+### Spec 003 iOS Plugin Session Realms
+
+This plugin model is separate from the desktop SessionState above. M2 SessionRecordV1 and the Stash/Loon key swufe.session.v1 implicitly represent only the webvpn-gateway Realm; no schema migration is required by the current design. The confirmed Gateway ticket name is wengine_vpn_ticketwebvpn_swufe_edu_cn, while the minimum ancillary Cookie set and server-side expiry signal remain open. Gateway Session values never enter diagnostics; a CAS page alone is not evidence that this Session expired.
+
+The future cas-sso Realm belongs only to a separate, off-by-default, independently threat-modeled design. It requires separate storage and lifecycle and may send its Cookie only to authserver.swufe.edu.cn. The two Realms must never share or concatenate Cookie sets; see [ADR-0015](adr/ADR-0015-session-realm-and-proxy-reuse.md).
+
 ### AppSettings
 
 - 说明：应用级设置与运行时标记。

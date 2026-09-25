@@ -3,9 +3,9 @@
 > Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
-> Last Reviewed: 2026-09-24
+> Last Reviewed: 2026-09-25
 
-状态初始均为 `Pending`。真实会话测试禁止把 Cookie/账号/MFA 写进证据文件。
+状态以 verification.md 为准；本节 N01 是已有 Safari 登录捕获的 Stash 真机观察，其余 N 组新增验证均为 `Pending`。真实会话测试禁止把 Cookie/账号/MFA 写进证据文件。
 
 ## A. Codec
 
@@ -41,7 +41,7 @@
 
 | ID | 场景 | 预期 |
 | --- | --- | --- |
-| C01 | gateway Cookie | 生成 SessionRecord |
+| C01 | gateway Cookie 含核心 ticket `wengine_vpn_ticketwebvpn_swufe_edu_cn` | 生成 Gateway SessionRecord |
 | C02 | gateway 无 Cookie | 不写 Session |
 | C03 | authserver Cookie | 不写 Session |
 | C04 | 非 gateway Cookie | 不写 Session |
@@ -59,7 +59,7 @@
 | D01 | allowlist + Session | gateway WRD + Cookie |
 | D02 | allowlist + no Session | login_required |
 | D03 | non-allowlist + Session | pass，无 Cookie |
-| D04 | gateway request | pass + 可捕获 Session |
+| D04 | 带 Gateway ticket 的 gateway request | 保留客户端 Cookie、capture/refresh + pass |
 | D05 | auth request | pass，不读 body |
 | D06 | codec failure | fail-closed |
 | D07 | Origin | 与 desktop 契约一致 |
@@ -212,3 +212,20 @@
 | M07 | wildcard QUIC rule | `DOMAIN-SUFFIX,swufe.edu.cn` + `PROTOCOL,QUIC` 只拒绝必要范围，TCP 回落脚本可观察；无全局 UDP/443 拒绝 |
 | M08 | gateway/authserver | 官方登录流正常；不进入普通 target rewrite |
 | M09 | external ordinary domain | 不新增 MitM/rewrite；无 WebVPN Cookie |
+
+## N. Gateway Session Realm / Direct Gateway Reuse / Safe Auth Trace
+
+除 N01 外均为新增验收用例，真机状态保持 `Pending`，直到取得脱敏设备证据。endpoint 具体 path 未被真机确认前使用分类 fixture，不把 fixture 名称写成 WebVPN 实际 pathname。
+
+| ID | 场景 | 预期 | Status |
+| --- | --- | --- | --- |
+| N01 | Safari 完成 WebVPN 登录 | Stash 脚本捕获含核心 ticket 的 Gateway Cookie，并持久化为 `swufe.session.v1`；证据不包含 Cookie value | Passed（2026-09-25 最新 Stash M2 观察；详见 verification） |
+| N02 | 第三方 App/WKWebView 无 Gateway Cookie 直接请求 Gateway；stored Session ready；`WRAPPED_RESOURCE` 且 login intent 为 none | 代理层向 gateway request 注入 stored Gateway Session；同一客户端 Cookie Jar 不需要有 ticket；WebVPN 不应仅因客户端缺 Cookie 而重新进入 Gateway login | Pending |
+| N03 | request 带 ticket B，stored ticket 为 A | 保留请求 Cookie B、不附加或替换为 A；capture/refresh B 到 store 并 PASS | Pending |
+| N04 | stored Gateway Session 已过期或核心 ticket 缺失 | 不注入；PASS/允许官方登录继续；不得只因出现 CAS 页面/redirect 清除 stored Gateway Session；只有独立 Gateway 失效证据才能清除 | Pending |
+| N05 | 已真机确认的 LOGOUT request fixture | 不注入旧 Session；清除 `swufe.session.v1`；真实 endpoint 未确认前此场景保持 Pending | Pending |
+| N06 | `https://webvpn.swufe.edu.cn/__swufe_bridge__/...` Settings Namespace | 本地 synthetic response；不注入、不 capture、不请求 upstream | Pending |
+| N07 | raw `authserver.swufe.edu.cn` request | PASS；无 Gateway Session 注入；无 CAS Cookie/credential 捕获或保存 | Pending |
+| N08 | raw authserver 与 gateway 上 WRD-wrapped authserver URL 并存 | Safe Auth Trace 分别记录 request host/route kind 与 decoded original host；`service` 只记录 target hostname；不记录 query、token 或 ticket value；不会把 authserver 加入普通 Routing Scope | Pending |
+| N09 | `tyxycg.swufe.edu.cn` 跨 App 流程 | Trace 可区分 gateway ticket 缺失/未注入后由 Gateway login redirect 到 CAS，与 Gateway 已认证访问业务站后由业务系统继续 redirect 到 CAS；后者不被误判为 Gateway Session 复用失败，也不因 CAS 页面单独清除 stored Gateway Session | Pending |
+| N10 | `GATEWAY_ROOT` 显式重新登录意图 | 即使 stored Gateway Session ready，也不注入旧 Session；意图未知时采取同样的 no-injection 行为，保留官方登录流程 | Pending |

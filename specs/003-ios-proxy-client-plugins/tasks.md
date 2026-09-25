@@ -3,7 +3,7 @@
 > Spec ID: 003  
 > Status: In Progress  
 > Owner: cherrchen  
-> Last Updated: 2026-09-24
+> Last Updated: 2026-09-25
 
 ## Phase P0 — Host Capability
 
@@ -28,12 +28,13 @@
 
 ## Phase M2 — Stash（首发宿主）
 
-- 追加范围：本地 bundled Settings UI/pseudo API、Settings V2 migration、动态精确 Routing Scope。
-- 退出条件：Settings E2E 通过；wildcard host/QUIC 能力实机通过，或采用静态 Interception 退化并更新验收；未选流量与 API security 有证据。
+- 已完成基线：Stash Adapter、插件 bundles、Tile、Gateway Cookie capture/store、普通目标 WRD rewrite 时的 Gateway Session 注入、Settings V2/pseudo API 实现。
+- 仍待 M2 收尾：Gateway direct request classifier/injection、Cookie precedence、login/logout 保护、Safe Auth Trace；wildcard/QUIC 与教务端到端真机验证。
+- 退出条件：N02–N10 实现与验证；Settings E2E 通过；wildcard host/QUIC 能力实机通过，或采用静态 Interception 退化并更新验收；未选流量、authserver pass-through 与 Settings API security 有证据。
 
 - [x] T022 实现 StashAdapter — 依赖：T011..T015 — 验证：Adapter unit — 关联：IOS-REQ-001/011
 - [x] T023 生成 request/response/tile bundles — 依赖：T022 — 验证：bundle scan — 关联：IOS-REQ-011
-- [ ] T024 编写 `.stoverride`（GitHub 远程安装 URL） — 依赖：T023 — 验证：IOS-TC-H01 — 关联：IOS-REQ-001
+- [x] T024 编写 Stash Override（GitHub 远程安装 URL） — 依赖：T023 — 输出：当前 M2 Override 制品 — 真机导入结果由 T027 记录 — 关联：IOS-REQ-001
 - [x] T025 实现 Tile ViewModel — 依赖：T022 — 验证：IOS-TC-H02/H06/H12 — 关联：IOS-REQ-008
 - [ ] T026 配置并验证目标域 HTTP/3 fallback — 依赖：T024 — 验证：IOS-TC-H09 — 关联：IOS-REQ-010
 - [ ] T027 Stash 真机 E2E 教务 — 依赖：T024..T026 — 验证：IOS-TC-H03..H12 — 关联：AC-IOS-001/002
@@ -58,9 +59,27 @@
 - [ ] T034 创建 GitHub Release / raw 安装链接、release artifact、rollback 验证 — 依赖：T033 — 验证：IOS-TC-J06/J07 — 关联：IOS-REQ-012
 - [ ] T035 完成 verification 并推进 Spec 状态 — 依赖：T034 — 验证：映射表无 Must Pending
 
+## Phase M2 Gateway Session Realm Follow-up
+
+- [ ] T050 实现 Gateway Request Kind classifier 与 pathname/login-intent 分类接口；Settings/WRD/root/login/logout/callback/other 分类有顺序，login intent unknown 与未确认 endpoint 默认不注入 — 依赖：T011,T040 — 验证：N02/N04/N05/N06/N10 + classifier matrix — 关联：IOS-REQ-016/017
+- [ ] T051 实现 direct Gateway Session injection：仅 webvpn.swufe.edu.cn、仅策略允许、request 无核心 ticket、stored session ready 时注入；请求 Cookie 同名值优先；ticket B capture/refresh 并 pass — 依赖：T010,T050 — 验证：N02–N04 — 关联：IOS-REQ-016
+- [ ] T052 以 Stash 真机流量确认 LOGIN/LOGOUT/AUTH_CALLBACK 的实际 pathname 与 intent；确认显式/未知 login intent 不注入；确认 logout 清本地 Gateway Session；未知 pathname 保持 pass/no-injection — 依赖：T050,T051 — 验证：N04/N05/N10 — 关联：IOS-REQ-017
+- [ ] T053 实现 Safe Auth Trace allowlist 与本地脱敏输出；支持 login-intent classification、raw authserver / WRD-wrapped authserver / redirect host / CAS service target hostname / tyxycg 阶段诊断 — 依赖：T015,T050,T051 — 验证：N07–N09；敏感字段负向审计 — 关联：IOS-REQ-018
+- [ ] T054 Stash 真机验证 direct Gateway reuse、ticket precedence、过期、logout、login intent、Settings/authserver negative cases 与 tyxycg 诊断；记录宿主版本及脱敏证据 — 依赖：T051–T053,T058 — 验证：N02–N10 — 关联：AC-IOS-011..014
+
+## Phase M2 — CAS Redirect Invalidation Boundary
+
+- [ ] T058 调整/回归 Gateway Session 失效判定：CAS 页面或 redirect 本身不能清除 Gateway Session；仅核心 ticket 明确到期/清除或其它已真机确认的 Gateway 失效信号可清理；保留 tyxycg 自行要求 CAS 的 Session — 依赖：T010,T051 — 验证：G14/N04/N09 与 Gateway 失效信号矩阵 — 关联：IOS-REQ-016/018
+
+## Phase M3 — Loon Gateway Session Parity additions
+
+- [ ] T055 Loon Adapter 实现同一 Gateway Request Kind 与直接 Gateway Session 注入契约；不猜 endpoint，不将 CAS Cookie 纳入 store — 依赖：T016 — 验证：共享 Core contract + Adapter cases — 关联：IOS-REQ-016/017
+- [ ] T056 Loon Adapter Safe Auth Trace allowlist/redaction 与 raw / WRD-wrapped authserver 区分 — 依赖：T055 — 验证：N07/N08 contract cases — 关联：IOS-REQ-018
+- [ ] T057 Loon 真机验证 Safari capture 与跨 App/WKWebView direct Gateway reuse、ticket precedence、logout/login intent 与 tyxycg 分流 — 依赖：T055,T056,T021 — 验证：N01–N10 — 关联：AC-IOS-011..014
+
 ## 注意事项
 
-- T024、T026、T027 仍待 Stash 真机：导入、HTTP/3 回落（H09）与教务 E2E。自动测试不能代替这三项。
+- T026/T027 仍待 Stash 真机：HTTP/3 回落（H09）与教务 E2E；N02–N10 是新增 M2 follow-up。自动测试不能代替设备证据。
 - P0 失败时先更新需求与架构，不用猜测继续实现；
 - 真实 Cookie 不得写入 commit、Issue、PR、CI artifact；
 - shared core 同一时段应有明确集成责任；

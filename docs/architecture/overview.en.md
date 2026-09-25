@@ -22,6 +22,8 @@ Phase 1 has no TUN-level takeover; the optional future `sing-box TUN → 127.0.0
 
 Mobile is a separate deployment shape: Stash (first) / Loon plugins reuse the third-party proxy client's Network Extension, HTTP Engine, MitM, and Script. They are not part of the desktop Electron/mitmproxy deployable unit. Mobile components and traffic boundaries are described in [Spec 003](../../specs/003-ios-proxy-client-plugins/architecture.md). Stash Settings are recorded in [ADR-0014](adr/ADR-0014-stash-local-settings-and-routing-scope.en.md): Interception Scope may be wider than the exact Routing Scope, while unselected targets still PASS unchanged.
 
+Spec 003's Gateway Session belongs to the webvpn-gateway Realm. It is stored locally at the Stash/Loon proxy layer and can be reused on safely classified direct Gateway requests, independently of each Safari/WKWebView Cookie Jar. CAS Cookies from authserver do not enter the Gateway Store. Any future cas-sso research must be separate, off by default and threat-modeled independently; see [ADR-0015](adr/ADR-0015-session-realm-and-proxy-reuse.en.md).
+
 ## System context
 
 ```mermaid

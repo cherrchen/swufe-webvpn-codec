@@ -1,9 +1,9 @@
 # SWUFE WebVPN iOS Proxy Client Plugins — 文档包
 
-> Status: In Progress  
-> Spec ID: `003-ios-proxy-client-plugins`  
-> Owner: cherrchen  
-> Last Reviewed: 2026-09-24  
+> Status: In Progress
+> Spec ID: `003-ios-proxy-client-plugins`
+> Owner: cherrchen
+> Last Reviewed: 2026-09-25
 > Scope: Loon / Stash 插件，不开发独立 iOS App
 
 本目录是仓库 [Spec 003](../README.md) 的 Feature 文档包（路径 `specs/003-ios-proxy-client-plugins/`），描述如何在 iPhone/iPad 上复用 Loon / Stash 的代理、TUN 与 HTTPS MitM 能力，实现 SWUFE WebVPN 的 URL 编码、会话捕获、请求改写与响应反向改写。
@@ -14,7 +14,7 @@
 2. **Stash 为首发宿主，Loon 为第二适配器**；两者共享同一个 TypeScript/JavaScript 业务 Core。
 3. 移动端不复刻 desktop 的 mitmproxy、CA Manager、System Proxy、进程捕获；这些基础网络能力由 Loon / Stash 提供。
 4. CAS / SSO / MFA 始终使用学校官方网页，不存储学号、密码，不模拟登录协议。
-5. 插件只保存 WebVPN 会话所需的最小 Cookie 状态，并禁止 Cookie/正文进入日志。
+5. 当前仅实现 webvpn-gateway Session Realm；Gateway Session 可由代理层跨 App 请求复用，但只发送给 Gateway host。authserver CAS Cookie 不捕获、不存储、不注入；Gateway Session 与客户端 Cookie Jar 解耦，且禁止 Cookie value/正文进入日志。
 6. WRD URL 算法以现有 `bridges/python/swufe_bridge/wrd_codec.py` 为行为权威；移动端实现必须通过同一组测试向量。
 7. 默认仍采用 allowlist，`webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 必须排除二次包装。
 8. Stash 首页 Tile 用作状态/登录入口；Loon 使用插件参数、通知/入口能力形成相近体验。
@@ -23,7 +23,7 @@
 11. 默认内置站点仅为有可靠依据的 `jwxt.swufe.edu.cn`；用户自定义项只接受合法 `.swufe.edu.cn` 子域，gateway/authserver 永久保留。
 12. **P0 实机结论（2026-09-24）**：Loon 通知 `openUrl` 与 Stash Tile `url` 都打开系统 Safari，不在宿主内嵌网页。MitM 启用后，两个宿主的脚本都能看见 `webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn`，登录后的 gateway 请求里能看到会话 Cookie 名。登录文案使用「打开网页登录」。细节见 [verification.md](verification.md)。
 13. **安装与更新分发**：`.stoverride` / `.plugin` 及 bundled 脚本仅通过本仓库 **GitHub** 提供（Release 附件与/或 `raw.githubusercontent.com` 固定路径）；GitHub 仅分发插件制品，不承载 Settings 页面或配置后端。
-14. **Spec 状态（2026-09-25）**：`In Progress`。本轮新增 Settings WebUI/API 与动态精确 allowlist 设计；实现和 Stash 真机能力验证未完成。见 [spec.md §Status](spec.md)。
+14. **Spec 状态（2026-09-25）**：In Progress。P0、M1 与 Stash M2 基础实现已交付，包括 Safari Gateway Session capture/persist 和普通目标 WRD 注入。无 ticket direct Gateway injection、Gateway Request Kind classifier、ticket precedence、login/logout safety、CAS-only redirect 不清 Gateway Session 与 Safe Auth Trace 是新增 M2 follow-up；N02–N10 和 Settings/wildcard/QUIC/教务 E2E 真机验证仍未完成。CAS Session Bridge 不在本轮实现范围。见 [spec.md §Status](spec.md)。
 
 ## 文件导航
 

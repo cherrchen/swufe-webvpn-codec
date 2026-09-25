@@ -3,7 +3,7 @@
 > Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
-> Last Reviewed: 2026-09-24
+> Last Reviewed: 2026-09-25
 
 本文定义逻辑契约；实际 TypeScript 名称允许微调，但语义变更必须同步文档与契约测试。
 
@@ -47,6 +47,43 @@ export type RouteDecision =
 
 Stash Settings V2 当前不启用 `includeSwufeWildcard`；仅 `compileEnabledSites(settings, builtinCatalog)` 产出的 exactHosts 进入 RoutingPolicy。Interception Scope 是宿主配置，不属于本 Core route decision。
 
+```ts
+export type GatewayRequestKind =
+  | "SETTINGS_NAMESPACE"
+  | "WRAPPED_RESOURCE"
+  | "GATEWAY_ROOT"
+  | "GATEWAY_STATIC"
+  | "GATEWAY_OWNED"
+  | "LOGIN"
+  | "LOGOUT"
+  | "AUTH_CALLBACK"
+  | "OTHER"
+
+export type GatewayPathnameClass =
+  | "settings-prefix"
+  | "wrd-resource"
+  | "root"
+  | "static-candidate"
+  | "login-candidate"
+  | "logout-candidate"
+  | "callback-candidate"
+  | "other"
+
+export interface GatewayRequestClassification {
+  kind: GatewayRequestKind
+  pathnameClass: GatewayPathnameClass
+  loginIntent: "explicit" | "none" | "unknown"
+  isWrd: boolean
+  originalHost: string | null
+}
+
+export interface GatewayRequestClassifier {
+  classify(gatewayUrl: string): GatewayRequestClassification
+}
+```
+
+所有 `webvpn.swufe.edu.cn` 请求先由 `GatewayRequestClassifier` 分类，再决定 Session 行为。分类器只返回分类和解码 host；原始 URL、pathname、query 与 WRD token 不进入诊断或持久化。`SETTINGS_NAMESPACE` 本地终结且不注入；`WRAPPED_RESOURCE` 可在 Session 可用时注入；`GATEWAY_ROOT` 只有 classifier 确认 `loginIntent = "none"` 时原则上可注入；所有可注入 kind 遇到 `loginIntent = "explicit" | "unknown"` 都不注入；`GATEWAY_STATIC` 必须按协议证据逐类启用；`LOGIN`、`LOGOUT`、`AUTH_CALLBACK`、`OTHER` 默认不注入。真实登录、登出和 callback pathname 尚未完全确认时不得猜测，见 [domain.md](domain.md) 与 [verification.md](verification.md)。
+
 ## 3. Session Store
 
 ```ts
@@ -60,6 +97,8 @@ export interface SessionRecordV1 {
   status: "captured" | "valid"
 }
 
+export type SessionRealm = "webvpn-gateway" | "cas-sso"
+
 export interface SessionStore {
   load(): SessionRecordV1 | null
   save(session: SessionRecordV1): boolean
@@ -68,6 +107,7 @@ export interface SessionStore {
 ```
 
 `cookieHeader` 是敏感字段，任何 diagnostic serialization 必须省略。
+Spec 003 M2 的 `SessionRecordV1` 当前只表示 `webvpn-gateway` Realm；Schema 保持不变，不新增必填 `realm` 字段。`cas-sso` 仅为未来独立研究的领域类型，不属于本 Store。
 
 ## 4. Session Capture
 
@@ -81,12 +121,12 @@ export interface SessionCaptureInput {
 
 export type SessionCaptureResult =
   | { kind: "captured"; session: SessionRecordV1 }
-  | { kind: "no_cookie" }
+  | { kind: "no_gateway_ticket" }
   | { kind: "not_gateway" }
   | { kind: "invalid" }
 ```
 
-第一版不在接口层写死单一 Cookie name。
+必须确认包含核心票据 `wengine_vpn_ticketwebvpn_swufe_edu_cn` 才能创建可复用 Session。可伴随保存的最小 Cookie 集仍由真机证据收敛；authserver Cookie 不进入捕获接口或 Gateway Session Store。
 
 ## 5. Request DTO / Decision
 
@@ -117,12 +157,16 @@ export interface RequestRewriteContext {
 export type RequestDecision =
   | { kind: "pass" }
   | { kind: "capture_session"; session: SessionRecordV1; pass: true }
+  | { kind: "inject_gateway_session"; headers: Record<string, string>; pass: true }
+  | { kind: "clear_gateway_session"; pass: true }
   | { kind: "login_required" }
   | { kind: "rewrite"; url: string; headers: Record<string,string>; context: RequestRewriteContext }
   | { kind: "error"; code: PluginErrorCode }
 ```
 
 `rewriteRequest()` 不直接调用宿主 `$done()`。
+
+Gateway 直连分支顺序固定为：先识别并本地终结 Settings Namespace；再识别 Gateway Request Kind；logout 不注入并清 Session；请求已有核心 Gateway ticket 时不覆盖其 Cookie，capture/refresh 后 PASS；请求没有 ticket 时，只有分类策略允许且本地 Session 可用才注入，否则 PASS。可用性检查至少要求 schema 可读、gateway host 精确匹配、存在核心 ticket 且 `expiresAt` 未过；仅 `loginIntent="none"` 才允许注入；`explicit` 或 `unknown` 必须不注入旧 Session。
 
 ## 6. Response DTO
 
@@ -199,6 +243,35 @@ export interface SafeDiagnosticRecord {
 ```
 
 禁止字段：cookie、authorization、password、body、WRD token、完整 URL query。
+
+### Safe Auth Trace
+
+以下结构是本地诊断事件的字段 allowlist。pathname 只编码为分类值，禁止保留原始 pathname。Cookie name 只作为需要时的名称集合；任何 Cookie value 一律不进入 Trace。
+
+```ts
+export type GatewaySessionTraceState = "missing" | "captured" | "valid" | "expired"
+
+export interface SafeAuthTraceRecord {
+  timestamp: string
+  requestHost: string | null
+  pathnameClass: GatewayPathnameClass
+  routeKind: RouteDecision["kind"]
+  gatewayRequestKind: GatewayRequestKind | null
+  loginIntent: "explicit" | "none" | "unknown"
+  requestHasGatewayTicket: boolean
+  storedGatewaySessionExists: boolean
+  storedGatewaySessionState: GatewaySessionTraceState
+  gatewaySessionInjected: boolean
+  existingRequestCookiePrecedence: boolean
+  isWrdUrl: boolean
+  decodedOriginalHost: string | null
+  redirectLocationHost: string | null
+  casServiceTargetHost: string | null
+  cookieNames?: string[]
+}
+```
+
+允许记录 timestamp、host/classification、login intent 分类、决策与状态布尔值、WRD 解码后的 original host、redirect host、CAS service target hostname、必要 Cookie names。CAS `service` 只能提取 hostname，不能保存 URL/query。禁止记录 Cookie value（包括 Gateway ticket）、CAS ticket、`execution`、Authorization、账号/密码/MFA、完整 query/service URL、原始 pathname、长十六进制 WRD token、request/response body。Safe Auth Trace 仅在本机诊断 sink 内存中短时存在，不得持久化到 Gateway Session Store、Settings DTO 或通知。
 
 ## 11. Storage Keys
 

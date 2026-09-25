@@ -3,7 +3,7 @@
 > Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
-> Last Reviewed: 2026-09-24  
+> Last Reviewed: 2026-09-25
 > Related: REQ-002 / REQ-005 / REQ-006 / REQ-007 / NFR-002 / NFR-003
 
 ## 1. 背景
@@ -11,6 +11,8 @@
 现有 SWUFE WebVPN Bridge 已在 desktop 端通过 Electron + mitmproxy 实现：用户完成官方 WebVPN/CAS/MFA 登录后，浏览器仍以真实校内主机名访问，由桥将 allowlist 请求改写为网瑞达 WebVPN URL、注入会话 Cookie，再对返回的 `Location`、`Set-Cookie`、HTML/JS/JSON URL 做反向改写。
 
 iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Extension、TUN/HTTP Proxy、MitM CA、HTTP(S) 拦截与 JavaScript request/response script。为避免维护独立 iOS App，本 Feature 将移动端实现为这些客户端的插件/覆写。
+
+认证状态分成两个 Realm：webvpn-gateway 是 webvpn.swufe.edu.cn 的 Gateway Session；cas-sso 是 authserver.swufe.edu.cn 的 CAS/SSO Session。Safari 与另一个 App 内的 WKWebView 通常使用不同 Cookie Jar。Stash/Loon 的正式能力是通过代理层捕获、保存并在安全分类允许时复用 Gateway Session；它不依赖也不声称 Cookie Jar 原生共享。当前不捕获、不存储、不注入 CAS Cookie。
 
 ## 2. 问题
 
@@ -42,6 +44,8 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 | G-IOS-004 | 不收集学校密码 | 插件代码、存储和日志均不存在用户名/密码保存路径 |
 | G-IOS-005 | 两客户端共享业务逻辑 | Loon/Stash 仅包含薄 Adapter，核心 codec/routing/rewrite/session 由共享包提供 |
 | G-IOS-006 | 分离拦截与路由范围 | Stash 可预先拦截 SWUFE 子域以支持动态选择；只有启用的精确 hostname 才改写并通过 WebVPN |
+| G-IOS-007 | Gateway Session 跨客户端复用 | 经代理处理的 App/WKWebView 请求可在安全分类允许时复用插件保存的 webvpn-gateway Session |
+| G-IOS-008 | 区分 Gateway 与 CAS Session | Gateway Session 与 CAS/SSO Session 属于不同 Realm，当前只实现 Gateway Realm |
 
 ## 5. Non-goals
 
@@ -55,6 +59,7 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 | NG-IOS-006 | 实现完整浏览器或独立服务 | Settings 只是轻量管理页，不承载 WebVPN 浏览 |
 | NG-IOS-007 | 首期支持 Surge/Quantumult X/Shadowrocket | 先完成 Stash 与 Loon，之后再评估 Adapter 扩展 |
 | NG-IOS-008 | BoxJS、外部设置后端、GitHub Pages、localhost server、CDN UI | Stash 插件自包含，设置由宿主 persistent store 保存 |
+| NG-IOS-009 | CAS Session Bridge | 高风险、可选的未来独立研究；本轮不捕获、存储、注入 CAS Cookie，也不视作 M2 隐含工作 |
 
 ## 6. 核心用户旅程
 
@@ -66,8 +71,10 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 4. 插件显示“未登录”状态，并提供“登录 SWUFE WebVPN”入口。
 5. 用户点击入口，打开 `https://webvpn.swufe.edu.cn`。
 6. 用户在官方页面完成 CAS/SSO/MFA。
-7. 插件从 WebVPN HTTP 请求中捕获必要 Cookie，持久化为 Session。
+7. 插件只从 webvpn.swufe.edu.cn 请求中捕获 Gateway ticket 与所需 Gateway Cookie，持久化到本地 webvpn-gateway Session Store；authserver Cookie 不进入该 Store。
 8. 状态变为“已登录”。
+
+Browser Cookie Jar != Plugin Gateway Session Store。登录发生在 Safari 不会把 CAS Cookie 原生共享给第三方 App 的 WKWebView；插件只在代理层复用 WebVPN Gateway Session。
 
 ### 6.2 日常访问
 
@@ -78,14 +85,22 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 5. 响应脚本反向改写网关 URL/Cookie。
 6. 普通页面保持真实主机名语义；教务页面可按 gateway bootstrap 规则进入 WebVPN 原生 URL 空间。
 
-### 6.3 会话过期
+### 6.3 跨 App 直接访问 Gateway
 
-1. 脚本观察到明确的过期信号，例如网关响应跳转回 CAS 或 Session Probe 失败。
+1. Safari 登录后，代理脚本观察并保存核心 Gateway ticket 及所需 Gateway Cookie 集合。
+2. 另一个 App/WKWebView 通过 Stash/Loon 发出直接 webvpn.swufe.edu.cn 请求时，代理先识别 Settings、Gateway Request Kind 和已有 ticket。
+3. 请求已有自己的 Gateway ticket 时保留原 Cookie、capture/refresh 该 Session 后 PASS。
+4. 请求没有 ticket 时，仅对策略允许的 Gateway Request Kind 注入可用 stored Gateway Session；LOGIN、LOGOUT、Settings、未确认 callback/other 路径不被旧 Session 无条件注入。
+5. WebVPN 若之后重定向到 authserver，第三方 WKWebView 仍使用自己的 CAS Cookie Jar；CAS 页面可能需要用户再次完成官方认证。
+
+### 6.4 会话过期
+
+1. 脚本观察到明确的 Gateway Session 过期信号；只有在已认证的 Gateway/业务上下文中，且不能由正常首次 CAS 往返解释时，才判为过期。
 2. 清除本地 Session。
 3. Tile/通知状态变为“登录已失效”。
 4. 用户点击“重新登录”，重复官方登录流程。
 
-### 6.4 管理代理网站（Stash 首发）
+### 6.5 管理代理网站（Stash 首发）
 
 1. 用户点击 Stash Tile 进入 `https://webvpn.swufe.edu.cn/__swufe_bridge__/`。
 2. Stash request script 优先识别保留 Settings 命名空间，并从插件内 bundle 合成 HTML，不联系真实 gateway。
@@ -113,9 +128,9 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 
 ### IOS-REQ-003 WebVPN Session Capture
 
-- 只在 `webvpn.swufe.edu.cn` 请求上下文中捕获 WebVPN Cookie。
-- `authserver.swufe.edu.cn` 的认证 Cookie、表单字段、密码不得写入插件持久存储。
-- Cookie 名不得在第一版代码中假设为单一固定值；应先按 gateway scope 捕获必要集合，再经真机验证收敛。
+- 只在目标 host 为 webvpn.swufe.edu.cn 的请求/响应上下文中捕获 Gateway Session。
+- 当前已确认核心 ticket Cookie 名为 wengine_vpn_ticketwebvpn_swufe_edu_cn；Session capture 必须确认 ticket 存在。最小辅助 Cookie 集与服务端失效信号仍以真机证据收敛。
+- authserver.swufe.edu.cn 的 CAS Cookie、表单字段、密码不得写入 Gateway Session Store。
 - Session 必须带版本号、更新时间和 gateway host。
 
 ### IOS-REQ-004 Allowlist
@@ -149,6 +164,32 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 - Settings POST 仅接受同源 Settings UI 发出的 JSON、自定义设备 token 和限定大小的合法 V2 schema；检查 Origin/Referer（若 Stash 暴露）、Host、path、method 和 Content-Type，任何检查不能由 UI 自己替代。
 - 页面 GET 生成短期 nonce 的能力及 Stash JS runtime 可用的安全随机源待实现前验证；没有可靠 token 时 POST 必须 fail-closed。不得用固定 bundle token 或 `Math.random()` 充当安全随机数。
 - API 只读写站点设置；响应不得包含 Session/CAS Cookie、Authorization、MFA、WRD key/iv 或完整敏感请求。Debug 不打印 Settings POST 原文。
+
+### IOS-REQ-016 Gateway Session Realm 与跨客户端复用
+
+- Session Realm 领域类型为 webvpn-gateway 与 cas-sso；M2 只实现 webvpn-gateway。
+- Stash/Loon 可以捕获 Safari 登录后经过代理的 Gateway Cookie，在本地安全持久化，并由代理层供其它经该代理处理的 App、WKWebView、Safari 请求复用。该能力不共享或修改任何客户端 Cookie Jar。
+- Gateway Session 只能发送给 webvpn.swufe.edu.cn。不得发送给普通 .swufe.edu.cn 源站，不得发送给 authserver.swufe.edu.cn，不得把 CAS Cookie 改 Domain 或并入 Gateway Cookie。
+- 仅 GatewayRequestKind 策略允许的 gateway 请求可以注入。Settings Namespace 永不注入；LOGOUT 不注入并清理本地 Gateway Session；LOGIN 与明确的重新登录意图不由旧 Session 注入破坏；AUTH_CALLBACK/OTHER 未有证据时默认不注入；所有可注入分类遇到显式或未知 login intent 都不注入。
+- Gateway 请求已携带 WebVPN ticket 时必须保留该请求自己的 Cookie，不得被旧 stored Session 覆盖；捕获/刷新新 ticket 后原样 PASS。
+- stored Session 不存在、schema 不兼容或已过期时不注入，保持正常网页登录路径。仅显示/跳转到 CAS 页面不得单独清除 Gateway Session；需独立 Gateway 失效证据。
+
+### IOS-REQ-017 Gateway Request Classification
+
+- Gateway request classifier 至少提供 SETTINGS_NAMESPACE、WRAPPED_RESOURCE、GATEWAY_ROOT、GATEWAY_STATIC / GATEWAY_OWNED、LOGIN、LOGOUT、AUTH_CALLBACK、OTHER。
+- /__swufe_bridge__/... Settings Namespace 必须本地终结、绝不访问 upstream、绝不注入 Cookie。
+- /http/<token>/... 与 /https/<token>/... WRAPPED_RESOURCE 可以在其它条件满足时注入。
+- GATEWAY_ROOT 仅在 classifier 确认 loginIntent=none 时原则上可复用现有 Session；explicit 或 unknown intent 必须绕过注入。
+- GATEWAY_STATIC / GATEWAY_OWNED 按确认过的协议需要逐类放行；LOGIN 不得无条件注入；LOGOUT 不注入且清理；未知 endpoint 保守 PASS。
+- 未经真机确认的真实 pathname 不得当成已知 WebVPN endpoint 写成事实；匹配规则与证据记入 Open Questions / Verification。
+
+### IOS-REQ-018 Safe Auth Trace
+
+- 安全诊断必须区分直接访问 authserver.swufe.edu.cn 与 WRD URL 解码后 originalHost 为 authserver 的请求，并能判断 tyxycg.swufe.edu.cn 流程中 Gateway Session 是否参与。
+- 允许字段：timestamp、request host、pathname classification、route kind、gateway request kind、是否带 Gateway ticket、stored Gateway Session 是否存在/ready 与 missing/captured/valid/expired 状态、是否执行 injection、请求 Cookie 是否优先、login intent 分类、是否 WRD、解码后的 original host、redirect location host、CAS service 参数解析出的 target hostname、必要 Cookie names。
+- 只记录 service target hostname；不得记录完整 service URL、完整 query 或原始 pathname/token。
+- 禁止记录 Cookie value、WebVPN ticket value、CAS ticket、execution、Authorization、用户名/密码/MFA、完整 query、长十六进制 WRD token、request/response body。
+- Trace 仅供本地诊断；不得进入 Settings DTO、通知、云端或持久 Gateway Session Store。
 
 ### IOS-REQ-005 WRD 请求改写
 
@@ -230,11 +271,18 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 | IOS-NFR-007 | observability | 错误可定位但不泄密 | 日志 schema 审查 |
 | IOS-NFR-008 | portability | iOS/iPadOS 为首期平台 | 至少两类设备/系统组合真机验收 |
 | IOS-NFR-009 | compatibility | 不影响 desktop | desktop 既有测试全绿 |
+| IOS-NFR-010 | security | 两个 Session Realm 隔离，Gateway Session 注入只触及 Gateway host 与获准 request kind | 正向/负向分类矩阵 + trace 检查 |
+| IOS-NFR-011 | privacy | Auth Trace 可判定登录链路但不输出敏感参数 | schema allowlist + 敏感值负向检查 |
 
 ## 9. 边界场景
 
-- Session 捕获时没有 `Cookie`：保持未登录，不写空 Session。
+- Gateway Session 捕获时没有确认的 Gateway ticket：保持未登录，不写空或不完整 Session。
 - Session 中包含多个 Cookie：按 gateway scope 保存，后续由最小化测试决定是否可裁剪。
+- Gateway 请求带新的 ticket B 而 stored Session 是 A：保留请求的 B、不注入 A，并 capture/refresh 为 B。
+- Gateway 请求无 ticket 但有可用存储：只对允许注入的 Gateway Request Kind 注入；LOGIN/LOGOUT/Settings/unknown 按分类拒绝注入。
+- Logout endpoint 确认后：不注入旧 Session，并清理本地 Gateway Session；具体真实 pathname 未确认前保留 Pending。
+- CAS 页面再次出现：不能单独判定 Gateway Session 复用失败；可能是 Gateway 成功访问业务站点后，业务系统自行要求 CAS，而 WKWebView 没有 Safari CAS Cookie。
+- authserver 请求保持 PASS，不注入 Gateway Session，不捕获 CAS Cookie。
 - 用户取消 CAS/MFA：不改变旧 Session；若旧 Session 已失效，状态仍为失效。
 - Gateway key/iv 轮换：Codec 明确失败，提示更新配置/插件，不伪装为普通网络错误。
 - 页面正文超出客户端脚本大小上限：跳过 body rewrite 并记录非敏感诊断；Header rewrite 仍应工作。
@@ -254,6 +302,10 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 - [ ] AC-IOS-008：Stash 与 Loon 各自至少通过安装/启用/禁用/更新/卸载冒烟测试。
 - [ ] AC-IOS-009：desktop 原有测试不受影响。
 - [x] AC-IOS-010：OQ-001/OQ-002 的 P0 实机结论已记录；Safari 降级已写入 PRD 与 UI/UX。
+- [ ] AC-IOS-011：Safari 捕获的 Gateway Session 可在真机上由代理层复用于没有自身 Gateway ticket 的 App/WKWebView Gateway 请求。
+- [ ] AC-IOS-012：请求自带新 Gateway ticket 时旧 stored ticket 不覆盖它；Logout 与明确 LOGIN 流程不会被旧 Session 注入破坏；Settings Namespace 不携带 Session。
+- [ ] AC-IOS-013：Gateway Session 与 CAS/SSO Realm 在架构、存储边界、trace 与测试中分开；当前 authserver 仍 PASS 且不捕获/注入 CAS Cookie。
+- [ ] AC-IOS-014：Safe Auth Trace 能区分 raw authserver 与 WRD-wrapped authserver，并安全诊断 tyxycg 场景且不记录禁止字段。
 
 ### Settings 验收标准
 

@@ -23,7 +23,12 @@
 | 系统代理接管 | system proxy takeover | 开桥前读 OS 代理；已启用且非本桥则拒绝启动；否则设为 `127.0.0.1:<bridge_port>` 并保存「由本 App 设置」标记，关闭/过期/退出时仅在标记存在时清除 | 不混淆：进程捕获（另一条接管路径） | 原包 `01-requirements/03-technical-design.md` §7 |
 | 进程捕获 | per-process capture | 用 mitmproxy local mode 选择指定进程（如 Chrome）接管其流量；与系统代理可同时启用，关闭时一并停止 | 别名：local capture；不混淆：系统代理 | 原包 `01-requirements/03-technical-design.md` §8 |
 | MITM CA | MITM CA | 本机生成的根证书，用于在本机解密并改写 HTTPS；建议复用 mitmproxy CA 机制、不自研 PKI，私钥仅本机且可一键卸载 | 别名：本机 CA；不混淆：学校官方证书 | 原包 `99-appendix/requirements-onepager-v1.0.md` FR-8；`01-requirements/03-technical-design.md` §10 |
-| 防环 | loop prevention | 访问 `webvpn.swufe.edu.cn` / `authserver.swufe.edu.cn` 不得进入本桥；已是 WebVPN 形态的请求直通 | 不混淆：allowlist 通配开关 | 原包 `01-requirements/03-technical-design.md` §6；`99-appendix/requirements-onepager-v1.0.md` FR-2 |
+| 防环 | loop prevention | raw webvpn.swufe.edu.cn 与 authserver.swufe.edu.cn 请求不按普通目标再次包装。Spec 003 可在分类允许的 direct Gateway request 上复用 Gateway Session；未知、登录、登出、callback、Settings、普通源站及 raw authserver 请求默认不接收 stored Gateway Cookie | 不混淆：客户端 Cookie Jar 原生共享、普通 WRD 路由 | 桌面 namespace 见 ADR-0007；移动端分类见 Spec 003 / ADR-0015 |
+| Session Realm | Session Realm | 有独立 host 边界、存储与生命周期的认证上下文。Spec 003 当前定义 webvpn-gateway；cas-sso 仅是未来独立可选项 | 不混淆：把两套 Cookie 合并 | Spec 003 domain model；ADR-0015 |
+| Gateway Session | Gateway Session | 属于 webvpn.swufe.edu.cn 的票据与最小 Cookie 状态；由代理捕获，只能随 Gateway request 发送 | 不混淆：CAS/SSO Session | Spec 003 / ADR-0015 |
+| CAS Session | CAS/SSO Session | 属于 authserver.swufe.edu.cn 的认证会话；当前插件范围不捕获、不存储、不注入 | 不混淆：Gateway Session | Spec 003 / ADR-0015 |
+| Browser Cookie Jar | Browser Cookie Jar | Safari、WKWebView 或其它 App 各自管理的 Cookie 存储 | 不混淆：Plugin Gateway Session Store | Spec 003 / ADR-0015 |
+| Inter-App Gateway Session Reuse | Inter-App Gateway Session Reuse | 代理层在分类允许时把本地 Gateway Session 用于另一个客户端 App 发起的 Gateway request；不共享 Cookie Jar | 不混淆：CAS Session Bridge | Spec 003 / ADR-0015 |
 | CAS / MFA | CAS / MFA | 统一身份认证：`authserver.swufe.edu.cn`（CAS，可含多因素认证）；由用户在官方 WebView 内自行完成，App 不代填、不存储 | 不混淆：WebVPN 会话 Cookie（登录的产物） | 原包 `99-appendix/requirements-onepager-v1.0.md` §2、FR-2 |
 | TUN（第一期不做） | TUN | 后续阶段的透明网关方案 `sing-box TUN → 127.0.0.1:mitm`；第一期不实现，也不阻塞第一期验收 | 不混淆：系统代理 / 进程捕获（第一期的接管方式） | 原包 `01-requirements/04-architecture-and-tech-selection.md` §1；[NFR-006](../requirements/non-functional-requirements.md) |
 | 桥状态机 | bridge state machine | 桥的生命周期：`idle → (start) → starting → running`；`running → (stop\|expire\|error) → stopping → idle`；`starting → (fail) → error → idle` | 不混淆：UI 状态条颜色 | 原包 `01-requirements/06-data-model.md` §5；`05-api-interfaces.md` §1.2 |

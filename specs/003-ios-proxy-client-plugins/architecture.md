@@ -3,7 +3,7 @@
 > Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
-> Last Reviewed: 2026-09-24
+> Last Reviewed: 2026-09-25
 
 ## 1. 选型结论
 
@@ -74,7 +74,7 @@ host normalize、exact allowlist、可选 SWUFE wildcard、excluded hosts。
 
 ### Session
 
-从 gateway request headers 提取 Session、schema/version、expiry state、serialization、敏感值保护。
+从 gateway request headers 提取 Gateway Session、schema/version、expiry state、serialization、敏感值保护；按 Gateway Request Kind 决定安全复用。该 Store 与客户端 Cookie Jar 解耦，且不接收 CAS/SSO Cookie。
 
 ### Request Rewrite
 
@@ -144,7 +144,7 @@ sequenceDiagram
     participant W as WebVPN
     participant C as CAS/MFA
     participant A as Adapter
-    participant S as Session Store
+    participant S as Gateway Session Store
     U->>H: 点击登录入口
     H->>W: 打开 WebVPN
     W->>C: redirect
@@ -155,9 +155,41 @@ sequenceDiagram
     A->>S: save gateway Cookie
 ```
 
-插件不需要知道 CAS 内部账号/MFA 数据；只关心认证完成后的 gateway Session。
+插件不需要知道 CAS 内部账号/MFA 数据；只捕获认证后 webvpn.swufe.edu.cn 的 Gateway Session，不捕获 authserver Cookie。两个 Realm 的 boundary、direct Gateway injection 与 CAS redirect 关系见下节和 [ADR-0015](../../docs/architecture/adr/ADR-0015-session-realm-and-proxy-reuse.md)。
 
-**P0 结论（2026-09-24）**：两个宿主都没有把登录 URL 留在应用内，通知和 Tile 打开的是系统 Safari。MitM 开启后，Safari 里的 `webvpn.swufe.edu.cn` 与 `authserver.swufe.edu.cn` 仍进入各自 HTTP Script，登录完成后的 gateway 请求能看到会话 Cookie 名。因此保持插件方案，不改为 Companion App。不为此单开 ADR：Safari 是原方案已写明的降级，组件边界没有变。
+### 8.1 Session Realm 与 Inter-App Gateway Session Reuse
+
+`Browser Cookie Jar != Plugin Gateway Session Store`。Safari、每个 WKWebView 和 App 可拥有各自的 Cookie Jar；Safari 的 CAS Cookie 不会因此出现在另一个 App 内。Stash/Loon 的 Gateway Session Store 是本地代理状态，Safari 登录流量中捕获的 Gateway Session 可由代理层用于另一个经 HTTP Engine 处理的 App/WKWebView Gateway 请求，不修改客户端 Cookie Jar。
+
+领域概念：
+
+```ts
+type SessionRealm = "webvpn-gateway" | "cas-sso";
+```
+
+M2 只实现 webvpn-gateway。现有 SessionRecordV1 隐含此 Realm，schema 不迁移。cas-sso 只作为未来独立、高风险、可选能力：默认关闭，单独威胁建模、存储 key、生命周期；只允许发往 authserver.swufe.edu.cn，绝不与 Gateway Cookie 拼接。本轮不实现 CAS Session Bridge。
+
+```mermaid
+sequenceDiagram
+    participant S as Safari Cookie Jar
+    participant P as Stash/Loon Proxy
+    participant GS as Gateway Session Store
+    participant A as Third-party App WKWebView Cookie Jar
+    participant W as WebVPN Gateway
+    participant C as CAS authserver
+    S->>P: Official login traffic passes proxy
+    P->>GS: Capture Gateway ticket and Cookie set
+    A->>P: Direct Gateway request without ticket
+    P->>GS: Check kind and ready state
+    GS-->>P: Stored Gateway Session
+    P->>W: Inject only into classified Gateway request
+    W->>C: May redirect business flow to CAS
+    Note over A,C: WKWebView has its own CAS Cookie Jar; no Safari Cookie sharing
+```
+
+图示区分两个认证层：Gateway Session 复用成功后，业务系统仍可能主动跳转到 CAS；再次显示 CAS 页面并不单独证明 Gateway Session 失败。
+
+**P0 结论（2026-09-24）**：两个宿主都没有把登录 URL 留在应用内，通知和 Tile 打开的是系统 Safari。MitM 开启后，Safari 里的 webvpn.swufe.edu.cn 与 authserver.swufe.edu.cn 仍进入各自 HTTP Script，登录完成后的 Gateway 请求能看到 Cookie 名。因此保持插件方案，不改为 Companion App。跨 Realm 与代理层 Gateway Session 复用决策另见 [ADR-0015](../../docs/architecture/adr/ADR-0015-session-realm-and-proxy-reuse.md)。
 
 ## 9. Ordinary Request 数据流
 
@@ -183,9 +215,23 @@ sequenceDiagram
 
 Request/Response script 不保证共享 JS 调用栈，因此不依赖内存对象跨脚本存活。优先从 `$request.url`/响应上下文重新推导；只有证据表明不足时才增加短生命周期 transient context，且不得保存 Cookie/body。
 
+Gateway RequestKind classification for direct Gateway requests:
+
+| Kind | Stored Gateway Session injection | Default behavior |
+| --- | --- | --- |
+| SETTINGS_NAMESPACE | Never | Local synthetic response; no upstream or capture |
+| WRAPPED_RESOURCE | Eligible when session ready and request has no ticket | Recognizable /http/<token>/... or /https/<token>/... on Gateway |
+| GATEWAY_ROOT | Eligible only when login intent is confirmed absent | Explicit or unknown intent passes without injection |
+| GATEWAY_STATIC / GATEWAY_OWNED | Only after protocol evidence | Conservative no-injection until confirmed |
+| LOGIN | Never | Preserve official login flow |
+| LOGOUT | Never | Clear local Gateway Session and pass |
+| AUTH_CALLBACK / OTHER | Never by default | Conservative pass until verified |
+
+Concrete login/logout/callback pathnames remain unconfirmed and must not be guessed; see [domain.md](domain.md) and [verification.md](verification.md).
+
 ## 11. Gateway-owned Namespace 与 Promotion
 
-desktop 当前将 `/wengine-vpn/`、`/authserver/` 视为 gateway root namespace，并有 bootstrap HTML promotion。移动端默认保持语义一致；必须由真机教务验证确认，不因脚本实现困难直接删除。
+desktop 当前将 `/wengine-vpn/`、`/authserver/` 视为 gateway root namespace，并有 bootstrap HTML promotion；这是桌面 ADR-0007 的行为事实。iOS/Loon/Stash 不直接继承这些路径的注入或改写规则：移动端的 GATEWAY_STATIC / GATEWAY_OWNED 必须按当前真机观察逐类启用，未确认的 endpoint 默认不注入。移动端是否需要 bootstrap promotion 也以宿主真机证据为准。
 
 Stash 真机日志显示，响应脚本把透明改写后的请求和浏览器直接访问的 WebVPN 原生 `/http/<token>/` 请求都呈现为同一 gateway URL。对原生 bootstrap 再执行 `302` promotion 会跳回自身，形成无限重定向。Stash Adapter 因此在教务文档导航的 request 阶段直接向浏览器返回指向 WebVPN URL 的 `302`；浏览器对该原生 URL 的响应不再反向改写。其它宿主的 Core promotion 语义不变。
 
@@ -196,13 +242,13 @@ Stash 真机日志显示，响应脚本把透明改写后的请求和浏览器�
 | Scope | Stash 首发设计 | 行为 |
 | --- | --- | --- |
 | Interception Scope | `webvpn.swufe.edu.cn`、`authserver.swufe.edu.cn`、`*.swufe.edu.cn` HTTPS；`*.swufe.edu.cn:80` 的 force-http-engine 范围待按 Stash 语法/实机评估 | 进入 HTTP Engine；TLS 在设备本地由 Stash MitM 解密 |
-| Routing Scope | Settings V2 中 enabled builtin + 合法 customHosts 编译出的精确 host 集 | 唯一可进行 WebVPN WRD、Session 注入与 reverse rewrite 的普通 target |
+| Routing Scope | Settings V2 中 enabled builtin + 合法 customHosts 编译出的精确 host 集 | 唯一可进行普通目标 WRD rewrite；其 Cookie 仅注入改写后的 Gateway upstream。直接 Gateway 请求另走 Gateway Request Kind 分类策略 |
 
 `Intercepted != Routed through WebVPN`。旧表述“MitM 只含当前明确 allowlist”对动态 Domain 功能不成立，是有意改变的安全语义：用户允许 Stash 对 SWUFE 子域范围解密，便于无需重装即启用新域；插件仍只对选中 hostname 代理。未选域需完整 PASS，不读 Cookie、不改 header/body、不请求 gateway。
 
 MitM `*.swufe.edu.cn:443` 是 Stash 官方配置支持的 wildcard 格式，但该仓库现有 Override 和设备 Demo 尚未验证这个通配值与 request script regex 的组合。动态 HTTP 子域是否需要/允许 `force-http-engine` 同样待实机确认。若任一关键范围无法可靠命中，产品退化为静态 Interception Scope，新增域名需更新 Override；不得谎称脚本可运行时扩展 MitM。
 
-为入口正常使用，`webvpn` 与 `authserver` 保持在 HTTP Engine 处理范围；认证 body 永不被保存，Cookie 捕获只在 gateway context。
+为登录入口正常使用，`webvpn` 与 `authserver` 保持在 HTTP Engine 处理范围；认证 body 永不被保存。Gateway Cookie capture 只在 webvpn.swufe.edu.cn context；原始 authserver.swufe.edu.cn 请求始终 PASS、不注入 Gateway Session，也不捕获 CAS Cookie。WRD 解码后 originalHost=authserver.swufe.edu.cn 的网络请求仍发往 Gateway；Trace 需同时记录请求 host 与 decoded original host。
 
 ## 13. Settings Virtual WebUI 与 pseudo HTTP API
 
@@ -250,13 +296,19 @@ Settings route 一经识别，即使 JSON parse/storage/render 出错，也必�
 request-entry
   1. parse URL safely; host + path in Settings namespace?
        yes → settings handler → synthetic response → stop
-  2. gateway/authserver Session behavior
+  2. apply Gateway RequestKind policy: authserver → PASS; logout → clear stored Gateway Session and PASS without injection;
+     request already has Gateway ticket → preserve Cookie, capture/refresh, PASS;
+     otherwise inject only for an eligible kind with a ready stored Gateway Session and classifier-confirmed `loginIntent=none`
   3. compile latest Settings DTO → exact RoutingPolicy
   4. selected target? no → PASS unchanged
-  5. selected target → Session / codec / rewrite
+  5. selected target → Session / codec / rewrite to Gateway
 ```
 
 Settings route 确认必须发生在 `captureSession()` 与 Core `rewriteRequest()` 之前。HTTP script request/response 两阶段都须识别 namespace；禁止 Settings HTML/JSON 被业务 response rewrite 处理。写入 v2 settings 后，下一次业务请求直接 parse 新 key；不缓存旧路由策略跨请求。
+
+Gateway RequestKind 至少区分 SETTINGS_NAMESPACE、WRAPPED_RESOURCE、GATEWAY_ROOT、GATEWAY_STATIC/GATEWAY_OWNED、LOGIN、LOGOUT、AUTH_CALLBACK、OTHER。Settings 永不注入；WRAPPED_RESOURCE 可根据 Session 状态复用；GATEWAY_ROOT 仅在 classifier 确认 loginIntent=none 时原则上允许；explicit/unknown intent 必须绕过；其它 gateway-owned/login/logout/callback 路径按实机确认后逐类启用，未确认路径默认不注入。具体规则见 [domain.md](domain.md) 与 [interfaces.md](interfaces.md)。
+
+客户端请求 Cookie 中已有 Gateway ticket 时，不注入 stored Session、不覆盖请求值；capture/refresh 后 PASS。只有请求不含 ticket，且 RequestKind 策略允许、stored Session ready 时才注入。注入目标始终是 webvpn.swufe.edu.cn。
 
 ## 15. HTTP/3 / QUIC
 
@@ -269,7 +321,7 @@ Loon 有 UDP 端口/规则能力，但全局 `disable-udp-ports = 443` 不应成
 以下是 Stash M2 真机问题提炼出的检查项，证据见 [verification.md 的 Stash 真机记录](verification.md)。Loon 是否呈现相同行为仍待 M3 真机验证，不能直接复制 Stash 的配置或绕行实现。
 
 1. **入口协议与脚本命中**：教务验收入口是 `http://jwxt.swufe.edu.cn/`，WebVPN 对应 `/http/`。在 Loon 中分别确认 HTTP/80 请求进入 request 与 response 脚本、HTTPS gateway/CAS 进入所需脚本，并核对浏览器所见 URL 与 WRD 上游 URL。Stash 的 `force-http-engine` 是其宿主配置，不能推定 Loon 有同名或同语义选项。
-2. **会话状态与首次 CAS 往返**：捕获 gateway Cookie 只表示 `captured`，不是教务访问已验证。首次教务跳转 CAS 不应仅凭 302 清除刚捕获的会话；教务成功响应后才能升级为 `valid`。已确认会话后来跳回 CAS 的失效处理需单独回归。
+2. **会话状态与 CAS 往返**：捕获 gateway Cookie 只表示 `captured`，不是教务访问已验证。首次或后续出现 CAS 页面/redirect 均不能单独证明 Gateway Session 失效，也不能单独触发清理；教务成功响应后才能升级为 `valid`。只有核心 ticket 明确过期/清除或其它已真机确认的 Gateway 失效证据才可清理。
 3. **原生 WebVPN 命名空间**：分别观察 Loon request/response 脚本中的 `$request.url`，不能从 URL 外观推定请求是透明改写还是浏览器直接发出的 `/http/<token>/`。对浏览器已处于原生 WebVPN URL 的响应应保持网关原有语义；任何 promotion 302 的目标都不能与当前浏览器 URL 相同。Stash 在 request 阶段返回 302 的适配方案仍待其真机复验，Loon 须按自身脚本能力确定实现。
 4. **响应体与诊断**：仅改写响应 Header 时，若宿主未提供 body，不得写出空 body；同时验证 Location、Set-Cookie 与业务 HTML 不被截断。分别确认插件加载、脚本执行、脚本日志位置和远程 bundle 更新，避免用“没有普通日志”推断脚本未运行。诊断只记录脱敏主机、状态、动作和错误码，不记录 Cookie、WRD token 或页面内容。
 
@@ -285,8 +337,10 @@ Loon/Stash runtime
 Plugin JS
    ├─ unselected intercepted SWUFE host → unchanged PASS
    ├─ selected exact host → WRD + Session only to gateway
+   ├─ classified direct Gateway request → stored Gateway Session only to Gateway
    └─ Settings namespace → synthetic local response, no upstream
 Selected WebVPN request → HTTPS → Official WebVPN
+CAS Session remains in the client App's own Cookie Jar; no Safari sharing or Gateway Store capture
 ```
 
 约束：Session 只存在本机宿主持久化；无项目云后端；无账号密码；日志 redact URL token/Cookie/body；只有 Routing Scope allowlist 进入 WRD rewrite；远程安装与脚本更新仅来自本仓库 **GitHub** HTTPS（Release 与/或 `raw.githubusercontent.com`，见 [prd.md §7 IOS-REQ-001/012](prd.md)）。用户须知 Stash Interception Scope 内的 HTTPS 都可能在设备本地解密，即使该 host 未选 WebVPN。

@@ -3,7 +3,7 @@
 > Status: Approved  
 > Spec ID: 003  
 > Owner: cherrchen  
-> Last Reviewed: 2026-09-24
+> Last Reviewed: 2026-09-25
 
 ## 1. 设计原则
 
@@ -41,7 +41,7 @@
 | `EXPIRED` | SWUFE WebVPN | 登录已失效 · 点击重新登录 | `https://webvpn.swufe.edu.cn` |
 | `ERROR` | SWUFE WebVPN | 配置错误 · 查看日志 | 项目故障排查页 |
 
-Tile 不展示 Cookie 名、Cookie 值、WRD token、账户信息。
+Tile 不展示 Cookie 名、Cookie 值、WRD token、账户信息。`READY` 只表示 Gateway Session 可供 Gateway 请求使用，不代表某个业务 App 的 CAS/SSO Session 已存在；在第三方 App 内再次出现 CAS 页面不单独证明 Gateway Session 失效。
 
 Tile Script 官方接口允许 `$done({url: ...})` 更新 Tile URL，因此设计为根据登录状态切换 URL；此动态行为仍需目标 Stash 版本实机确认。若真机不稳定，退化为 Tile 固定进入 Settings，Settings 页面分别提供「登录 / 重新登录」按钮与站点管理入口。
 

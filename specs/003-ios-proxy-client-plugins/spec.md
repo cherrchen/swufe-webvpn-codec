@@ -15,15 +15,15 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 **`In Progress`**（2026-09-25）：Gate A 与 Core parity 已通过；Stash 基础 Adapter/Demo 已开发并有部分设备日志。2026-09-25 修订确认动态站点 Settings、pseudo HTTP API、精确 Routing Scope 与较宽 Interception Scope 的架构方向；Settings 实现、wildcard MitM/QUIC 实机确认与 Settings E2E 尚未通过。M3/M4 未开始。
+当前为 **In Progress**（2026-09-25）：P0、M1 Shared Core 与 Stash M2 基础实现已交付；Gateway Cookie capture/store 与普通目标 WRD 注入已具备。发现并正式纳入 M2 follow-up：无 ticket direct Gateway request 的分类注入、客户端 ticket precedence、login/logout 保护、CAS-only redirect 不清 Session 与 Safe Auth Trace。新增用例 N02–N10 尚未实现/取证；现有真机观察只确认 Safari Gateway Session capture/persist，不确认 Inter-App Gateway Session Reuse。M3/M4 未开始。
 
 | Gate | 含义 | 本 Spec 状态 |
 | --- | --- | --- |
 | **Gate A** | P0 登录链路与 Script 可观察性（见 [project-management.md §10](project-management.md)） | **已通过**（2026-09-24 真机；见 [verification.md](verification.md)） |
 | **文档评审** | PRD / 架构 / 任务 / 验证计划一致，产品决策已冻结（含 Stash 首发、自包含 Settings、无 BoxJS/backend、GitHub 只分发） | **已通过**（本轮文档修订；宿主能力仍需 Gate D） |
-| **Approved** | Gate A + 文档评审通过 | **当前** |
+| **Approved** | Gate A + 文档评审通过 | 已完成（2026-09-25 设计增补不代表实现/验证完成） |
 | **Gate B** | M1 退出：Python/JS 共享向量全绿、Core 无 Host API 泄漏（见 [project-management.md §10](project-management.md)） | **已通过**（2026-09-24 本地向量与隔离扫描；真机 E2E 仍待 T027） |
-| **In Progress** | Gate B 通过后进入 M2/M3 实现 | **当前**（M1/M2 实现中；Gate B 以向量全绿为准） |
+| **In Progress** | Gate B 通过后进入 M2/M3 实现 | **当前**（M1 完成；Stash M2 基础实现交付，direct Gateway reuse / Safe Trace follow-up 与真机验证待完成） |
 
 ## Background
 
@@ -94,6 +94,11 @@
 | Q-008 | `DOMAIN-SUFFIX,swufe.edu.cn` QUIC 规则在目标 iOS Override 真机命中与 TCP 回落 | 子域 HTTPS script | Open / Gate D | M2 发布前 |
 | Q-009 | Tile `$done({url})` 动态切换到 Settings 是否可靠 | Tile Journey | Open / M2 | 否；固定 Settings + 独立登录按钮为退化 |
 | Q-010 | 16 KiB 以上 Settings POST 能否本地 413 且保证不被 Stash `max-size` 跳过后发往 upstream | Settings API 安全 | Open / Gate D | 是；失败则不能交付 POST API |
+
+| Q-011 | LOGIN、LOGOUT、AUTH_CALLBACK 与 GATEWAY_OWNED 的真实 pathname / request intent 是什么 | Gateway classifier 与登录/登出安全 | Open；逐条真机确认，未确认前不注入 | 是，未知路径默认 no-injection |
+| Q-012 | 独立 App/WKWebView 的 direct Gateway request 是否稳定进入 Stash HTTP Engine，以及哪些 Gateway Request Kind 可安全复用 Session | Inter-App Gateway Session Reuse | Open；按应用/宿主版本取证 | 是，N02 前不得宣称已支持 |
+| Q-013 | raw authserver、WRD-wrapped authserver 与 tyxycg 的 redirect/service 目标如何在 Safe Auth Trace 中区分 | Auth flow diagnosis / 隐私 | Open；service 仅抽取 target hostname | Trace 实现可先并行，解释业务因果需实机 |
+| Q-014 | tyxycg 在 Gateway 已认证后是否会自行要求 CAS，哪些响应组合才足以判定 Gateway Session 失效 | 登录解释与 expired 判定 | Open；不得仅因再次出现 CAS 清除 Session | 是，tyxycg E2E 前保留为未知 |
 
 ## Acceptance Criteria
 

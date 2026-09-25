@@ -3,7 +3,7 @@
 > Spec ID: 003  
 > Status: In Progress  
 > Owner: cherrchen  
-> Last Updated: 2026-09-24
+> Last Updated: 2026-09-25
 
 ## Strategy
 
@@ -26,13 +26,15 @@
 
 ### Phase M2 — Stash（首发宿主）
 
-- 目标：Stash Adapter、`.stoverride`、Tile、HTTP/3 fallback、bundled Settings WebUI/pseudo API、Settings V2 migration、动态精确 allowlist、E2E。
-- 退出条件：Stash 主路径和 Settings E2E 通过；wildcard interception 通过真机，或产品明确退化为静态 interception；未选目标 PASS 与 Settings endpoint no-upstream 已有证据。
+- 基线实现已交付：Stash Adapter、Override/Tile、Gateway Cookie capture/store、普通目标 WRD rewrite 与 Gateway Session 注入、Settings V2/pseudo API。
+- 新增收尾：direct Gateway Request Kind classification 与 Session injection、客户端 ticket precedence、login/logout 保护、CAS-only redirect 不清 Session、Safe Auth Trace 与 login-intent 分类；对应实现任务见 tasks.md T050–T054、T058。
+- 设备验证仍待完成：无 ticket 的第三方 App/WKWebView Gateway 请求、ticket rotation、过期/logout、explicit/unknown login intent、CAS-only redirect、Settings/authserver negative cases、tyxycg 诊断、wildcard/QUIC 与教务 E2E。
+- 退出条件：N02–N10 通过或按真机证据收敛分类；Settings E2E 通过；wildcard interception 通过真机，或产品明确退化为静态 interception；未选目标 PASS、Settings endpoint no-upstream 与 Gateway/CAS Realm 隔离有证据。
 
 ### Phase M3 — Loon
 
-- 目标：Loon Adapter、`.plugin`、bundle、Session 通知、QUIC 路径、E2E。
-- 退出条件：Loon 主路径与禁用/更新冒烟通过。
+- 目标：Loon Adapter、.plugin、bundle、HTTP/3 fallback、Session notifications、Gateway Request Kind 与 direct Gateway Session reuse、Safe Auth Trace、E2E。
+- 退出条件：Loon 主路径、跨 App Gateway Session、ticket precedence、CAS boundary 与 disable/update smoke 通过。每个宿主独立实机验证。
 
 ### Phase M4 — Hardening & Release
 
@@ -72,4 +74,4 @@ Settings 从 `swufe.settings.v1` 迁移到 `swufe.settings.v2`，V1 exact hosts 
 
 ## Open Questions
 
-实现前 Gate D 需确认安全 nonce source、Origin/Referer/body host interface、synthetic response、wildcard MitM、HTTP force-engine 与 QUIC suffix rule；见 [project-management.md §10](project-management.md) 与 [verification.md](verification.md)。
+Gate D 仍需确认 Settings 宿主能力；新增 Gate E 需确认登录/登出/callback 真实路径、direct Gateway request 命中、ticket rotation 与 tyxycg redirect 来源。未确认路径按 OTHER/no-injection；见 project-management.md §10 与 verification.md。

@@ -25,6 +25,8 @@ flowchart LR
 
 说明：来自本机浏览器的请求先经系统代理或进程捕获进入本机桥，由 Bridge Addon 做 allowlist 判定；命中则用 WrdCodec 生成 WebVPN URL、附加 WebVPN Cookie 后发往 `webvpn.swufe.edu.cn`，再由校内服务返回，响应经反向改写（`Location`、`Set-Cookie`、HTML/JS/JSON 内绝对 URL）回到浏览器；未命中则直连且不改写。客户端侧始终使用真实主机名，仅上行改走 WebVPN；两条例外（[ADR-0007](adr/ADR-0007-gateway-owned-namespaces-and-native-mode-promotion.md)）：路径以 `/wengine-vpn/`、`/authserver/` 开头时不经 token、直接取自网关根（其响应不反向改写）；命中网关 bootstrap 判据（`text/html` + ≤ 8192 B + 同时含 `__vpn_` 与 `/wengine-vpn/js/main.js`）的 HTML 文档由 Bridge Addon 以 `302` 升级到网关原生 URL 空间（`https://webvpn.swufe.edu.cn/<scheme>/<token>/…`），该主机此后不再经本桥改写。两种接管方式互斥（ADR-0006）：系统代理覆盖全部流量；「指定应用」由 mitmproxy local 模式只接管所选应用，此时本 App 不设置系统代理（见 DF-005 / DF-007）。
 
+下表 DF-001–DF-009 延续桌面 Phase 1 的流转；其中会话失效信号只描述桌面桥规则。iOS 插件另有 Gateway Session Store 与 direct Gateway request 分类注入流程，见 DF-010、[Spec 003](../../specs/003-ios-proxy-client-plugins/architecture.md) 与 [ADR-0015](adr/ADR-0015-session-realm-and-proxy-reuse.md)。iOS 中 CAS 页面/redirect 不能单独作为 Gateway Session 失效证据。
+
 ## 流程清单
 
 | ID | 流程 | 触发 | 输入 | 关键变换 | 输出 | 持久化 | 详见 |
@@ -38,13 +40,14 @@ flowchart LR
 | DF-007 | 捕获方式切换与进程捕获 | 用户选择「指定应用 / 系统代理」或增删候选应用；开桥时下发配置 | `captureMode`、`captureProcesses`（intercept pattern）、OS 进程列表 | 枚举候选应用（macOS `ps -Ao pid=,comm=`、Windows `tasklist /fo csv /nh`）→ 应用按 `.app` 包路径归并为一行、非应用用可执行文件全路径 → 整体覆盖写入 `bridge-config.json` 的 `capture.processes`（`system-proxy` 下恒为 `[]`）→ sidecar 每秒轮询配置，把 `local:<spec>` 叠加到同一个 mitmproxy 实例（切回系统代理则移除）并回报 `swufe-capture` | `localCaptureEnabled` / `BridgeStatus.captureError`；被捕获应用的流量进入本机桥 | `userData/config.json`（`settings.captureMode` / `captureProcesses`）与 `userData/bridge-config.json`（`capture.processes`） | [components.md](components.md)、[api/bridge-control-protocol.md](../api/bridge-control-protocol.md)、[ADR-0006](adr/ADR-0006-local-capture-mode-and-mutual-exclusion.md) |
 | DF-008 | 窗口打开（二级窗口） | 主窗口点 `[选择应用…]` / `[管理…]`，或打开「调试日志」开关（日志窗口由开关关闭后重开同样走此路径） | Renderer 的 `openCaptureWindow` / `openLogWindow` / `openAllowlistWindow` 调用 | Main 查窗口注册表：已存在则 `restore()` / `show()` / `focus()`；否则按 `WINDOW_SPECS` 创建（生产 `loadFile('<appRoot>/dist/renderer/<entry>.html')`，开发期 `loadURL('<devServerUrl>/<entry>.html')`）并 `ready-to-show` 后显示 → 新窗口挂载后自行经 preload 拉取初始状态（`getStatus` / `getSettings` / `getAllowlist` / `getCaStatus` / `listCaptureCandidates` / `getDebugLogs`） | 窗口出现且显示与 Main 一致的当前状态 | 无 | [components.md](components.md)（Window Registry）、[api/electron-ipc.md](../api/electron-ipc.md) |
 | DF-009 | 广播到全部窗口 | 桥状态变化 / 调试日志产生 / 会话过期 / `setAllowlist` 成功 | `BridgeStatus`、`DebugLogEvent` | Main 遍历**全部存活窗口** `webContents.send`（`onStatus` / `onDebugLog` / `onSessionExpired`；M2/M3 只投递主窗口）；调试日志事件**先写入 Main 环形缓冲（≤200、最新在前、仅内存）再广播**；渲染层按常规 100ms 合并渲染（饱和且 >50 条/秒时 250ms） | 各窗口刷新状态条 / 日志表格 / 会话过期模态 | 环形缓冲仅驻留内存（不落盘） | [components.md](components.md)（Debug Log Buffer）、[api/electron-ipc.md](../api/electron-ipc.md)、[ADR-0012](adr/ADR-0012-react-antd-multiwindow-renderer.md) |
+| DF-010 | iOS 插件 Gateway Session 复用（Spec 003） | Safari 登录流量经过 Stash/Loon；另一 App/WKWebView 请求 Gateway | Gateway host request、request Cookie、Plugin Gateway Session Store | 先本地终结 Settings Namespace，再分类 Gateway Request Kind；request 已带核心 ticket 时保留并 capture/refresh 后 PASS；无 ticket 时仅对获准 kind、无 login intent 且 stored Session schema/host/ticket/expiry 可用的请求注入。raw authserver 与普通源站不注入。 | 仅发往 webvpn.swufe.edu.cn 的 Gateway request | Stash/Loon persistent store 的 swufe.session.v1；仅 webvpn-gateway Realm | [Spec 003](../../specs/003-ios-proxy-client-plugins/architecture.md)、[ADR-0015](adr/ADR-0015-session-realm-and-proxy-reuse.md) |
 
 ## 数据生命周期
 
 | 阶段 | 说明 | 保留策略 |
 | ---- | ---- | -------- |
 | 采集 / 接收 | DF-003 从登录 WebView 的 session 采集 WebVPN 会话 Cookie | 仅采集会话所需 Cookie 及最小附属状态；不采集密码 |
-| 校验 | DF-003 失效检测：探测登录页标记、`Set-Cookie` 清空、连续改写后 302 到 CAS | 每次桥运行期间持续进行；命中即触发停桥流程 |
+| 校验（桌面桥） | DF-003 失效检测：探测登录页标记、`Set-Cookie` 清空、连续改写后 302 到 CAS | 每次桥运行期间持续进行；命中即触发停桥流程 |
 | 存储 | `userData/config.json`（settings + allowlist，settings 含 `captureMode` / `captureProcesses`）、`userData/bridge-config.json`（下发 sidecar 的运行时配置）、`userData/session.bin`（加密）或 Electron Session 持久分区、CA 用 mitmproxy 专用 confdir | 运行时配置随每次开桥 / 设置变更整体覆盖写入；Cookie 存用户目录且权限收紧；CA 私钥仅本机；调试日志环形缓冲只驻留 Main 内存（≤200 条、最新在前），不落盘 |
 | 使用 / 派生 | DF-001/DF-002 使用 Cookie 与 allowlist；DF-005 使用「由本 App 设置」标记；DF-007 使用 `captureMode` / `captureProcesses` 并回报捕获状态；DF-008/DF-009 用窗口注册表与环形缓冲把状态、日志与过期通知投递到全部存活窗口 | 会话与标记只在桥运行期间有效，标记随清除动作失效；进程捕获只在桥 `running` 且捕获方式为 `selected-apps` 时生效 |
 | 归档 / 删除 | 退出登录清 Cookie；卸载 CA 移除信任；关闭/退出清除本 App 设置的系统代理 | 不保留历史会话；无云端账号体系 |

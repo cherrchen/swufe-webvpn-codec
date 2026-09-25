@@ -1,6 +1,4 @@
-# 项目总览
-
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-21
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-25
 
 **用途**：本文件回答「这个项目是什么、为谁解决什么问题、边界在哪里」。
 它是所有 Agent 与新人进入项目后第一份应读的文档，也是 [AGENTS.md](../../AGENTS.md) 中 Project Identity 的展开版本。
@@ -12,6 +10,9 @@
 `SWUFE WebVPN Bridge`：macOS / Windows 上的 Electron 桌面应用——用户在 App 内完成官方网瑞达 WebVPN（CAS/MFA）登录后，本机 HTTP/HTTPS 流量中命中 allowlist 的请求由本地桥（[本机桥](glossary.md)）改写为 WebVPN URL 并携带会话，使本机浏览器能打开并操作教务 `jwxt.swufe.edu.cn`。不是真 VPN。
 
 ## 背景
+
+iOS 代理客户端插件是 Spec 003 的独立交付线，当前状态为 In Progress，不属于桌面发行目标。Gateway/CAS Session 边界见 [ADR-0015](../architecture/adr/ADR-0015-session-realm-and-proxy-reuse.md)。
+
 
 - 学校校外访问校内 Web 资源依赖网瑞达（Wengine）WebVPN `webvpn.swufe.edu.cn`；统一身份认证经 `authserver.swufe.edu.cn`（CAS，可含 MFA）。
 - WebVPN 是**应用层反向代理**，不是 SSLVPN/TUN；URL 编解码为 AES-128-CFB（`segment_size=128`），默认 `key = iv = wrdvpnisthebest!`，形态为
@@ -70,6 +71,6 @@ Owner:            cherrchen
 
 | ID  | 问题 | 影响 | 状态 |
 | --- | ---- | ---- | ---- |
-| Q-001 | WebVPN 会话 Cookie 名称与失效信号需以实机为准 | Session Broker 的会话提取与过期检测实现 | Open |
+| Q-001 | M2 Gateway Session 当前最小必需 Cookie 集与服务端过期判定尚未由完整真机协议观察确认。 | Stash / 真机验证 |
 | Q-002 | mitm sidecar 分发形态未定：嵌入式 Python 还是外置 mitmproxy 可执行文件 | 打包体积、安装流程与跨平台分发 | Open |
 | Q-003 | 产品名「SWUFE WebVPN Bridge」为原包标注的暂定名 | 文档、包名与发布物料 | Open |

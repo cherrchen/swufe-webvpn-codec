@@ -25,7 +25,7 @@ specs/001-phase1-local-bridge/     ← 本项目第一个 Spec（Phase 1 本机�
 | ---- | ---- | -------- | ------ | ---- |
 | 001-phase1-local-bridge | Phase 1 本机桥与教务浏览器验收 | REQ-001..REQ-011、NFR-001..NFR-007 | Implemented（macOS 与 Windows 真机验收通过；`KI-014` 与 `KI-019` 均暂列 `Accepted`，`KI-019` 根因未定、复现时重开） | [spec.md](001-phase1-local-bridge/spec.md) |
 | 002-desktop-ui-multiwindow | 桌面界面重构（React + Ant Design 多窗口） | REQ-001 / REQ-003 / REQ-005 / REQ-009 / REQ-012、NFR-003 / NFR-005 / NFR-007 | Implemented（2026-09-23：实现与可机器执行的验收已完成；仍有 Windows 界面判据及 macOS 进程捕获授权验证项，见 verification.md） | [spec.md](002-desktop-ui-multiwindow/spec.md) |
-| 003-ios-proxy-client-plugins | iOS 代理客户端插件（Stash / Loon） | `IOS-REQ-*`（草案）+ 语义对齐 REQ-002 / REQ-005 / REQ-006 / REQ-007、NFR-002 / NFR-003 | Approved（Gate A 已通过；Stash 首发宿主；GitHub 分发；M1 待启动；见 [spec.md §Status](003-ios-proxy-client-plugins/spec.md)） | [spec.md](003-ios-proxy-client-plugins/spec.md) |
+| 003-ios-proxy-client-plugins | iOS 代理客户端插件（Stash / Loon） | IOS-REQ-* + 语义对齐 REQ-002 / REQ-005 / REQ-006 / REQ-007、NFR-002 / NFR-003 | In Progress（Gate A、M1 与 Stash M2 基础实现已交付；direct Gateway Session reuse、Safe Trace 与真机验证仍待完成；见 [spec.md §Status](003-ios-proxy-client-plugins/spec.md)） | [spec.md](003-ios-proxy-client-plugins/spec.md) |
 
 > 每个 Spec 在此登记一行，并在 [roadmap.md](../docs/planning/roadmap.md) 同步注册；长期事实不属于 Spec。
 
