@@ -267,6 +267,7 @@ export interface SettingsV2 {
   gatewayBase: string;
   builtinSiteStates: Record<string, boolean>;
   customHosts: string[];
+  hostSchemes: Record<string, "http" | "https">;
   debug: boolean;
   wrdKeyOverride?: string;
   wrdIvOverride?: string;
@@ -278,6 +279,7 @@ export interface SettingsPublicDTO {
   schemaVersion: 2;
   builtinSiteStates: Record<string, boolean>;
   customHosts: string[];
+  hostSchemes: Record<string, "http" | "https">;
 }
 
 export interface SettingsUpdateDTO extends SettingsPublicDTO {}

@@ -52,6 +52,24 @@ describe("settings hostname", () => {
     );
     expect(result).toMatchObject({ ok: false, code: "DUPLICATE_HOST" });
   });
+
+  it("keeps an omitted host scheme as HTTP and stores HTTPS only when selected", () => {
+    const omitted = validateSettingsUpdate(
+      { schemaVersion: 2, builtinSiteStates: { jwxt: true }, customHosts: ["resource.swufe.edu.cn"] },
+      BUILTIN_SITES.map((site) => site.host),
+    );
+    expect(omitted).toMatchObject({ ok: true, value: { hostSchemes: {} } });
+    const selected = validateSettingsUpdate(
+      {
+        schemaVersion: 2,
+        builtinSiteStates: { jwxt: true },
+        customHosts: ["resource.swufe.edu.cn"],
+        hostSchemes: { "resource.swufe.edu.cn": "https", "jwxt.swufe.edu.cn": "http" },
+      },
+      BUILTIN_SITES.map((site) => site.host),
+    );
+    expect(selected).toMatchObject({ ok: true, value: { hostSchemes: { "resource.swufe.edu.cn": "https" } } });
+  });
 });
 
 describe("settings migration", () => {

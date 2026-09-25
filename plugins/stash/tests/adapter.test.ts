@@ -55,7 +55,7 @@ describe("Stash adapter", () => {
     handleStashRequest(next);
     expect(next.requests[0]).toMatchObject({ decision: "rewrite" });
     expect(JSON.stringify(next.requests[0])).toContain("route=fake");
-    expect(JSON.stringify(next.requests[0])).toContain("webvpn.swufe.edu.cn/https/");
+    expect(JSON.stringify(next.requests[0])).toContain("webvpn.swufe.edu.cn/http/");
   });
 
   it("routes the plain-HTTP jwxt entry through the gateway HTTP namespace", () => {
@@ -147,12 +147,12 @@ describe("Stash adapter", () => {
     const rewritten = other.requests[0] as { url: string };
     rt.response = { status: 302, headers: { location: rewritten.url }, body: "" };
     handleStashResponse(rt);
-    expect(rt.responses[0]).toMatchObject({ headers: { location: "https://jwxt.swufe.edu.cn/xtgl/index_initMenu.html" } });
+    expect(rt.responses[0]).toMatchObject({ headers: { location: "http://jwxt.swufe.edu.cn/xtgl/index_initMenu.html" } });
   });
 
   it("does not emit a redirect whose target is the current browser URL", () => {
     const rt = runtime({
-      request: { url: "https://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
+      request: { url: "http://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
     });
     rt.store[STORAGE_KEYS.session] = JSON.stringify({
       schemaVersion: 1,
@@ -184,7 +184,7 @@ describe("Stash adapter", () => {
     });
     handleStashRequest(req);
     const rewritten = req.requests[0] as { url: string };
-    expect(rewritten.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn\/https\//);
+    expect(rewritten.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn\/http\//);
     const res = runtime({
       request: { url: rewritten.url, method: "GET", headers: {} },
       response: {

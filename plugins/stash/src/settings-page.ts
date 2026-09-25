@@ -11,9 +11,11 @@ export const SETTINGS_PAGE_HTML = `<!DOCTYPE html>
   h1 { font-size: 22px; margin: 0 0 12px; }
   section { background: var(--card); border-radius: 12px; margin: 0 0 16px; overflow: hidden; }
   .row, label.row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .row > span:first-child { flex: 1; }
   .row:last-child { border-bottom: 0; }
   .meta { color: var(--muted); font-size: 13px; }
-  button, input { font: inherit; }
+  button, input, select { font: inherit; }
+  select { border: 0; background: transparent; color: inherit; }
   button { border: 0; background: transparent; color: #007aff; padding: 12px 14px; }
   input { flex: 1; border: 0; background: transparent; color: inherit; min-width: 0; }
   .error { color: var(--bad); font-size: 13px; padding: 0 14px 12px; }
@@ -40,7 +42,7 @@ export const SETTINGS_PAGE_HTML = `<!DOCTYPE html>
 <script>
 const origin = "https://webvpn.swufe.edu.cn";
 const api = origin + "/__swufe_bridge__/api/settings";
-const state = { token: "", builtin: { jwxt: true }, custom: [], status: "logged-out" };
+const state = { token: "", builtin: { jwxt: true }, custom: [], schemes: {}, status: "logged-out" };
 const statusText = { "logged-in": "已登录", "logged-out": "未登录", expired: "会话已失效", incompatible: "插件需要更新" };
 function show(id, text, kind) {
   const node = document.getElementById(id);
@@ -48,11 +50,27 @@ function show(id, text, kind) {
   node.textContent = text || "";
   if (kind) node.className = "banner " + kind;
 }
+function schemeSelect(host) {
+  const select = document.createElement("select");
+  select.setAttribute("aria-label", host + " 协议");
+  for (const scheme of ["http", "https"]) {
+    const option = document.createElement("option");
+    option.value = scheme;
+    option.textContent = scheme;
+    select.append(option);
+  }
+  select.value = state.schemes[host] === "https" ? "https" : "http";
+  select.addEventListener("change", () => {
+    if (select.value === "https") state.schemes[host] = "https";
+    else delete state.schemes[host];
+  });
+  return select;
+}
 function render() {
   document.getElementById("status").textContent = "状态：" + (statusText[state.status] || "未登录");
   const builtin = document.getElementById("builtin");
   builtin.replaceChildren();
-  const row = document.createElement("label");
+  const row = document.createElement("div");
   row.className = "row";
   const text = document.createElement("span");
   text.append(document.createTextNode("教务系统"));
@@ -66,7 +84,7 @@ function render() {
   toggle.checked = state.builtin.jwxt === true;
   toggle.setAttribute("aria-label", "教务系统");
   toggle.addEventListener("change", () => { state.builtin.jwxt = toggle.checked; });
-  row.append(text, toggle);
+  row.append(text, schemeSelect("jwxt.swufe.edu.cn"), toggle);
   builtin.append(row);
   const custom = document.getElementById("custom");
   custom.replaceChildren();
@@ -78,8 +96,8 @@ function render() {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = "删除";
-    remove.addEventListener("click", () => { state.custom.splice(index, 1); render(); });
-    item.append(name, remove);
+    remove.addEventListener("click", () => { state.custom.splice(index, 1); delete state.schemes[host]; render(); });
+    item.append(name, schemeSelect(host), remove);
     custom.append(item);
   });
 }
@@ -93,6 +111,7 @@ async function load() {
   state.token = body.token || "";
   state.builtin = body.data.settings.builtinSiteStates;
   state.custom = body.data.settings.customHosts.slice();
+  state.schemes = body.data.settings.hostSchemes || {};
   state.status = body.data.status;
   show("warning", body.data.migrationWarnings && body.data.migrationWarnings.length ? "部分旧网站设置不再受支持，请检查当前列表" : "");
   render();
@@ -114,7 +133,7 @@ document.getElementById("save").addEventListener("click", async () => {
   const response = await fetch(api, {
     method: "POST",
     headers: { "content-type": "application/json", "x-swufe-settings-token": state.token },
-    body: JSON.stringify({ schemaVersion: 2, builtinSiteStates: state.builtin, customHosts: state.custom })
+    body: JSON.stringify({ schemaVersion: 2, builtinSiteStates: state.builtin, customHosts: state.custom, hostSchemes: state.schemes })
   });
   const body = await response.json().catch(() => ({}));
   if (response.ok && body.ok) {

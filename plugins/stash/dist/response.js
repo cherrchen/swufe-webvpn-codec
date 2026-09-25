@@ -1,4 +1,4 @@
-/* swufe-webvpn stash e52bd49 */
+/* swufe-webvpn stash 909a8b9 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1009,7 +1009,7 @@
     }
     let wrdUrl;
     try {
-      wrdUrl = codec.encodeUrl(request.url, settings.gatewayBase);
+      wrdUrl = codec.encodeUrl(urlForHostScheme(request.url, route.originalHost, settings.hostSchemes), settings.gatewayBase);
     } catch (error) {
       if (error instanceof CodecError) {
         return { kind: "error", code: "CODEC_FAILED" };
@@ -1031,6 +1031,19 @@
         gatewayOwned: false
       }
     };
+  }
+  function urlForHostScheme(url, host, schemes) {
+    if (!schemes) return url;
+    const wanted = schemes[host] === "https" ? "https:" : "http:";
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return url;
+    }
+    if (parsed.protocol === wanted) return url;
+    parsed.protocol = wanted;
+    return parsed.toString();
   }
   function wrdPrefixOf(wrdUrl) {
     const path = new URL(wrdUrl).pathname.replace(/^\/+/, "");
@@ -1097,7 +1110,7 @@
       return;
     }
     try {
-      setHeader(headers, "referer", codec.encodeUrl(referer, settings.gatewayBase));
+      setHeader(headers, "referer", codec.encodeUrl(urlForHostScheme(referer, refererHost, settings.hostSchemes), settings.gatewayBase));
     } catch (error) {
       if (error instanceof CodecError) {
         return;
@@ -1542,6 +1555,7 @@
       gatewayBase: SETTINGS_ORIGIN,
       builtinSiteStates: { jwxt: true },
       customHosts: [],
+      hostSchemes: {},
       debug: false,
       bodyRewriteMaxBytes: DEFAULT_BODY_REWRITE_MAX_BYTES,
       migrationWarnings: []
@@ -1596,6 +1610,7 @@
       wrdKey: settings.wrdKeyOverride ?? DEFAULT_KEY,
       wrdIv: settings.wrdIvOverride ?? DEFAULT_IV,
       routing: compileRoutingPolicy(settings),
+      hostSchemes: settings.hostSchemes,
       debug: settings.debug,
       bodyRewriteMaxBytes: settings.bodyRewriteMaxBytes
     };
@@ -1624,6 +1639,7 @@
       gatewayBase: v1.gatewayBase,
       builtinSiteStates,
       customHosts,
+      hostSchemes: {},
       debug: v1.debug,
       ...v1.wrdKeyOverride ? { wrdKeyOverride: v1.wrdKeyOverride } : {},
       ...v1.wrdIvOverride ? { wrdIvOverride: v1.wrdIvOverride } : {},
@@ -1654,6 +1670,17 @@
     } catch {
       return false;
     }
+  }
+  function readHostSchemes(value, allowedHosts) {
+    if (value === void 0) return {};
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const out = {};
+    for (const [key, scheme] of Object.entries(value)) {
+      if (!allowedHosts.includes(key)) continue;
+      if (scheme !== "http" && scheme !== "https") return null;
+      if (scheme === "https") out[key] = "https";
+    }
+    return out;
   }
   function persistOrFailClosed(kv2, settings) {
     if (!kv2.write(STORAGE_KEYS.settingsV2, JSON.stringify(settings))) {
@@ -1695,6 +1722,9 @@
       if (!checked.ok || customHosts.includes(checked.value) || BUILTIN_SITES.some((site) => site.host === checked.value)) return null;
       customHosts.push(checked.value);
     }
+    const allowedHosts = [...BUILTIN_SITES.map((site) => site.host), ...customHosts];
+    const hostSchemes = record.hostSchemes === void 0 ? {} : readHostSchemes(record.hostSchemes, allowedHosts);
+    if (!hostSchemes) return null;
     const maxBytes = record.bodyRewriteMaxBytes;
     if (typeof maxBytes !== "number" || !Number.isFinite(maxBytes) || maxBytes <= 0) return null;
     const settings = {
@@ -1703,6 +1733,7 @@
       gatewayBase: record.gatewayBase,
       builtinSiteStates,
       customHosts,
+      hostSchemes,
       debug: record.debug === true,
       bodyRewriteMaxBytes: maxBytes,
       migrationWarnings: record.migrationWarnings === void 0 ? [] : []

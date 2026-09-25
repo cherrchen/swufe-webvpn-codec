@@ -55,6 +55,23 @@ describe("IOS-TC-D request rewrite", () => {
     expect(decision.context.gatewayOwned).toBe(false);
   });
 
+  it("uses the configured host scheme instead of the browser scheme", () => {
+    const httpDecision = rewriteRequest(
+      { url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} },
+      settings({ hostSchemes: {} }),
+      SESSION,
+      NOW,
+    );
+    const httpsDecision = rewriteRequest(
+      { url: "http://jwxt.swufe.edu.cn/", method: "GET", headers: {} },
+      settings({ hostSchemes: { "jwxt.swufe.edu.cn": "https" } }),
+      SESSION,
+      NOW,
+    );
+    expect(httpDecision.kind === "rewrite" && httpDecision.url).toContain("/http/");
+    expect(httpsDecision.kind === "rewrite" && httpsDecision.url).toContain("/https/");
+  });
+
   it("D02 allowlist without session asks for login", () => {
     expect(
       rewriteRequest({ url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} }, settings(), null, NOW).kind,

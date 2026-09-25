@@ -149,6 +149,7 @@ Session 若无法安全迁移，直接清除并要求重新登录，不猜测转
   "gatewayBase": "https://webvpn.swufe.edu.cn",
   "builtinSiteStates": { "jwxt": true },
   "customHosts": [],
+  "hostSchemes": {},
   "debug": false,
   "bodyRewriteMaxBytes": 1048576,
   "migrationWarnings": []
@@ -178,4 +179,4 @@ Session 若无法安全迁移，直接清除并要求重新登录，不猜测转
 
 ## 17. 默认与敏感性
 
-默认 `builtinSiteStates.jwxt = true`，`customHosts = []`，无 wildcard routing。Settings API 返回 public Settings DTO 时不包含 WRD key/iv overrides。敏感性：站点选择为低敏感；CSRF nonce 为短期本机秘密；WebVPN Cookie 仍是独立高敏感 `swufe.session.v1`。
+默认 `builtinSiteStates.jwxt = true`，`customHosts = []`，`hostSchemes = {}`，无 wildcard routing。`hostSchemes` 只保存显式选择的 `https`；缺省项在改写时使用 HTTP，因此新增域名不必逐个填写协议。Settings API 返回 public Settings DTO 时不包含 WRD key/iv overrides。敏感性：站点选择为低敏感；CSRF nonce 为短期本机秘密；WebVPN Cookie 仍是独立高敏感 `swufe.session.v1`。

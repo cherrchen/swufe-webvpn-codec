@@ -31,12 +31,15 @@ export const BUILTIN_SITES: readonly BuiltinSite[] = [
   { id: "jwxt", name: "教务系统", host: "jwxt.swufe.edu.cn" },
 ];
 
+export type HostScheme = "http" | "https";
+
 export interface SettingsV2 {
   schemaVersion: 2;
   enabled: boolean;
   gatewayBase: string;
   builtinSiteStates: Record<string, boolean>;
   customHosts: string[];
+  hostSchemes: Record<string, HostScheme>;
   debug: boolean;
   wrdKeyOverride?: string;
   wrdIvOverride?: string;
@@ -48,6 +51,7 @@ export interface SettingsPublicDTO {
   schemaVersion: 2;
   builtinSiteStates: Record<string, boolean>;
   customHosts: string[];
+  hostSchemes: Record<string, HostScheme>;
 }
 
 export interface SettingsPageDTO {
@@ -112,6 +116,7 @@ export function defaultSettingsV2(): SettingsV2 {
     gatewayBase: SETTINGS_ORIGIN,
     builtinSiteStates: { jwxt: true },
     customHosts: [],
+    hostSchemes: {},
     debug: false,
     bodyRewriteMaxBytes: DEFAULT_BODY_REWRITE_MAX_BYTES,
     migrationWarnings: [],
@@ -169,6 +174,7 @@ export function toRewriteSettingsFromV2(settings: SettingsV2): RewriteSettings {
     wrdKey: settings.wrdKeyOverride ?? DEFAULT_KEY,
     wrdIv: settings.wrdIvOverride ?? DEFAULT_IV,
     routing: compileRoutingPolicy(settings),
+    hostSchemes: settings.hostSchemes,
     debug: settings.debug,
     bodyRewriteMaxBytes: settings.bodyRewriteMaxBytes,
   };
@@ -198,6 +204,7 @@ export function migrateV1ToV2(v1: PluginSettingsV1): SettingsV2 {
     gatewayBase: v1.gatewayBase,
     builtinSiteStates,
     customHosts,
+    hostSchemes: {},
     debug: v1.debug,
     ...(v1.wrdKeyOverride ? { wrdKeyOverride: v1.wrdKeyOverride } : {}),
     ...(v1.wrdIvOverride ? { wrdIvOverride: v1.wrdIvOverride } : {}),
@@ -226,7 +233,7 @@ export function loadSettingsV2(kv: KeyValueStore): LoadedSettings {
 export function toPublicSettings(settings: SettingsV2): SettingsPublicDTO {
   const builtinSiteStates: Record<string, boolean> = {};
   for (const site of BUILTIN_SITES) builtinSiteStates[site.id] = settings.builtinSiteStates[site.id] === true;
-  return { schemaVersion: 2, builtinSiteStates, customHosts: [...settings.customHosts] };
+  return { schemaVersion: 2, builtinSiteStates, customHosts: [...settings.customHosts], hostSchemes: { ...settings.hostSchemes } };
 }
 
 export function pageFromSettings(settings: SettingsV2, status: SettingsPageDTO["status"]): SettingsPageDTO {
@@ -264,9 +271,11 @@ export function validateSettingsUpdate(input: unknown, catalogHosts: string[]): 
     }
     customHosts.push(checked.value);
   }
+  const schemes = readHostSchemes(record.hostSchemes, [...catalogHosts, ...customHosts]);
+  if (!schemes) return { ok: false, code: "INVALID_SETTINGS" };
   return {
     ok: true,
-    value: { schemaVersion: 2, builtinSiteStates, customHosts },
+    value: { schemaVersion: 2, builtinSiteStates, customHosts, hostSchemes: schemes },
     normalizedHosts: customHosts,
   };
 }
@@ -368,10 +377,23 @@ function settingsPost(
     schemaVersion: 2,
     builtinSiteStates: update.value.builtinSiteStates,
     customHosts: update.value.customHosts,
+    hostSchemes: update.value.hostSchemes,
     migrationWarnings: [],
   };
   if (!dependencies.kv.write(STORAGE_KEYS.settingsV2, JSON.stringify(next))) return json(500, "STORAGE_FAILED");
   return { status: 200, headers: jsonHeaders(), body: JSON.stringify({ ok: true }) };
+}
+
+function readHostSchemes(value: unknown, allowedHosts: string[]): Record<string, HostScheme> | null {
+  if (value === undefined) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const out: Record<string, HostScheme> = {};
+  for (const [key, scheme] of Object.entries(value as Record<string, unknown>)) {
+    if (!allowedHosts.includes(key)) continue;
+    if (scheme !== "http" && scheme !== "https") return null;
+    if (scheme === "https") out[key] = "https";
+  }
+  return out;
 }
 
 function persistOrFailClosed(kv: KeyValueStore, settings: SettingsV2): LoadedSettings {
@@ -415,6 +437,9 @@ function parseStoredV2(raw: string): SettingsV2 | "incompatible" | null {
     if (!checked.ok || customHosts.includes(checked.value) || BUILTIN_SITES.some((site) => site.host === checked.value)) return null;
     customHosts.push(checked.value);
   }
+  const allowedHosts = [...BUILTIN_SITES.map((site) => site.host), ...customHosts];
+  const hostSchemes = record.hostSchemes === undefined ? {} : readHostSchemes(record.hostSchemes, allowedHosts);
+  if (!hostSchemes) return null;
   const maxBytes = record.bodyRewriteMaxBytes;
   if (typeof maxBytes !== "number" || !Number.isFinite(maxBytes) || maxBytes <= 0) return null;
   const settings: SettingsV2 = {
@@ -423,6 +448,7 @@ function parseStoredV2(raw: string): SettingsV2 | "incompatible" | null {
     gatewayBase: record.gatewayBase,
     builtinSiteStates,
     customHosts,
+    hostSchemes,
     debug: record.debug === true,
     bodyRewriteMaxBytes: maxBytes,
     migrationWarnings: record.migrationWarnings === undefined ? [] : [],

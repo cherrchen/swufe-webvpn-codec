@@ -26,6 +26,7 @@ export interface RewriteSettings {
   routing: RoutingPolicy;
   debug: boolean;
   bodyRewriteMaxBytes?: number;
+  hostSchemes?: Record<string, "http" | "https">;
 }
 
 export interface RequestRewriteContext {
@@ -106,7 +107,7 @@ export function rewriteRequest(
 
   let wrdUrl: string;
   try {
-    wrdUrl = codec.encodeUrl(request.url, settings.gatewayBase);
+    wrdUrl = codec.encodeUrl(urlForHostScheme(request.url, route.originalHost, settings.hostSchemes), settings.gatewayBase);
   } catch (error) {
     if (error instanceof CodecError) {
       return { kind: "error", code: "CODEC_FAILED" };
@@ -129,6 +130,20 @@ export function rewriteRequest(
       gatewayOwned: false,
     },
   };
+}
+
+function urlForHostScheme(url: string, host: string, schemes: RewriteSettings["hostSchemes"]): string {
+  if (!schemes) return url;
+  const wanted = schemes[host] === "https" ? "https:" : "http:";
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (parsed.protocol === wanted) return url;
+  parsed.protocol = wanted;
+  return parsed.toString();
 }
 
 export function wrdPrefixOf(wrdUrl: string): string {
@@ -214,7 +229,7 @@ function rewriteReferer(
     return;
   }
   try {
-    setHeader(headers, "referer", codec.encodeUrl(referer, settings.gatewayBase));
+    setHeader(headers, "referer", codec.encodeUrl(urlForHostScheme(referer, refererHost, settings.hostSchemes), settings.gatewayBase));
   } catch (error) {
     if (error instanceof CodecError) {
       return;
