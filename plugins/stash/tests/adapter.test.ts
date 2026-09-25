@@ -130,6 +130,50 @@ describe("Stash adapter", () => {
     expect(output).not.toMatch(/secret-ticket|%2Fsecret|service=https|cookieHeader=|\/http\/[a-z0-9]+/);
   });
 
+  it("logs correlated, redacted POST metadata and classifies wrapped JSON responses", () => {
+    const logs: string[] = [];
+    const rt = runtime({
+      request: {
+        url: "http://jwxt.swufe.edu.cn/campusapp/api/lanapi/login/signin",
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "content-length": "430",
+          "user-agent": "SciyardApp--HttpRequest",
+          cookie: "route=route-secret; app=app-secret",
+          authorization: "Bearer auth-secret",
+        },
+        body: "username=user-secret&password=password-secret&token=token-secret",
+      },
+      debug: (record) => logs.push(JSON.stringify(record)),
+    });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=ticket-secret; route=gateway-route-secret`, capturedAt: NOW, lastConfirmedAt: NOW, expiresAt: null, status: "valid" });
+    handleStashRequest(rt);
+    const rewritten = rt.requests[0] as { decision: string; url: string; headers: Record<string, string> };
+    expect(rewritten.decision).toBe("rewrite");
+    const requestLines = logs.join("\n");
+    expect(requestLines).toContain("method=POST");
+    expect(requestLines).toContain("originalPath=/campusapp/api/lanapi/login/signin");
+    expect(requestLines).toContain("contentLengthHeader=430");
+    expect(requestLines).toContain("bodyLength=");
+    expect(requestLines).toContain("userAgentClass=SciyardApp");
+    expect(requestLines).toContain("gatewayTicketCookiePresent=yes");
+    expect(requestLines).toContain("requestBodyPreserved=unknown");
+    expect(requestLines).not.toMatch(/user-secret|password-secret|token-secret|ticket-secret|gateway-route-secret|auth-secret|app-secret/);
+
+    rt.request = { url: rewritten.url, method: "POST", headers: rewritten.headers, body: "username=user-secret&password=password-secret&token=token-secret" };
+    rt.response = { status: 200, headers: { "content-type": "application/json", "set-cookie": "JSESSIONID=app-session-secret; Path=/; HttpOnly, route=gateway-route-secret; Path=/" }, body: '{"code":401,"message":"rejected"}' };
+    handleStashResponse(rt);
+    const responseLines = logs.join("\n");
+    expect(responseLines).toMatch(/trace=[a-z0-9]+ status=200/);
+    expect(responseLines).toContain("bodyKind=json");
+    expect(responseLines).toContain("bodyOriginGuess=upstream-api");
+    expect(responseLines).toContain("applicationSetCookieNames=[JSESSIONID]");
+    expect(responseLines).toContain("gatewaySetCookieNames=[route]");
+    expect(responseLines).toContain("applicationSessionCandidate=present");
+    expect(responseLines).not.toContain("app-session-secret");
+  });
+
   it("rotates a gateway ticket and clears it only on an explicit deletion", () => {
     const logs: string[] = [];
     const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/http/opaque/path", headers: { cookie: `${TICKET_COOKIE_NAME}=A` } }, response: { status: 200, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=B; Max-Age=3600` } }, debug: (record) => logs.push(JSON.stringify(record)) });

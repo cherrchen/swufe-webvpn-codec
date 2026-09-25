@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 0bc1702 */
+/* swufe-webvpn stash 70781d4 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1902,6 +1902,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
 
   // src/adapter.ts
   var NOTIFY_GAP_MS = 6e4;
+  var DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
   function handleStashRequest(runtime) {
     if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
       try {
@@ -1954,6 +1955,8 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       runtime.finishRequest({ decision: "pass" });
       return;
     }
+    const traceId = diagnosticTrace(runtime);
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host: safeHost(request.url), direction: "request", action: "entered", detail: `trace=${traceId} request-enter ${requestMetadata(request)}` });
     const decision = rewriteRequest(
       {
         url: request.url,
@@ -1966,7 +1969,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       runtime.nowIso
     );
     const host = safeHost(request.url);
-    const detail = authTraceDetail(request.url, rewriteSettings, session, request.headers, decision.kind, clockExpired);
+    const detail = `${authTraceDetail(request.url, rewriteSettings, session, request.headers, decision.kind, clockExpired)} ${requestMetadata(request)}`;
     if (decision.kind === "capture_session") {
       const next = session ? applyNewerCookie(session, decision.session) : decision.session;
       store.save(next);
@@ -1991,7 +1994,11 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       return;
     }
     if (decision.kind === "rewrite") {
-      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail });
+      const decoded = deriveRewriteContext(decision.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv);
+      const bodyPreserved = "unknown";
+      const gwCookies = gatewayCookieNames(decision.headers);
+      savePendingTrace(runtime, { traceId, method: request.method ?? "GET", host: decoded?.originalHost ?? host, path: safePath(request.url), at: runtime.nowIso });
+      emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail: `trace=${traceId} targetHost=${safeHost(decision.url) ?? "-"} targetScheme=${schemeOf(decision.url)} rewrittenPathShape=/${wrappedSchemeOf(decision.url)}/<wrd>/... decodedOriginalHost=${decoded?.originalHost ?? "-"} gatewayKind=wrapped-resource gatewayCookiePresent=${gwCookies.length ? "yes" : "no"} gatewayCookieNames=[${gwCookies.join(",")}] gatewayTicketCookiePresent=${gwCookies.some((n) => n.startsWith("wengine_vpn_ticket")) ? "yes" : "no"} routeCookiePresent=${gwCookies.includes("route") ? "yes" : "no"} requestBodyPreserved=${bodyPreserved} ${detail}` });
       runtime.finishRequest({ decision: "rewrite", url: decision.url, headers: decision.headers });
       return;
     }
@@ -2201,6 +2208,43 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     } catch {
       return null;
     }
+  }
+  function requestMetadata(request) {
+    const method = (request.method ?? "GET").toUpperCase();
+    const length = byteLength(request.body);
+    const ua = header(request.headers, "user-agent") ?? "";
+    const uaClass = /sciyardapp/i.test(ua) ? "SciyardApp" : /safari/i.test(ua) ? "Safari" : /webview|wv\)/i.test(ua) ? "WebView" : ua ? "other" : "unknown";
+    return `method=${method} originalHost=${safeHost(request.url) ?? "-"} originalPath=${safePath(request.url)} originalScheme=${schemeOf(request.url)} contentType=${header(request.headers, "content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown"} contentLengthHeader=${header(request.headers, "content-length") ?? "unknown"} bodyPresent=${length === null ? "unknown" : length > 0 ? "yes" : "no"} bodyLength=${length ?? "unknown"} bodyHash=unavailable userAgentClass=${uaClass} requestCookieNames=[${cookieNames(request.headers).join(",")}]`;
+  }
+  function cookieNames(headers) {
+    const raw = header(headers, "cookie") ?? "";
+    return raw.split(";").map((part) => part.trim().split("=", 1)[0]?.trim()).filter((name) => !!name);
+  }
+  function gatewayCookieNames(headers) {
+    return cookieNames(headers).filter((name) => /^(route|refresh|heartbeat|show_faq|show_vpn|wengine_vpn_ticket)/i.test(name));
+  }
+  function byteLength(body) {
+    if (body === void 0) return null;
+    if (body instanceof Uint8Array) return body.byteLength;
+    return new TextEncoder().encode(body).byteLength;
+  }
+  function safePath(url) {
+    try {
+      return new URL(url).pathname;
+    } catch {
+      return "-";
+    }
+  }
+  function diagnosticTrace(runtime) {
+    const cryptoObj = globalThis.crypto;
+    try {
+      if (cryptoObj?.randomUUID) return cryptoObj.randomUUID().replace(/-/g, "").slice(0, 12);
+    } catch {
+    }
+    return `${Date.parse(runtime.nowIso).toString(36)}${Math.random().toString(36).slice(2, 7)}`.slice(-12);
+  }
+  function savePendingTrace(runtime, pending) {
+    runtime.write(DIAGNOSTIC_TRACE_KEY, JSON.stringify(pending));
   }
   function safeHost(url) {
     try {

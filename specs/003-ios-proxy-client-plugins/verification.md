@@ -212,6 +212,14 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 ## 未验证 / 无法验证项
 
+### Stash 请求诊断（2026-09-25）
+
+request/response 脚本新增安全摘要：每个被处理请求生成短 trace id；rewrite 请求把该 id 暂存供 response 脚本关联。POST body 仅记录存在性与 UTF-8 字节长度，当前 Stash `$done({url, headers})` 接口看不到改写后的 body，因此 `requestBodyPreserved=unknown`，不计算 body hash。此暂存关联只保留最近一条待响应记录；并发同路径请求可能无法可靠配对，日志不得据此认定关联成功，需结合时间、method、host/path核对。
+
+响应摘要记录 body 类型与长度、Content-Type、Set-Cookie 名称及启发式来源分类。`bodyOriginGuess=upstream-api` 只表示 wrapped-resource JSON 的启发式判断，不证明响应一定由 bctest 生成；`applicationSessionCandidate` 也只表示响应出现疑似应用 Cookie 名，不代表 session 有效。Cookie、Set-Cookie、Authorization、UA 原文及请求/响应正文不得进入日志。
+
+本地自动化覆盖：`plugins/stash/tests/adapter.test.ts` 的安全 POST/响应摘要用例；Stash 真机验证仍未执行。真机步骤：打开 Stash 独立脚本日志，保持 WebVPN 已登录，在 Sciyard App 执行一次登录，回传同一 trace 的 `request-enter`、`rewrite` 与 `response` 行，以及随后一条 bctest 请求行。不要回传请求或响应正文、Cookie 值或 Authorization。
+
 | 项 | 原因 | 已尝试 | 需要的动作 |
 | --- | --- | --- | --- |
 | openUrl App 内呈现 | 2026-09-24 两边都打开系统 Safari | Loon 3.5.1(998) 通知；Stash Tile | 已记录。Stash 版本未记 |

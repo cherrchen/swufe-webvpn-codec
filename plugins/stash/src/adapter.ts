@@ -39,11 +39,12 @@ import {
 import { SETTINGS_PAGE_HTML } from "./settings-page.ts";
 
 const NOTIFY_GAP_MS = 60_000;
+const DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
 
 export interface StashRuntime {
   nowIso: string;
-  request?: { url: string; method?: string; headers?: Record<string, string>; body?: string };
-  response?: { status?: number; headers?: Record<string, string>; body?: string };
+  request?: { url: string; method?: string; headers?: Record<string, string>; body?: string | Uint8Array };
+  response?: { status?: number; headers?: Record<string, string>; body?: string | Uint8Array };
   read(key: string): string | null;
   write(key: string, value: string | null): boolean;
   notify(input: NotificationDTO): void;
@@ -117,6 +118,8 @@ export function handleStashRequest(runtime: StashRuntime): void {
     runtime.finishRequest({ decision: "pass" });
     return;
   }
+  const traceId = diagnosticTrace(runtime);
+  emit(runtime, settings.debug, { ts: runtime.nowIso, host: safeHost(request.url), direction: "request", action: "entered", detail: `trace=${traceId} request-enter ${requestMetadata(request)}` });
   const decision = rewriteRequest(
     {
       url: request.url,
@@ -129,7 +132,7 @@ export function handleStashRequest(runtime: StashRuntime): void {
     runtime.nowIso,
   );
   const host = safeHost(request.url);
-  const detail = authTraceDetail(request.url, rewriteSettings, session, request.headers, decision.kind, clockExpired);
+  const detail = `${authTraceDetail(request.url, rewriteSettings, session, request.headers, decision.kind, clockExpired)} ${requestMetadata(request)}`;
   if (decision.kind === "capture_session") {
     const next = session ? applyNewerCookie(session, decision.session) : decision.session;
     store.save(next);
@@ -154,7 +157,11 @@ export function handleStashRequest(runtime: StashRuntime): void {
     return;
   }
   if (decision.kind === "rewrite") {
-    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail });
+    const decoded = deriveRewriteContext(decision.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv);
+    const bodyPreserved = "unknown"; // Stash's $done({url, headers}) does not expose the post-rewrite request body.
+    const gwCookies = gatewayCookieNames(decision.headers);
+    savePendingTrace(runtime, { traceId, method: request.method ?? "GET", host: decoded?.originalHost ?? host, path: safePath(request.url), at: runtime.nowIso });
+    emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail: `trace=${traceId} targetHost=${safeHost(decision.url) ?? "-"} targetScheme=${schemeOf(decision.url)} rewrittenPathShape=/${wrappedSchemeOf(decision.url)}/<wrd>/... decodedOriginalHost=${decoded?.originalHost ?? "-"} gatewayKind=wrapped-resource gatewayCookiePresent=${gwCookies.length ? "yes" : "no"} gatewayCookieNames=[${gwCookies.join(",")}] gatewayTicketCookiePresent=${gwCookies.some((n) => n.startsWith("wengine_vpn_ticket")) ? "yes" : "no"} routeCookiePresent=${gwCookies.includes("route") ? "yes" : "no"} requestBodyPreserved=${bodyPreserved} ${detail}` });
     runtime.finishRequest({ decision: "rewrite", url: decision.url, headers: decision.headers });
     return;
   }
@@ -193,6 +200,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
   const rewriteSettings = toRewriteSettingsFromV2(settings);
   const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv)
     ?? deriveOriginalRequestContext(runtime, rewriteSettings);
+  const traceId = takePendingTrace(runtime, context?.originalHost ?? safeHost(runtime.request.url), safePath(context?.originalUrl ?? runtime.request.url), runtime.request.method ?? "GET") ?? diagnosticTrace(runtime);
   // After a browser navigation has reached the WebVPN URL, its bootstrap
   // document must be served as-is. Promoting it to the same URL loops forever.
   if (context && !context.gatewayOwned && isNativeGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
@@ -201,7 +209,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
       host: safeHost(runtime.request.url),
       direction: "response",
       action: "pass",
-      detail: responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession),
+      detail: `trace=${traceId} ${responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession)}`,
     });
     runtime.finishResponse({});
     return;
@@ -216,7 +224,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
     rewriteSettings,
   );
   const host = context?.originalHost ?? safeHost(runtime.request.url);
-  const detail = responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession);
+  const detail = `trace=${traceId} ${responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession)}`;
   const store = createSessionStore(kv(runtime));
   const session = store.load();
   const confirmedExpiry = result.sessionExpired && session?.status === "valid";
@@ -613,7 +621,97 @@ function responseDetail(response: NonNullable<StashRuntime["response"]>, request
       : responseTicket === storedTicket ? "same" : "different";
   const authKind = locationHost === "authserver.swufe.edu.cn" ? "raw-authserver"
     : wrapped?.originalHost === "authserver.swufe.edu.cn" ? "wrapped-authserver" : "none";
-  return `status=${response.status ?? 0} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} targetScheme=${requestGatewayKind === "wrapped-resource" ? wrappedSchemeOf(requestUrl) : "-"} responseVisibleTicket=${responseVisibleTicket} responseTicketRelation=${responseTicketRelation} ticketSetCookie=${ticketEvent} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationGatewaySignal=${locationGatewaySignal} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
+  const cookieInfo = classifySetCookie(response.headers ?? {});
+  const body = response.body;
+  const bodyLength = byteLength(body);
+  const contentType = header(response.headers, "content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown";
+  const bodyKind = classifyBody(contentType, body);
+  const origin = classifyResponseOrigin(contentType, bodyKind, requestGatewayKind, locationHost, authKind, body);
+  const status = response.status ?? 0;
+  const responseClass = status >= 300 && status < 400 && authKind !== "none" ? "redirect-auth"
+    : origin.kind === "gateway-auth" ? "redirect-auth"
+      : origin.kind === "gateway-html" ? "gateway-html"
+        : origin.kind === "upstream-api" ? "upstream-json"
+          : origin.kind === "upstream-html" ? "upstream-html"
+            : status >= 200 && status < 300 ? "success-http" : "unknown";
+  return `status=${status} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} targetScheme=${requestGatewayKind === "wrapped-resource" ? wrappedSchemeOf(requestUrl) : "-"} responseVisibleTicket=${responseVisibleTicket} responseTicketRelation=${responseTicketRelation} ticketSetCookie=${ticketEvent} gatewaySessionRefresh=${ticketEvent === "new" || ticketEvent === "rotated" ? "yes" : "no"} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationGatewaySignal=${locationGatewaySignal} locationAuth=${authKind} contentType=${contentType} contentLength=${header(response.headers, "content-length") ?? (bodyLength === null ? "unknown" : bodyLength)} bodyPresent=${bodyLength === null ? "unknown" : bodyLength > 0 ? "yes" : "no"} bodyLength=${bodyLength ?? "unknown"} bodyKind=${bodyKind} bodyOriginGuess=${origin.kind} bodyOriginGuessReason=${origin.reason} responseClass=${responseClass} setCookiePresent=${cookieInfo.all.length ? "yes" : "no"} setCookieNames=[${cookieInfo.all.join(",")}] gatewaySetCookieNames=[${cookieInfo.gateway.join(",")}] applicationSetCookieNames=[${cookieInfo.application.join(",")}] unknownSetCookieNames=[${cookieInfo.unknown.join(",")}] applicationSessionCandidate=${cookieInfo.application.length ? "present" : cookieInfo.unknown.length ? "unknown" : "missing"} location=${locationUrl ? "present" : "none"} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
+}
+
+function requestMetadata(request: NonNullable<StashRuntime["request"]>): string {
+  const method = (request.method ?? "GET").toUpperCase();
+  const length = byteLength(request.body);
+  const ua = header(request.headers, "user-agent") ?? "";
+  const uaClass = /sciyardapp/i.test(ua) ? "SciyardApp" : /safari/i.test(ua) ? "Safari" : /webview|wv\)/i.test(ua) ? "WebView" : ua ? "other" : "unknown";
+  return `method=${method} originalHost=${safeHost(request.url) ?? "-"} originalPath=${safePath(request.url)} originalScheme=${schemeOf(request.url)} contentType=${header(request.headers, "content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown"} contentLengthHeader=${header(request.headers, "content-length") ?? "unknown"} bodyPresent=${length === null ? "unknown" : length > 0 ? "yes" : "no"} bodyLength=${length ?? "unknown"} bodyHash=unavailable userAgentClass=${uaClass} requestCookieNames=[${cookieNames(request.headers).join(",")}]`;
+}
+
+function classifyBody(contentType: string, body: string | Uint8Array | undefined): string {
+  if (!body || byteLength(body) === 0) return "empty";
+  if (contentType.includes("json")) return "json";
+  const text = typeof body === "string" ? body.trimStart().slice(0, 256).toLowerCase() : "";
+  if (contentType === "text/html" || text.startsWith("<!doctype") || text.startsWith("<html")) return "html";
+  if (contentType.startsWith("text/")) return "text";
+  return typeof body === "string" ? "text" : "binary";
+}
+
+function classifyResponseOrigin(contentType: string, bodyKind: string, gatewayKind: string, locationHost: string | null, authKind: string, body: string | Uint8Array | undefined): { kind: string; reason: string } {
+  const text = typeof body === "string" ? body.slice(0, 8192).toLowerCase() : "";
+  if (authKind !== "none" || locationHost === "authserver.swufe.edu.cn") return { kind: "gateway-auth", reason: "auth-location" };
+  if (bodyKind === "html" && /(webvpn|wengine-vpn|authserver)/i.test(text)) return { kind: "gateway-html", reason: "content-type-html+webvpn-marker" };
+  if (bodyKind === "html") return { kind: gatewayKind === "wrapped-resource" ? "upstream-html" : "unknown", reason: "content-type-html" };
+  if (bodyKind === "json" && gatewayKind === "wrapped-resource") return { kind: "upstream-api", reason: "content-type-json" };
+  return { kind: "unknown", reason: contentType === "unknown" ? "content-type-missing" : "insufficient-signals" };
+}
+
+function classifySetCookie(headers: Record<string, string>): { all: string[]; gateway: string[]; application: string[]; unknown: string[] } {
+  const raw = Object.entries(headers).find(([key]) => key.toLowerCase() === "set-cookie")?.[1];
+  const all = raw ? raw.split(/,(?=\s*[^;,=\s]+\s*=)/).map((part) => part.trim().split("=", 1)[0]?.trim()).filter((name): name is string => !!name) : [];
+  const gateway = all.filter((name) => /^(route|refresh|heartbeat|show_faq|show_vpn|wengine_vpn_ticket)/i.test(name));
+  const knownApp = /^(jsessionid|session|phpsessid|asp\.net_sessionid)$/i;
+  const application = all.filter((name) => !gateway.includes(name) && knownApp.test(name));
+  const unknown = all.filter((name) => !gateway.includes(name) && !application.includes(name));
+  return { all, gateway, application, unknown };
+}
+
+function cookieNames(headers: Record<string, string> | undefined): string[] {
+  const raw = header(headers, "cookie") ?? "";
+  return raw.split(";").map((part) => part.trim().split("=", 1)[0]?.trim()).filter((name): name is string => !!name);
+}
+
+function gatewayCookieNames(headers: Record<string, string> | undefined): string[] {
+  return cookieNames(headers).filter((name) => /^(route|refresh|heartbeat|show_faq|show_vpn|wengine_vpn_ticket)/i.test(name));
+}
+
+function byteLength(body: string | Uint8Array | undefined): number | null {
+  if (body === undefined) return null;
+  if (body instanceof Uint8Array) return body.byteLength;
+  return new TextEncoder().encode(body).byteLength;
+}
+
+function safePath(url: string): string {
+  try { return new URL(url).pathname; } catch { return "-"; }
+}
+
+function diagnosticTrace(runtime: StashRuntime): string {
+  const cryptoObj = globalThis.crypto as { randomUUID?: () => string } | undefined;
+  try { if (cryptoObj?.randomUUID) return cryptoObj.randomUUID().replace(/-/g, "").slice(0, 12); } catch { /* runtime may not expose crypto */ }
+  return `${Date.parse(runtime.nowIso).toString(36)}${Math.random().toString(36).slice(2, 7)}`.slice(-12);
+}
+
+function savePendingTrace(runtime: StashRuntime, pending: { traceId: string; method: string; host: string | null; path: string; at: string }): void {
+  runtime.write(DIAGNOSTIC_TRACE_KEY, JSON.stringify(pending));
+}
+
+function takePendingTrace(runtime: StashRuntime, host: string | null, path: string, method: string): string | null {
+  const raw = runtime.read(DIAGNOSTIC_TRACE_KEY);
+  runtime.write(DIAGNOSTIC_TRACE_KEY, null);
+  if (!raw) return null;
+  try {
+    const pending = JSON.parse(raw) as { traceId?: string; method?: string; host?: string | null; path?: string; at?: string };
+    if (pending.host === host && pending.path === path && pending.method === method
+      && Date.parse(runtime.nowIso) - Date.parse(pending.at ?? "") < 120_000) return pending.traceId ?? null;
+  } catch { /* ignore corrupt transient trace */ }
+  return null;
 }
 
 function gatewayOwnedSignal(url: string): "failed" | "other" {
