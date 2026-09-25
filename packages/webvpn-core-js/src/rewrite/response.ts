@@ -1,5 +1,4 @@
 import { gatewayHost, WrdCodec } from "../codec/wrd-codec.ts";
-import { AUTH_HOST } from "../routing/allowlist.ts";
 import {
   isGatewayBootstrapHtml,
   isRewritableContentType,
@@ -92,26 +91,15 @@ export function rewriteResponse(
     response: next,
     changed: changes.length > 0,
     changes,
-    sessionExpired: sessionExpiredFrom(next, settings),
+    // CAS redirects can be issued by the original service. Only an explicit
+    // gateway ticket expiry, processed by the adapter, clears the session.
+    sessionExpired: false,
     warning,
   };
 }
 
 function unchanged(response: ResponseDTO, sessionExpired: boolean): ResponseRewriteResult {
   return { response, changed: false, changes: [], sessionExpired };
-}
-
-function sessionExpiredFrom(response: ResponseDTO, settings: RewriteSettings): boolean {
-  const location = headerValue(response.headers, "location");
-  if (!location) {
-    return false;
-  }
-  try {
-    const url = new URL(location, settings.gatewayBase);
-    return url.hostname.toLowerCase() === AUTH_HOST;
-  } catch {
-    return false;
-  }
 }
 
 function rewriteSetCookieHeader(

@@ -9,7 +9,7 @@ export interface HostEnvironment {
 }
 
 export interface HostRequestResult {
-  decision: "pass" | "rewrite" | "reject" | "respond";
+  decision: "pass" | "rewrite" | "rewrite_headers" | "reject" | "respond";
   url?: string;
   headers?: Record<string, string>;
   response?: { status: number; headers: Record<string, string>; body: string };

@@ -6,19 +6,18 @@ export function traceEntered(script: string, requestUrl: string | undefined): vo
     host: hostnameOf(requestUrl),
     direction: "system",
     action: "entered",
-    detail: requestUrl ? `${script} trace=1 ${requestUrl}` : `${script} trace=1`,
+    detail: `${script} trace=1`,
   });
 }
 
 export function traceThrew(script: string, requestUrl: string | undefined, error: unknown): void {
-  const message = error instanceof Error ? error.message : "unknown";
   writeTrace({
     ts: new Date().toISOString(),
     host: hostnameOf(requestUrl),
     direction: "system",
     action: "error",
     code: "script-threw",
-    detail: `${script} ${message}`,
+    detail: script,
   });
 }
 

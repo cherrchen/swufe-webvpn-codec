@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 2e84f11 */
+/* swufe-webvpn stash 7da9df0 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -639,6 +639,28 @@
     return now >= expires;
   }
 
+  // ../../packages/webvpn-core-js/src/runtime/settings.ts
+  function stashTile(input) {
+    let content = "\u672A\u767B\u5F55 \xB7 \u6253\u5F00\u7F51\u9875\u767B\u5F55";
+    if (input.incompatible) {
+      content = "\u63D2\u4EF6\u9700\u8981\u66F4\u65B0";
+    } else if (input.expired) {
+      content = "\u4F1A\u8BDD\u5DF2\u5931\u6548 \xB7 \u6253\u5F00\u7F51\u9875\u767B\u5F55";
+    } else if (input.sessionReady) {
+      content = "\u5DF2\u767B\u5F55";
+    }
+    const loggedIn = input.sessionReady && !input.expired && !input.incompatible;
+    return {
+      title: "SWUFE WebVPN",
+      content,
+      url: loggedIn ? "https://webvpn.swufe.edu.cn/__swufe_bridge__/" : "https://webvpn.swufe.edu.cn",
+      icon: "network"
+    };
+  }
+
+  // ../../packages/webvpn-core-js/src/runtime/settings-v2.ts
+  var SETTINGS_BODY_MAX_BYTES = 16 * 1024;
+
   // ../../packages/webvpn-core-js/src/rewrite/body.ts
   var SCHEME_TOKEN = String.raw`https?(?:-\d+)?`;
   var HOST_TOKEN = String.raw`[0-9a-fA-F]{34,}`;
@@ -666,33 +688,11 @@
     let text = value.replace(/[0-9a-fA-F]{32,}/g, REDACTED);
     text = text.replace(/([?&][^=\s]+=)[^&\s]*/g, `$1${REDACTED}`);
     for (const word of FORBIDDEN) {
-      const pattern = new RegExp(`(${word}\\s*[:=]\\s*)([^\\s,;]+)`, "gi");
+      const pattern = new RegExp(`(\\b${word}\\s*[:=]\\s*)([^\\s,;]+)`, "gi");
       text = text.replace(pattern, `$1${REDACTED}`);
     }
     return text;
   }
-
-  // ../../packages/webvpn-core-js/src/runtime/settings.ts
-  function stashTile(input) {
-    let content = "\u672A\u767B\u5F55 \xB7 \u6253\u5F00\u7F51\u9875\u767B\u5F55";
-    if (input.incompatible) {
-      content = "\u63D2\u4EF6\u9700\u8981\u66F4\u65B0";
-    } else if (input.expired) {
-      content = "\u4F1A\u8BDD\u5DF2\u5931\u6548 \xB7 \u6253\u5F00\u7F51\u9875\u767B\u5F55";
-    } else if (input.sessionReady) {
-      content = "\u5DF2\u767B\u5F55";
-    }
-    const loggedIn = input.sessionReady && !input.expired && !input.incompatible;
-    return {
-      title: "SWUFE WebVPN",
-      content,
-      url: loggedIn ? "https://webvpn.swufe.edu.cn/__swufe_bridge__/" : "https://webvpn.swufe.edu.cn",
-      icon: "network"
-    };
-  }
-
-  // ../../packages/webvpn-core-js/src/runtime/settings-v2.ts
-  var SETTINGS_BODY_MAX_BYTES = 16 * 1024;
 
   // src/adapter.ts
   function handleStashTile(runtime) {
@@ -725,18 +725,17 @@
       host: hostnameOf(requestUrl),
       direction: "system",
       action: "entered",
-      detail: requestUrl ? `${script} trace=1 ${requestUrl}` : `${script} trace=1`
+      detail: `${script} trace=1`
     });
   }
   function traceThrew(script, requestUrl, error) {
-    const message = error instanceof Error ? error.message : "unknown";
     writeTrace({
       ts: (/* @__PURE__ */ new Date()).toISOString(),
       host: hostnameOf(requestUrl),
       direction: "system",
       action: "error",
       code: "script-threw",
-      detail: `${script} ${message}`
+      detail: script
     });
   }
   function writeTrace(record) {

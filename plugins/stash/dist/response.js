@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 2e84f11 */
+/* swufe-webvpn stash 7da9df0 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1059,14 +1059,21 @@
       return { kind: "pass" };
     }
     if (route.kind === "gateway") {
-      const captured = captureSession({
-        url: request.url,
-        headers: request.headers,
-        nowIso,
-        gatewayHost: gatewayHost(settings.gatewayBase)
-      });
-      if (captured.kind === "captured") {
-        return { kind: "capture_session", session: captured.session, pass: true };
+      if (parsed.hostname.toLowerCase() !== gatewayHost(settings.gatewayBase)) return { kind: "pass" };
+      const kind = classifyGatewayRequest(request.url);
+      if (kind === "settings" || kind === "logout") return { kind: "pass" };
+      if (cookiePairValue(headerValue(request.headers, "cookie"), TICKET_COOKIE_NAME) !== null) {
+        const captured = captureSession({
+          url: request.url,
+          headers: request.headers,
+          nowIso,
+          gatewayHost: gatewayHost(settings.gatewayBase)
+        });
+        if (captured.kind === "captured") return { kind: "capture_session", session: captured.session, pass: true };
+      }
+      const usable2 = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
+      if (gatewayRequestAllowsInjection(kind) && (kind !== "gateway-root" || /^(GET|HEAD)$/i.test(request.method)) && (kind !== "wrapped-resource" || wrappedHostIsAllowed(request.url, settings)) && usable2 && !sessionExpiredByClock(usable2, nowIso) && cookiePairValue(usable2.cookieHeader, TICKET_COOKIE_NAME) !== null) {
+        return { kind: "inject_gateway_session", headers: injectCookie(request.headers, usable2.cookieHeader) };
       }
       return { kind: "pass" };
     }
@@ -1124,6 +1131,15 @@
       }
     };
   }
+  function wrappedHostIsAllowed(url, settings) {
+    try {
+      const codec = new WrdCodec(settings.wrdKey, settings.wrdIv, gatewayHost(settings.gatewayBase));
+      const originalHost = new URL(codec.decodeUrl(url)).hostname;
+      return decideRoute(originalHost, settings.routing).kind === "rewrite";
+    } catch {
+      return false;
+    }
+  }
   function urlForHostScheme(url, host, schemes) {
     if (!schemes) return url;
     const wanted = schemes[host] === "https" ? "https:" : "http:";
@@ -1154,9 +1170,10 @@
     return next;
   }
   function mergeCookies(existing, sessionCookie) {
+    const existingPairs = parseCookies(existing);
     const sessionPairs = parseCookies(sessionCookie);
-    const kept = parseCookies(existing).filter((pair) => !sessionPairs.some((item) => item.name === pair.name));
-    return [...kept, ...sessionPairs].map((pair) => `${pair.name}=${pair.value}`).join("; ");
+    const added = sessionPairs.filter((pair) => !existingPairs.some((item) => item.name === pair.name));
+    return [...existingPairs, ...added].map((pair) => `${pair.name}=${pair.value}`).join("; ");
   }
   function parseCookies(header) {
     if (!header.trim()) {
@@ -1217,339 +1234,6 @@
       }
     }
     headers[name] = value;
-  }
-
-  // ../../packages/webvpn-core-js/src/rewrite/body.ts
-  var SCHEME_TOKEN = String.raw`https?(?:-\d+)?`;
-  var HOST_TOKEN = String.raw`[0-9a-fA-F]{34,}`;
-  var SLASH = String.raw`(?:\\?/)`;
-  var REST = String.raw`(?:\\/|[^\s"'<>\\])*`;
-  var REWRITABLE_CONTENT_TYPES = [
-    "text/html",
-    "application/javascript",
-    "text/javascript",
-    "application/json"
-  ];
-  var GATEWAY_BOOTSTRAP_MARKERS = ["__vpn_", "/wengine-vpn/js/main.js"];
-  var GATEWAY_BOOTSTRAP_MAX_BYTES = 8192;
-  function isRewritableContentType(value) {
-    if (!value) {
-      return false;
-    }
-    const type = value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-    return REWRITABLE_CONTENT_TYPES.includes(type);
-  }
-  function isGatewayBootstrapHtml(contentType, body) {
-    if (!contentType || contentType.split(";", 1)[0]?.trim().toLowerCase() !== "text/html") {
-      return false;
-    }
-    if (!body || body.byteLength > GATEWAY_BOOTSTRAP_MAX_BYTES) {
-      return false;
-    }
-    const text = new TextDecoder("utf-8", { fatal: false }).decode(body);
-    return GATEWAY_BOOTSTRAP_MARKERS.every((marker) => text.includes(marker));
-  }
-  function decodeWrdReference(value, codec, webvpnHost) {
-    if (!value) {
-      return null;
-    }
-    const match = valuePattern(webvpnHost).exec(value);
-    if (!match?.groups?.path) {
-      return null;
-    }
-    const path = match.groups.path.replace(/\\\//g, "/");
-    try {
-      return codec.decodeUrl(`https://${webvpnHost}${path.startsWith("/") ? path : `/${path}`}`);
-    } catch {
-      return null;
-    }
-  }
-  function rewriteLocation(value, codec, webvpnHost) {
-    const decoded = decodeWrdReference(value, codec, webvpnHost);
-    if (decoded === null) {
-      return { value, changed: false };
-    }
-    return { value: decoded, changed: true };
-  }
-  function stripWrdPrefix(path, wrdPrefix) {
-    if (!wrdPrefix) {
-      return null;
-    }
-    if (path === wrdPrefix) {
-      return "/";
-    }
-    if (path.startsWith(`${wrdPrefix}/`)) {
-      return path.slice(wrdPrefix.length);
-    }
-    return null;
-  }
-  function rewriteSetCookieAttrs(attrs, input) {
-    let changed = false;
-    if (attrs.has("domain")) {
-      const domain = attrs.get("domain") ?? "";
-      const candidate = domain.replace(/^\./, "").toLowerCase();
-      if (candidate === input.webvpnHost || candidate.endsWith(`.${input.webvpnHost}`)) {
-        attrs.set("domain", input.originalHost.replace(/^\./, ""));
-        changed = true;
-      }
-    }
-    if (attrs.has("path")) {
-      const stripped = stripWrdPrefix(attrs.get("path") ?? "", input.wrdPrefix);
-      if (stripped !== null) {
-        attrs.set("path", stripped);
-        changed = true;
-      }
-    }
-    return changed;
-  }
-  function rewriteBodyText(text, codec, webvpnHost) {
-    const pattern = bodyPattern(webvpnHost);
-    let count = 0;
-    const replaced = text.replace(pattern, (raw, ...rest) => {
-      const groups = rest.at(-1);
-      const path = groups?.path ?? "";
-      const decoded = decodeWrdReference(raw, codec, webvpnHost);
-      if (decoded === null) {
-        return raw;
-      }
-      count += 1;
-      if (path.includes("\\/")) {
-        return decoded.replaceAll("/", "\\/");
-      }
-      return decoded;
-    });
-    return { text: replaced, count };
-  }
-  function valuePattern(webvpnHost) {
-    return buildPattern(webvpnHost, true);
-  }
-  function bodyPattern(webvpnHost) {
-    return buildPattern(webvpnHost, false);
-  }
-  function buildPattern(webvpnHost, anchored) {
-    const host = escapeRegExp(webvpnHost) + String.raw`(?::\d+)?`;
-    const prefix = `(?:(?:https?:)?${SLASH}${SLASH}${host})?`;
-    const path = `(?<path>${SLASH}(?<scheme_token>${SCHEME_TOKEN})${SLASH}(?<token>${HOST_TOKEN})(?<rest>${REST}))`;
-    const body = `${prefix}${path}`;
-    return new RegExp(anchored ? `^${body}$` : body, "gi");
-  }
-  function escapeRegExp(value) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
-  // ../../packages/webvpn-core-js/src/rewrite/response.ts
-  function rewriteResponse(context, response, settings) {
-    if (!context) {
-      return unchanged(response, false);
-    }
-    if (context.gatewayOwned) {
-      return unchanged(response, false);
-    }
-    const host = gatewayHost(settings.gatewayBase);
-    const codec = new WrdCodec(settings.wrdKey, settings.wrdIv, host);
-    const bodyBytes = responseBodyBytes(response.body);
-    if (isGatewayBootstrapHtml(headerValue2(response.headers, "content-type"), bodyBytes) && context.wrdUrl) {
-      return {
-        response: {
-          status: 302,
-          headers: { location: context.wrdUrl, "cache-control": "no-store" },
-          body: ""
-        },
-        changed: true,
-        changes: ["promotion"],
-        sessionExpired: false
-      };
-    }
-    const headers = { ...response.headers };
-    const changes = [];
-    const location = headerValue2(headers, "location");
-    if (location) {
-      const rewritten = rewriteLocation(location, codec, host);
-      if (rewritten.changed) {
-        setHeader2(headers, "location", rewritten.value);
-        changes.push("location");
-      }
-    }
-    const setCookie = headerValue2(headers, "set-cookie");
-    if (setCookie && rewriteSetCookieHeader(headers, setCookie, context, host)) {
-      changes.push("set-cookie");
-    }
-    let warning;
-    let body = response.body;
-    const contentType = headerValue2(headers, "content-type");
-    const maxBytes = settings.bodyRewriteMaxBytes ?? DEFAULT_BODY_REWRITE_MAX_BYTES;
-    if (isRewritableContentType(contentType) && bodyBytes) {
-      if (bodyBytes.byteLength > maxBytes) {
-        warning = "body-too-large";
-      } else {
-        const decoded = decodeBody(response.body);
-        if (decoded === null) {
-          warning = "unsupported-body";
-        } else {
-          const replaced = rewriteBodyText(decoded, codec, host);
-          if (replaced.count > 0) {
-            body = replaced.text;
-            changes.push("body");
-          }
-        }
-      }
-    }
-    const next = { ...response, headers, body };
-    return {
-      response: next,
-      changed: changes.length > 0,
-      changes,
-      sessionExpired: sessionExpiredFrom(next, settings),
-      warning
-    };
-  }
-  function unchanged(response, sessionExpired) {
-    return { response, changed: false, changes: [], sessionExpired };
-  }
-  function sessionExpiredFrom(response, settings) {
-    const location = headerValue2(response.headers, "location");
-    if (!location) {
-      return false;
-    }
-    try {
-      const url = new URL(location, settings.gatewayBase);
-      return url.hostname.toLowerCase() === AUTH_HOST;
-    } catch {
-      return false;
-    }
-  }
-  function rewriteSetCookieHeader(headers, raw, context, webvpnHost) {
-    const cookies = raw.split("\n");
-    let changed = false;
-    const next = cookies.map((cookie) => {
-      const parsed = parseSetCookie(cookie);
-      if (!parsed) {
-        return cookie;
-      }
-      const attrs = {
-        has: (key) => parsed.attrs.has(key),
-        get: (key) => parsed.attrs.get(key),
-        set: (key, value) => parsed.attrs.set(key, value)
-      };
-      if (rewriteSetCookieAttrs(attrs, {
-        originalHost: context.originalHost,
-        webvpnHost,
-        wrdPrefix: context.wrdPrefix
-      })) {
-        changed = true;
-      }
-      return serializeSetCookie(parsed.name, parsed.value, parsed.attrs);
-    });
-    if (changed) {
-      setHeader2(headers, "set-cookie", next.join("\n"));
-    }
-    return changed;
-  }
-  function parseSetCookie(cookie) {
-    const parts = cookie.split(";");
-    const first = parts[0] ?? "";
-    const eq = first.indexOf("=");
-    if (eq <= 0) {
-      return null;
-    }
-    const attrs = /* @__PURE__ */ new Map();
-    for (const part of parts.slice(1)) {
-      const trimmed = part.trim();
-      if (!trimmed) {
-        continue;
-      }
-      const at = trimmed.indexOf("=");
-      if (at === -1) {
-        attrs.set(trimmed.toLowerCase(), "");
-      } else {
-        attrs.set(trimmed.slice(0, at).trim().toLowerCase(), trimmed.slice(at + 1).trim());
-      }
-    }
-    return { name: first.slice(0, eq).trim(), value: first.slice(eq + 1).trim(), attrs };
-  }
-  function serializeSetCookie(name, value, attrs) {
-    const extra = [...attrs.entries()].map(([key, attrValue]) => attrValue ? `${key}=${attrValue}` : key);
-    return [`${name}=${value}`, ...extra].join("; ");
-  }
-  function responseBodyBytes(body) {
-    if (body === void 0) {
-      return null;
-    }
-    if (typeof body === "string") {
-      return new TextEncoder().encode(body);
-    }
-    return body;
-  }
-  function decodeBody(body) {
-    if (typeof body === "string") {
-      return body;
-    }
-    if (!body) {
-      return null;
-    }
-    try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(body);
-    } catch {
-      return null;
-    }
-  }
-  function headerValue2(headers, name) {
-    const target = name.toLowerCase();
-    for (const [key, value] of Object.entries(headers)) {
-      if (key.toLowerCase() === target) {
-        return value;
-      }
-    }
-    return "";
-  }
-  function setHeader2(headers, name, value) {
-    for (const key of Object.keys(headers)) {
-      if (key.toLowerCase() === name) {
-        delete headers[key];
-      }
-    }
-    headers[name] = value;
-  }
-
-  // ../../packages/webvpn-core-js/src/runtime/diagnostics.ts
-  var FORBIDDEN = ["cookie", "authorization", "password", "body", "token", "set-cookie"];
-  var REDACTED = "[redacted]";
-  function safeDiagnostic(record, debug) {
-    if (!debug && record.direction !== "system") {
-      return null;
-    }
-    const detail = record.detail ? redactText(record.detail) : void 0;
-    return {
-      ts: record.ts,
-      host: record.host,
-      direction: record.direction,
-      action: record.action,
-      ...record.code ? { code: record.code } : {},
-      ...detail ? { detail } : {}
-    };
-  }
-  function redactText(value) {
-    let text = value.replace(/[0-9a-fA-F]{32,}/g, REDACTED);
-    text = text.replace(/([?&][^=\s]+=)[^&\s]*/g, `$1${REDACTED}`);
-    for (const word of FORBIDDEN) {
-      const pattern = new RegExp(`(${word}\\s*[:=]\\s*)([^\\s,;]+)`, "gi");
-      text = text.replace(pattern, `$1${REDACTED}`);
-    }
-    return text;
-  }
-  function notificationFor(event) {
-    if (event === "login-required" || event === "session-expired") {
-      return {
-        event,
-        title: "SWUFE WebVPN",
-        body: "\u6253\u5F00\u7F51\u9875\u767B\u5F55",
-        openUrl: "https://webvpn.swufe.edu.cn"
-      };
-    }
-    if (event === "codec-failed") {
-      return { event, title: "SWUFE WebVPN", body: "WebVPN \u5730\u5740\u8F6C\u6362\u5931\u8D25\uFF0C\u53EF\u80FD\u9700\u8981\u66F4\u65B0\u63D2\u4EF6" };
-    }
-    return { event, title: "SWUFE WebVPN", body: "\u63D2\u4EF6\u4E0E\u5F53\u524D\u5BBF\u4E3B\u4E0D\u517C\u5BB9" };
   }
 
   // ../../packages/webvpn-core-js/src/runtime/settings.ts
@@ -1872,10 +1556,359 @@
     return cleaned.endsWith("/") ? cleaned.slice(0, -1) : cleaned;
   }
 
+  // ../../packages/webvpn-core-js/src/routing/gateway-request.ts
+  function classifyGatewayRequest(url) {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return "unknown";
+    }
+    if (isSettingsNamespaceUrl(url)) return "settings";
+    const path = parsed.pathname;
+    if (path === "/login" || path.startsWith("/login/")) return "login";
+    if (path === "/logout") return "logout";
+    if (path === "/" && !parsed.search) return "gateway-root";
+    if (/^\/(?:https?(?:-\d+)?)\/[^/]+(?:\/|$)/.test(path)) return "wrapped-resource";
+    if (path === "/wengine-vpn" || path.startsWith("/wengine-vpn/")) return "gateway-owned";
+    return "unknown";
+  }
+  function gatewayRequestAllowsInjection(kind) {
+    return kind === "wrapped-resource" || kind === "gateway-root";
+  }
+
+  // ../../packages/webvpn-core-js/src/rewrite/body.ts
+  var SCHEME_TOKEN = String.raw`https?(?:-\d+)?`;
+  var HOST_TOKEN = String.raw`[0-9a-fA-F]{34,}`;
+  var SLASH = String.raw`(?:\\?/)`;
+  var REST = String.raw`(?:\\/|[^\s"'<>\\])*`;
+  var REWRITABLE_CONTENT_TYPES = [
+    "text/html",
+    "application/javascript",
+    "text/javascript",
+    "application/json"
+  ];
+  var GATEWAY_BOOTSTRAP_MARKERS = ["__vpn_", "/wengine-vpn/js/main.js"];
+  var GATEWAY_BOOTSTRAP_MAX_BYTES = 8192;
+  function isRewritableContentType(value) {
+    if (!value) {
+      return false;
+    }
+    const type = value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+    return REWRITABLE_CONTENT_TYPES.includes(type);
+  }
+  function isGatewayBootstrapHtml(contentType, body) {
+    if (!contentType || contentType.split(";", 1)[0]?.trim().toLowerCase() !== "text/html") {
+      return false;
+    }
+    if (!body || body.byteLength > GATEWAY_BOOTSTRAP_MAX_BYTES) {
+      return false;
+    }
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(body);
+    return GATEWAY_BOOTSTRAP_MARKERS.every((marker) => text.includes(marker));
+  }
+  function decodeWrdReference(value, codec, webvpnHost) {
+    if (!value) {
+      return null;
+    }
+    const match = valuePattern(webvpnHost).exec(value);
+    if (!match?.groups?.path) {
+      return null;
+    }
+    const path = match.groups.path.replace(/\\\//g, "/");
+    try {
+      return codec.decodeUrl(`https://${webvpnHost}${path.startsWith("/") ? path : `/${path}`}`);
+    } catch {
+      return null;
+    }
+  }
+  function rewriteLocation(value, codec, webvpnHost) {
+    const decoded = decodeWrdReference(value, codec, webvpnHost);
+    if (decoded === null) {
+      return { value, changed: false };
+    }
+    return { value: decoded, changed: true };
+  }
+  function stripWrdPrefix(path, wrdPrefix) {
+    if (!wrdPrefix) {
+      return null;
+    }
+    if (path === wrdPrefix) {
+      return "/";
+    }
+    if (path.startsWith(`${wrdPrefix}/`)) {
+      return path.slice(wrdPrefix.length);
+    }
+    return null;
+  }
+  function rewriteSetCookieAttrs(attrs, input) {
+    let changed = false;
+    if (attrs.has("domain")) {
+      const domain = attrs.get("domain") ?? "";
+      const candidate = domain.replace(/^\./, "").toLowerCase();
+      if (candidate === input.webvpnHost || candidate.endsWith(`.${input.webvpnHost}`)) {
+        attrs.set("domain", input.originalHost.replace(/^\./, ""));
+        changed = true;
+      }
+    }
+    if (attrs.has("path")) {
+      const stripped = stripWrdPrefix(attrs.get("path") ?? "", input.wrdPrefix);
+      if (stripped !== null) {
+        attrs.set("path", stripped);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+  function rewriteBodyText(text, codec, webvpnHost) {
+    const pattern = bodyPattern(webvpnHost);
+    let count = 0;
+    const replaced = text.replace(pattern, (raw, ...rest) => {
+      const groups = rest.at(-1);
+      const path = groups?.path ?? "";
+      const decoded = decodeWrdReference(raw, codec, webvpnHost);
+      if (decoded === null) {
+        return raw;
+      }
+      count += 1;
+      if (path.includes("\\/")) {
+        return decoded.replaceAll("/", "\\/");
+      }
+      return decoded;
+    });
+    return { text: replaced, count };
+  }
+  function valuePattern(webvpnHost) {
+    return buildPattern(webvpnHost, true);
+  }
+  function bodyPattern(webvpnHost) {
+    return buildPattern(webvpnHost, false);
+  }
+  function buildPattern(webvpnHost, anchored) {
+    const host = escapeRegExp(webvpnHost) + String.raw`(?::\d+)?`;
+    const prefix = `(?:(?:https?:)?${SLASH}${SLASH}${host})?`;
+    const path = `(?<path>${SLASH}(?<scheme_token>${SCHEME_TOKEN})${SLASH}(?<token>${HOST_TOKEN})(?<rest>${REST}))`;
+    const body = `${prefix}${path}`;
+    return new RegExp(anchored ? `^${body}$` : body, "gi");
+  }
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  // ../../packages/webvpn-core-js/src/rewrite/response.ts
+  function rewriteResponse(context, response, settings) {
+    if (!context) {
+      return unchanged(response, false);
+    }
+    if (context.gatewayOwned) {
+      return unchanged(response, false);
+    }
+    const host = gatewayHost(settings.gatewayBase);
+    const codec = new WrdCodec(settings.wrdKey, settings.wrdIv, host);
+    const bodyBytes = responseBodyBytes(response.body);
+    if (isGatewayBootstrapHtml(headerValue2(response.headers, "content-type"), bodyBytes) && context.wrdUrl) {
+      return {
+        response: {
+          status: 302,
+          headers: { location: context.wrdUrl, "cache-control": "no-store" },
+          body: ""
+        },
+        changed: true,
+        changes: ["promotion"],
+        sessionExpired: false
+      };
+    }
+    const headers = { ...response.headers };
+    const changes = [];
+    const location = headerValue2(headers, "location");
+    if (location) {
+      const rewritten = rewriteLocation(location, codec, host);
+      if (rewritten.changed) {
+        setHeader2(headers, "location", rewritten.value);
+        changes.push("location");
+      }
+    }
+    const setCookie = headerValue2(headers, "set-cookie");
+    if (setCookie && rewriteSetCookieHeader(headers, setCookie, context, host)) {
+      changes.push("set-cookie");
+    }
+    let warning;
+    let body = response.body;
+    const contentType = headerValue2(headers, "content-type");
+    const maxBytes = settings.bodyRewriteMaxBytes ?? DEFAULT_BODY_REWRITE_MAX_BYTES;
+    if (isRewritableContentType(contentType) && bodyBytes) {
+      if (bodyBytes.byteLength > maxBytes) {
+        warning = "body-too-large";
+      } else {
+        const decoded = decodeBody(response.body);
+        if (decoded === null) {
+          warning = "unsupported-body";
+        } else {
+          const replaced = rewriteBodyText(decoded, codec, host);
+          if (replaced.count > 0) {
+            body = replaced.text;
+            changes.push("body");
+          }
+        }
+      }
+    }
+    const next = { ...response, headers, body };
+    return {
+      response: next,
+      changed: changes.length > 0,
+      changes,
+      // CAS redirects can be issued by the original service. Only an explicit
+      // gateway ticket expiry, processed by the adapter, clears the session.
+      sessionExpired: false,
+      warning
+    };
+  }
+  function unchanged(response, sessionExpired) {
+    return { response, changed: false, changes: [], sessionExpired };
+  }
+  function rewriteSetCookieHeader(headers, raw, context, webvpnHost) {
+    const cookies = raw.split("\n");
+    let changed = false;
+    const next = cookies.map((cookie) => {
+      const parsed = parseSetCookie(cookie);
+      if (!parsed) {
+        return cookie;
+      }
+      const attrs = {
+        has: (key) => parsed.attrs.has(key),
+        get: (key) => parsed.attrs.get(key),
+        set: (key, value) => parsed.attrs.set(key, value)
+      };
+      if (rewriteSetCookieAttrs(attrs, {
+        originalHost: context.originalHost,
+        webvpnHost,
+        wrdPrefix: context.wrdPrefix
+      })) {
+        changed = true;
+      }
+      return serializeSetCookie(parsed.name, parsed.value, parsed.attrs);
+    });
+    if (changed) {
+      setHeader2(headers, "set-cookie", next.join("\n"));
+    }
+    return changed;
+  }
+  function parseSetCookie(cookie) {
+    const parts = cookie.split(";");
+    const first = parts[0] ?? "";
+    const eq = first.indexOf("=");
+    if (eq <= 0) {
+      return null;
+    }
+    const attrs = /* @__PURE__ */ new Map();
+    for (const part of parts.slice(1)) {
+      const trimmed = part.trim();
+      if (!trimmed) {
+        continue;
+      }
+      const at = trimmed.indexOf("=");
+      if (at === -1) {
+        attrs.set(trimmed.toLowerCase(), "");
+      } else {
+        attrs.set(trimmed.slice(0, at).trim().toLowerCase(), trimmed.slice(at + 1).trim());
+      }
+    }
+    return { name: first.slice(0, eq).trim(), value: first.slice(eq + 1).trim(), attrs };
+  }
+  function serializeSetCookie(name, value, attrs) {
+    const extra = [...attrs.entries()].map(([key, attrValue]) => attrValue ? `${key}=${attrValue}` : key);
+    return [`${name}=${value}`, ...extra].join("; ");
+  }
+  function responseBodyBytes(body) {
+    if (body === void 0) {
+      return null;
+    }
+    if (typeof body === "string") {
+      return new TextEncoder().encode(body);
+    }
+    return body;
+  }
+  function decodeBody(body) {
+    if (typeof body === "string") {
+      return body;
+    }
+    if (!body) {
+      return null;
+    }
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(body);
+    } catch {
+      return null;
+    }
+  }
+  function headerValue2(headers, name) {
+    const target = name.toLowerCase();
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === target) {
+        return value;
+      }
+    }
+    return "";
+  }
+  function setHeader2(headers, name, value) {
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === name) {
+        delete headers[key];
+      }
+    }
+    headers[name] = value;
+  }
+
+  // ../../packages/webvpn-core-js/src/runtime/diagnostics.ts
+  var FORBIDDEN = ["cookie", "authorization", "password", "body", "token", "set-cookie"];
+  var REDACTED = "[redacted]";
+  function safeDiagnostic(record, debug) {
+    if (!debug && record.direction !== "system") {
+      return null;
+    }
+    const detail = record.detail ? redactText(record.detail) : void 0;
+    return {
+      ts: record.ts,
+      host: record.host,
+      direction: record.direction,
+      action: record.action,
+      ...record.code ? { code: record.code } : {},
+      ...detail ? { detail } : {}
+    };
+  }
+  function redactText(value) {
+    let text = value.replace(/[0-9a-fA-F]{32,}/g, REDACTED);
+    text = text.replace(/([?&][^=\s]+=)[^&\s]*/g, `$1${REDACTED}`);
+    for (const word of FORBIDDEN) {
+      const pattern = new RegExp(`(\\b${word}\\s*[:=]\\s*)([^\\s,;]+)`, "gi");
+      text = text.replace(pattern, `$1${REDACTED}`);
+    }
+    return text;
+  }
+  function notificationFor(event) {
+    if (event === "login-required" || event === "session-expired") {
+      return {
+        event,
+        title: "SWUFE WebVPN",
+        body: "\u6253\u5F00\u7F51\u9875\u767B\u5F55",
+        openUrl: "https://webvpn.swufe.edu.cn"
+      };
+    }
+    if (event === "codec-failed") {
+      return { event, title: "SWUFE WebVPN", body: "WebVPN \u5730\u5740\u8F6C\u6362\u5931\u8D25\uFF0C\u53EF\u80FD\u9700\u8981\u66F4\u65B0\u63D2\u4EF6" };
+    }
+    return { event, title: "SWUFE WebVPN", body: "\u63D2\u4EF6\u4E0E\u5F53\u524D\u5BBF\u4E3B\u4E0D\u517C\u5BB9" };
+  }
+
   // src/adapter.ts
   var NOTIFY_GAP_MS = 6e4;
   function handleStashResponse(runtime) {
     if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
+      runtime.finishResponse({});
+      return;
+    }
+    if (isGatewayLogoutUrl(runtime.request?.url)) {
+      clearGatewaySessionForLogout(runtime, "response");
       runtime.finishResponse({});
       return;
     }
@@ -1906,7 +1939,7 @@
       rewriteSettings
     );
     const host = context?.originalHost ?? safeHost(runtime.request.url);
-    const detail = responseDetail(runtime.response);
+    const detail = responseDetail(runtime.response, runtime.request.url, rewriteSettings);
     const store = createSessionStore(kv(runtime));
     const session = store.load();
     const confirmedExpiry = result.sessionExpired && session?.status === "valid";
@@ -1936,6 +1969,20 @@
       headers: result.response.headers,
       body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : void 0
     });
+  }
+  function isGatewayLogoutUrl(url) {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return parsed.hostname.toLowerCase() === GATEWAY_HOST && classifyGatewayRequest(url) === "logout";
+    } catch {
+      return false;
+    }
+  }
+  function clearGatewaySessionForLogout(runtime, direction) {
+    createSessionStore(kv(runtime)).clear();
+    runtime.write(STORAGE_KEYS.lastError, null);
+    emit(runtime, false, { ts: runtime.nowIso, host: GATEWAY_HOST, direction, action: "pass", detail: "route=gateway gatewayKind=logout sessionAction=clear" });
   }
   function isNativeGatewayUrl(requestUrl2, gatewayBase) {
     let url;
@@ -2033,30 +2080,12 @@
       }
       if (applied.kind === "update") store.save(applied.session);
     }
-    if (requestCarriedTicket(request.headers) && gatewayLoginRedirect(response, request.url, gateway)) {
-      expireStoredSession(runtime, host);
-    }
   }
   function expireStoredSession(runtime, host) {
     createSessionStore(kv(runtime)).clear();
     writeLastError(runtime, "SESSION_EXPIRED", host);
     notifyThrottled(runtime, "session-expired");
     emit(runtime, false, { ts: runtime.nowIso, host, direction: "response", action: "session-expired", code: "SESSION_EXPIRED", detail: "ticket" });
-  }
-  function requestCarriedTicket(headers) {
-    return cookiePairValue(headerValue(headers ?? {}, "cookie"), TICKET_COOKIE_NAME) !== null;
-  }
-  function gatewayLoginRedirect(response, requestUrl2, gateway) {
-    const status = response.status ?? 0;
-    if (status < 300 || status >= 400) return false;
-    const location = headerValue(response.headers ?? {}, "location");
-    if (!location) return false;
-    try {
-      const url = new URL(location, requestUrl2);
-      return url.hostname.toLowerCase() === gateway && url.pathname.startsWith("/login");
-    } catch {
-      return false;
-    }
   }
   function kv(runtime) {
     return { read: (key) => runtime.read(key), write: (key, value) => runtime.write(key, value) };
@@ -2094,20 +2123,25 @@
     const always = safeDiagnostic({ ...record, direction: "system" }, false);
     if (always) runtime.debug(always);
   }
-  function responseDetail(response) {
-    return `status=${response.status ?? 0} locationHost=${locationHost(response.headers) ?? "-"}`;
-  }
-  function locationHost(headers) {
-    if (!headers) return null;
-    for (const [key, value] of Object.entries(headers)) {
-      if (key.toLowerCase() !== "location" || !value) continue;
-      try {
-        return new URL(value, "https://webvpn.swufe.edu.cn").hostname;
-      } catch {
-        return null;
-      }
+  function serviceTargetHost(url) {
+    try {
+      const service = new URL(url).searchParams.get("service");
+      return service ? new URL(service).hostname : null;
+    } catch {
+      return null;
     }
-    return null;
+  }
+  function responseDetail(response, requestUrl2, settings) {
+    const rawLocation = headerValue(response.headers ?? {}, "location");
+    let locationUrl = null;
+    try {
+      if (rawLocation) locationUrl = new URL(rawLocation, requestUrl2).href;
+    } catch {
+    }
+    const locationHost = locationUrl ? safeHost(locationUrl) : null;
+    const wrapped = locationUrl && locationHost === gatewayHost(settings.gatewayBase) ? deriveRewriteContext(locationUrl, settings.gatewayBase, settings.wrdKey, settings.wrdIv) : null;
+    const authKind = locationHost === "authserver.swufe.edu.cn" ? "raw-authserver" : wrapped?.originalHost === "authserver.swufe.edu.cn" ? "wrapped-authserver" : "none";
+    return `status=${response.status ?? 0} locationHost=${locationHost ?? "-"} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
   }
   function safeHost(url) {
     try {
@@ -2124,18 +2158,17 @@
       host: hostnameOf(requestUrl2),
       direction: "system",
       action: "entered",
-      detail: requestUrl2 ? `${script} trace=1 ${requestUrl2}` : `${script} trace=1`
+      detail: `${script} trace=1`
     });
   }
   function traceThrew(script, requestUrl2, error) {
-    const message = error instanceof Error ? error.message : "unknown";
     writeTrace({
       ts: (/* @__PURE__ */ new Date()).toISOString(),
       host: hostnameOf(requestUrl2),
       direction: "system",
       action: "error",
       code: "script-threw",
-      detail: `${script} ${message}`
+      detail: script
     });
   }
   function writeTrace(record) {

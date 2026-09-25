@@ -1,8 +1,11 @@
 import { CodecError } from "../errors.ts";
 import { gatewayHost, WrdCodec } from "../codec/wrd-codec.ts";
 import { decideRoute, type RoutingPolicy } from "../routing/allowlist.ts";
+import { classifyGatewayRequest, gatewayRequestAllowsInjection } from "../routing/gateway-request.ts";
 import {
   captureSession,
+  cookiePairValue,
+  TICKET_COOKIE_NAME,
   headerValue,
   sessionExpiredByClock,
   sessionMatchesGateway,
@@ -41,6 +44,7 @@ export interface RequestRewriteContext {
 export type RequestDecision =
   | { kind: "pass" }
   | { kind: "capture_session"; session: SessionRecordV1; pass: true }
+  | { kind: "inject_gateway_session"; headers: Record<string, string> }
   | { kind: "login_required" }
   | { kind: "rewrite"; url: string; headers: Record<string, string>; context: RequestRewriteContext }
   | { kind: "error"; code: PluginErrorCode };
@@ -62,14 +66,24 @@ export function rewriteRequest(
     return { kind: "pass" };
   }
   if (route.kind === "gateway") {
-    const captured = captureSession({
-      url: request.url,
-      headers: request.headers,
-      nowIso,
-      gatewayHost: gatewayHost(settings.gatewayBase),
-    });
-    if (captured.kind === "captured") {
-      return { kind: "capture_session", session: captured.session, pass: true };
+    if (parsed.hostname.toLowerCase() !== gatewayHost(settings.gatewayBase)) return { kind: "pass" };
+    const kind = classifyGatewayRequest(request.url);
+    if (kind === "settings" || kind === "logout") return { kind: "pass" };
+    if (cookiePairValue(headerValue(request.headers, "cookie"), TICKET_COOKIE_NAME) !== null) {
+      const captured = captureSession({
+        url: request.url,
+        headers: request.headers,
+        nowIso,
+        gatewayHost: gatewayHost(settings.gatewayBase),
+      });
+      if (captured.kind === "captured") return { kind: "capture_session", session: captured.session, pass: true };
+    }
+    const usable = sessionMatchesGateway(session, gatewayHost(settings.gatewayBase)) ? session : null;
+    if (gatewayRequestAllowsInjection(kind) && (kind !== "gateway-root" || /^(GET|HEAD)$/i.test(request.method))
+      && (kind !== "wrapped-resource" || wrappedHostIsAllowed(request.url, settings))
+      && usable && !sessionExpiredByClock(usable, nowIso)
+      && cookiePairValue(usable.cookieHeader, TICKET_COOKIE_NAME) !== null) {
+      return { kind: "inject_gateway_session", headers: injectCookie(request.headers, usable.cookieHeader) };
     }
     return { kind: "pass" };
   }
@@ -133,6 +147,16 @@ export function rewriteRequest(
   };
 }
 
+function wrappedHostIsAllowed(url: string, settings: RewriteSettings): boolean {
+  try {
+    const codec = new WrdCodec(settings.wrdKey, settings.wrdIv, gatewayHost(settings.gatewayBase));
+    const originalHost = new URL(codec.decodeUrl(url)).hostname;
+    return decideRoute(originalHost, settings.routing).kind === "rewrite";
+  } catch {
+    return false;
+  }
+}
+
 function urlForHostScheme(url: string, host: string, schemes: RewriteSettings["hostSchemes"]): string {
   if (!schemes) return url;
   const wanted = schemes[host] === "https" ? "https:" : "http:";
@@ -166,9 +190,10 @@ function injectCookie(headers: Record<string, string>, sessionCookie: string): R
 }
 
 export function mergeCookies(existing: string, sessionCookie: string): string {
+  const existingPairs = parseCookies(existing);
   const sessionPairs = parseCookies(sessionCookie);
-  const kept = parseCookies(existing).filter((pair) => !sessionPairs.some((item) => item.name === pair.name));
-  return [...kept, ...sessionPairs].map((pair) => `${pair.name}=${pair.value}`).join("; ");
+  const added = sessionPairs.filter((pair) => !existingPairs.some((item) => item.name === pair.name));
+  return [...existingPairs, ...added].map((pair) => `${pair.name}=${pair.value}`).join("; ");
 }
 
 function parseCookies(header: string): Array<{ name: string; value: string }> {

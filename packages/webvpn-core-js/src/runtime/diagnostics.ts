@@ -37,7 +37,7 @@ export function redactText(value: string): string {
   let text = value.replace(/[0-9a-fA-F]{32,}/g, REDACTED);
   text = text.replace(/([?&][^=\s]+=)[^&\s]*/g, `$1${REDACTED}`);
   for (const word of FORBIDDEN) {
-    const pattern = new RegExp(`(${word}\\s*[:=]\\s*)([^\\s,;]+)`, "gi");
+    const pattern = new RegExp(`(\\b${word}\\s*[:=]\\s*)([^\\s,;]+)`, "gi");
     text = text.replace(pattern, `$1${REDACTED}`);
   }
   return text;

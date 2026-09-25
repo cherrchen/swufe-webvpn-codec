@@ -215,7 +215,7 @@
 
 ## N. Gateway Session Realm / Direct Gateway Reuse / Safe Auth Trace
 
-除 N01 外均为新增验收用例，真机状态保持 `Pending`，直到取得脱敏设备证据。endpoint 具体 path 未被真机确认前使用分类 fixture，不把 fixture 名称写成 WebVPN 实际 pathname。
+除 N01 外均为新增验收用例，真机状态保持 `Pending`，直到取得脱敏设备证据。用户已确认正常 Gateway logout 的实际 pathname 为 `/logout`；其余未确认 endpoint 使用分类 fixture，不把 fixture 名称写成 WebVPN 实际 pathname。
 
 | ID | 场景 | 预期 | Status |
 | --- | --- | --- | --- |
@@ -223,7 +223,7 @@
 | N02 | 第三方 App/WKWebView 无 Gateway Cookie 直接请求 Gateway；stored Session ready；`WRAPPED_RESOURCE` 且 login intent 为 none | 代理层向 gateway request 注入 stored Gateway Session；同一客户端 Cookie Jar 不需要有 ticket；WebVPN 不应仅因客户端缺 Cookie 而重新进入 Gateway login | Pending |
 | N03 | request 带 ticket B，stored ticket 为 A | 保留请求 Cookie B、不附加或替换为 A；capture/refresh B 到 store 并 PASS | Pending |
 | N04 | stored Gateway Session 已过期或核心 ticket 缺失 | 不注入；PASS/允许官方登录继续；不得只因出现 CAS 页面/redirect 清除 stored Gateway Session；只有独立 Gateway 失效证据才能清除 | Pending |
-| N05 | 已真机确认的 LOGOUT request fixture | 不注入旧 Session；清除 `swufe.session.v1`；真实 endpoint 未确认前此场景保持 Pending | Pending |
+| N05 | 用户确认的 Gateway `https://webvpn.swufe.edu.cn/logout` request（可带 query） | 不注入旧 Session；请求时清除 `swufe.session.v1`；响应不得重新存入 ticket；Stash 真机脚本命中与清理结果仍待取证 | Pending |
 | N06 | `https://webvpn.swufe.edu.cn/__swufe_bridge__/...` Settings Namespace | 本地 synthetic response；不注入、不 capture、不请求 upstream | Pending |
 | N07 | raw `authserver.swufe.edu.cn` request | PASS；无 Gateway Session 注入；无 CAS Cookie/credential 捕获或保存 | Pending |
 | N08 | raw authserver 与 gateway 上 WRD-wrapped authserver URL 并存 | Safe Auth Trace 分别记录 request host/route kind 与 decoded original host；`service` 只记录 target hostname；不记录 query、token 或 ticket value；不会把 authserver 加入普通 Routing Scope | Pending |

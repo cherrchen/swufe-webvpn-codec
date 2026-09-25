@@ -86,7 +86,9 @@ M3 Loon 新增回归门槛：G13（HTTP/80 与 WRD `/http/`）、G14/G15（首�
 
 2026-09-25 最新 Stash M2 真机观察：Safari 完成 WebVPN 登录后，request/response 脚本捕获 Gateway ticket，并持久化到 `swufe.session.v1`；日志不包含 Cookie value。此证据支持 test case N01 = Passed，只确认 Safari 流量到 Plugin Gateway Session Store。它不证明第三方 App 的 direct Gateway request 已注入。
 
-N02–N10 全部 Pending。当前代码对无 Cookie 的 direct Gateway request 仍 pass-through，故 N02 是新增待实现行为。endpoint pathname、LOGOUT 与 callback 分类仍需真机确认；单元测试不能提升设备 Pending 项。
+N02–N10 真机项全部 Pending。当前本地实现对无 ticket、stored session 可用的已分类 Gateway 请求注入，其中 WRD 包装资源必须能解码到当前 Routing Scope 的目标域；Stash 以同 URL 的 headers-only `$done` 输出。它尚未证明第三方 App 的请求确实进入 Stash HTTP Engine，或服务端接受该 Cookie 集。`/login` 已见于既有真机链路，排除注入；用户另已确认正常 Gateway logout 精确端点为 `/logout`，本地实现清除 Session 且不注入，响应入口也阻止重新保存 ticket。callback 真实路径仍未确认，未知路径默认不注入。明确 ticket 删除、时钟到期或上述 logout 会清理 Session；CAS-only redirect 保留 Gateway Session。
+
+2026-09-25 本地回归：`pnpm --filter webvpn-core-js test` 75 passed，`typecheck` 通过；`pnpm --filter swufe-webvpn-stash test` 29 passed，bundle scan 与 `typecheck` 通过。覆盖 gateway classifier、ticket B precedence、direct WRD 注入、Settings/authserver 排除、`/logout` 请求与响应清理、过期、Set-Cookie rotation、CAS-only redirect 与既有 bootstrap/response reverse rewrite 防环。`pnpm docs:check`、`pnpm spec:check` 与 `git diff --check` 通过。Stash 官方 [Rewrite HTTP 文档](https://stash.wiki/en/script/rewrite-requests) 的 `$done(value)` 字段表允许只返回 `headers`；目标设备上的 headers-only 行为仍待验证。
 
 ## 执行的命令与结果
 

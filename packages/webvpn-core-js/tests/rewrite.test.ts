@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_KEY,
+  TICKET_COOKIE_NAME,
   defaultRoutingPolicy,
   diagnosticContainsSensitive,
   isGatewayBootstrapHtml,
@@ -91,7 +92,7 @@ describe("IOS-TC-D request rewrite", () => {
 
   it("D04 gateway request can capture and still pass", () => {
     const decision = rewriteRequest(
-      { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: "route=fake" } },
+      { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: `route=fake; ${TICKET_COOKIE_NAME}=B` } },
       settings(),
       null,
       NOW,
@@ -99,7 +100,7 @@ describe("IOS-TC-D request rewrite", () => {
     expect(decision.kind).toBe("capture_session");
     if (decision.kind !== "capture_session") return;
     expect(decision.pass).toBe(true);
-    expect(decision.session.cookieHeader).toBe("route=fake");
+    expect(decision.session.cookieHeader).toContain("route=fake");
   });
 
   it("D05 auth request passes and does not require the body", () => {
@@ -288,13 +289,13 @@ describe("IOS-TC-E response rewrite", () => {
     expect(result.response.body).toBe("keep");
   });
 
-  it("authserver redirect on a rewritten allowlist response marks the session expired", () => {
+  it("authserver redirect on a rewritten allowlist response preserves the gateway session", () => {
     const result = rewriteResponse(
       context(),
       { status: 302, headers: { location: "https://authserver.swufe.edu.cn/authserver/login" } },
       settings(),
     );
-    expect(result.sessionExpired).toBe(true);
+    expect(result.sessionExpired).toBe(false);
   });
 
   it("an elapsed ticket clock does not inject the cookie", () => {

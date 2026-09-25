@@ -13,6 +13,8 @@ export {
   GATEWAY_HOST,
 } from "./routing/allowlist.ts";
 export type { RouteDecision, RoutingPolicy } from "./routing/allowlist.ts";
+export { classifyGatewayRequest, gatewayRequestAllowsInjection } from "./routing/gateway-request.ts";
+export type { GatewayRequestKind } from "./routing/gateway-request.ts";
 export {
   STORAGE_KEYS,
   TICKET_COOKIE_NAME,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STORAGE_KEYS, TICKET_COOKIE_NAME } from "webvpn-core-js";
+import { DEFAULT_KEY, STORAGE_KEYS, TICKET_COOKIE_NAME, WrdCodec } from "webvpn-core-js";
 import { handleStashRequest, handleStashResponse, handleStashTile, nativeGatewayRedirect, type StashRuntime } from "../src/adapter.ts";
 
 const NOW = "2026-09-24T08:00:00.000Z";
@@ -36,9 +36,96 @@ function runtime(overrides: Partial<StashRuntime> = {}): StashRuntime & {
 }
 
 describe("Stash adapter", () => {
+  it("clears the local gateway session for the observed /logout endpoint and never injects it", () => {
+    const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/logout?next=%2F", headers: { cookie: `${TICKET_COOKIE_NAME}=B` } } });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=A`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "valid" });
+    handleStashRequest(rt);
+    expect(rt.requests[0]).toEqual({ decision: "pass" });
+    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+    rt.response = { status: 302, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=C; Max-Age=3600`, location: "/" } };
+    handleStashResponse(rt);
+    expect(rt.responses[0]).toEqual({});
+    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=A`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "valid" });
+    rt.request = { url: "https://authserver.swufe.edu.cn/logout", headers: {} };
+    handleStashRequest(rt);
+    expect(rt.store[STORAGE_KEYS.session]).toBeDefined();
+  });
+  it("injects a stored gateway ticket as a same URL header edit and preserves client ticket precedence", () => {
+    const codec = new WrdCodec(DEFAULT_KEY, DEFAULT_KEY, "webvpn.swufe.edu.cn");
+    const rt = runtime({ request: { url: codec.encodeUrl("http://jwxt.swufe.edu.cn/path", "https://webvpn.swufe.edu.cn"), headers: { cookie: "other=x" } } });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=A`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "valid" });
+    handleStashRequest(rt);
+    expect(rt.requests[0]).toEqual({ decision: "rewrite_headers", headers: { cookie: `other=x; ${TICKET_COOKIE_NAME}=A` } });
+    expect(JSON.stringify(rt.requests[0])).not.toContain("url");
+
+    rt.request = { url: codec.encodeUrl("https://jwxt.swufe.edu.cn/path", "https://webvpn.swufe.edu.cn"), headers: { Cookie: `${TICKET_COOKIE_NAME}=B` } };
+    handleStashRequest(rt);
+    expect(rt.requests[1]).toEqual({ decision: "pass" });
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=B`);
+  });
+
+  it("does not inject for authserver, settings, login, or an expired gateway session", () => {
+    const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/login", headers: {} } });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=A`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "valid" });
+    handleStashRequest(rt);
+    expect(rt.requests[0]).toEqual({ decision: "pass" });
+    rt.request = { url: "https://authserver.swufe.edu.cn/authserver/login", headers: {} };
+    handleStashRequest(rt);
+    expect(rt.requests[1]).toEqual({ decision: "pass" });
+    rt.request = { url: "https://webvpn.swufe.edu.cn/__swufe_bridge__/", headers: {} };
+    handleStashRequest(rt);
+    expect(rt.requests[2]).toMatchObject({ decision: "respond" });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=A`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: "2026-09-24T00:00:00.000Z", status: "valid" });
+    rt.request = { url: "https://webvpn.swufe.edu.cn/http/opaque/path", headers: {} };
+    handleStashRequest(rt);
+    expect(rt.requests[3]).toEqual({ decision: "pass" });
+    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+  });
+
+  it("emits safe gateway and auth trace fields without secrets", () => {
+    const logs: string[] = [];
+    const wrapped = new WrdCodec(DEFAULT_KEY, DEFAULT_KEY, "webvpn.swufe.edu.cn").encodeUrl("http://tyxycg.swufe.edu.cn/path?service=https%3A%2F%2Ftyxycg.swufe.edu.cn%2Fsecret", "https://webvpn.swufe.edu.cn");
+    const rt = runtime({ request: { url: wrapped, headers: {} }, debug: (record) => logs.push(JSON.stringify(record)) });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=secret-ticket`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "valid" });
+    handleStashRequest(rt);
+    const output = logs.join("\n");
+    expect(output).toContain("route=gateway");
+    expect(output).toContain("gatewayKind=wrapped-resource");
+    expect(output).toContain("decodedOriginalHost=tyxycg.swufe.edu.cn");
+    expect(output).toContain("serviceHost=tyxycg.swufe.edu.cn");
+    expect(output).not.toMatch(/secret-ticket|%2Fsecret|service=https|cookieHeader=|\/http\/[a-z0-9]+/);
+  });
+
+  it("rotates a gateway ticket and clears it only on an explicit deletion", () => {
+    const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/http/opaque/path", headers: {} }, response: { status: 200, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=B; Max-Age=3600` } } });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=A`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "valid" });
+    handleStashResponse(rt);
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=B`);
+    rt.response = { status: 302, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=; Max-Age=0`, location: "/login" } };
+    handleStashResponse(rt);
+    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+  });
+
+  it("traces raw authserver redirects using only the service hostname", () => {
+    const logs: string[] = [];
+    const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/", headers: {} }, response: { status: 302, headers: { location: "https://authserver.swufe.edu.cn/authserver/login?service=https%3A%2F%2Ftyxycg.swufe.edu.cn%2Fprivate" } }, debug: (record) => logs.push(JSON.stringify(record)) });
+    handleStashResponse(rt);
+    const output = logs.join("\n");
+    expect(output).toContain("locationAuth=raw-authserver");
+    expect(output).toContain("serviceHost=tyxycg.swufe.edu.cn");
+    expect(output).not.toMatch(/private|service=https|%2F/);
+    logs.length = 0;
+    const wrapped = new WrdCodec(DEFAULT_KEY, DEFAULT_KEY, "webvpn.swufe.edu.cn").encodeUrl("https://authserver.swufe.edu.cn/authserver/login?service=https%3A%2F%2Ftyxycg.swufe.edu.cn%2Fprivate", "https://webvpn.swufe.edu.cn");
+    rt.response = { status: 302, headers: { location: wrapped } };
+    handleStashResponse(rt);
+    expect(logs.join("\n")).toContain("locationAuth=wrapped-authserver");
+    expect(logs.join("\n")).not.toMatch(/private|service=https|%2F/);
+  });
   it("rewrites an allowlisted request after a gateway cookie is stored", () => {
     const rt = runtime({
-      request: { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: "route=fake" } },
+      request: { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: `route=fake; ${TICKET_COOKIE_NAME}=A` } },
     });
     handleStashRequest(rt);
     expect(rt.store[STORAGE_KEYS.session]).toContain("route=fake");
@@ -201,7 +288,7 @@ describe("Stash adapter", () => {
 
   it("keeps a captured session when the login page redirects to CAS", () => {
     const rt = runtime({
-      request: { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: "route=fake" } },
+      request: { url: "https://webvpn.swufe.edu.cn/", method: "GET", headers: { cookie: `route=fake; ${TICKET_COOKIE_NAME}=A` } },
     });
     handleStashRequest(rt);
     expect(rt.store[STORAGE_KEYS.session]).toContain("route=fake");
@@ -257,7 +344,7 @@ describe("Stash adapter", () => {
     expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").status).toBe("valid");
   });
 
-  it("clears a confirmed session when a rewritten allowlist response redirects to CAS", () => {
+  it("keeps a confirmed gateway session when a rewritten allowlist response redirects to CAS", () => {
     const req = runtime({
       request: { url: "https://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
     });
@@ -277,14 +364,14 @@ describe("Stash adapter", () => {
       write: req.write,
     });
     handleStashResponse(res);
-    expect(req.store[STORAGE_KEYS.session]).toBeUndefined();
-    expect(handleStashTile(res).content).toContain("失效");
+    expect(req.store[STORAGE_KEYS.session]).toBeDefined();
+    expect(handleStashTile(res).content).toContain("已登录");
   });
 
   it("logs the decision without a cookie value when debug is off", () => {
     const logs: string[] = [];
     const rt = runtime({
-      request: { url: "https://webvpn.swufe.edu.cn/login?ticket=abc", method: "GET", headers: { cookie: "route=fake" } },
+      request: { url: "https://webvpn.swufe.edu.cn/?ticket=abc", method: "GET", headers: { cookie: `route=fake; ${TICKET_COOKIE_NAME}=A` } },
       debug: (record) => logs.push(JSON.stringify(record)),
     });
     handleStashRequest(rt);
@@ -341,7 +428,7 @@ describe("Stash adapter", () => {
     expect(handleStashTile(later).content).toContain("失效");
   });
 
-  it("clears a stored ticket when the gateway answers 302 to /login", () => {
+  it("keeps a stored ticket when the gateway answers 302 to /login without an explicit expiry", () => {
     const rt = runtime({
       request: {
         url: "https://webvpn.swufe.edu.cn/",
@@ -360,7 +447,7 @@ describe("Stash adapter", () => {
       status: "valid",
     });
     handleStashResponse(rt);
-    expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+    expect(rt.store[STORAGE_KEYS.session]).toBeDefined();
   });
 
   it("serves settings HTML without capturing the session", () => {

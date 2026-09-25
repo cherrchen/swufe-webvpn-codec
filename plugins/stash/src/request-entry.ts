@@ -45,6 +45,10 @@ function bindRuntime(): StashRuntime {
         $done({ url: result.url, headers: result.headers ?? {} });
         return;
       }
+      if (result.decision === "rewrite_headers" && result.headers) {
+        $done({ headers: result.headers });
+        return;
+      }
       $done({});
     },
     finishResponse: () => $done({}),

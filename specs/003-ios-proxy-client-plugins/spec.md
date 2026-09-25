@@ -15,7 +15,7 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 **In Progress**（2026-09-25）：P0、M1 Shared Core 与 Stash M2 基础实现已交付；Gateway Cookie capture/store 与普通目标 WRD 注入已具备。发现并正式纳入 M2 follow-up：无 ticket direct Gateway request 的分类注入、客户端 ticket precedence、login/logout 保护、CAS-only redirect 不清 Session 与 Safe Auth Trace。新增用例 N02–N10 尚未实现/取证；现有真机观察只确认 Safari Gateway Session capture/persist，不确认 Inter-App Gateway Session Reuse。M3/M4 未开始。
+当前为 **In Progress**（2026-09-25）：P0、M1 Shared Core 与 Stash M2 基础实现已交付；Gateway Cookie capture/store、普通目标 WRD 注入，以及已知路径上的 direct Gateway request 注入已有本地实现和测试。客户端 ticket 优先、CAS-only redirect 不清 Session 与 Safe Auth Trace 已完成本地回归；用户已确认正常 Gateway logout 端点为 `/logout`，本地实现已对该精确路径清 Session 且不注入。callback 真实 endpoint 与跨 App/WKWebView 注入效果仍须真机取证。N02–N10 真机用例继续 Pending；现有真机观察只确认 Safari Gateway Session capture/persist，不确认 Inter-App Gateway Session Reuse。M3/M4 未开始。
 
 | Gate | 含义 | 本 Spec 状态 |
 | --- | --- | --- |
@@ -95,7 +95,7 @@
 | Q-009 | Tile `$done({url})` 动态切换到 Settings 是否可靠 | Tile Journey | Open / M2 | 否；固定 Settings + 独立登录按钮为退化 |
 | Q-010 | 16 KiB 以上 Settings POST 能否本地 413 且保证不被 Stash `max-size` 跳过后发往 upstream | Settings API 安全 | Open / Gate D | 是；失败则不能交付 POST API |
 
-| Q-011 | LOGIN、LOGOUT、AUTH_CALLBACK 与 GATEWAY_OWNED 的真实 pathname / request intent 是什么 | Gateway classifier 与登录/登出安全 | Open；逐条真机确认，未确认前不注入 | 是，未知路径默认 no-injection |
+| Q-011 | LOGIN、LOGOUT、AUTH_CALLBACK 与 GATEWAY_OWNED 的真实 pathname / request intent 是什么 | Gateway classifier 与登录/登出安全 | 部分确认：`/login` 已见于既有链路；用户真机确认正常 logout 为精确 `/logout`；callback 与其它 owned 路径仍 Open、默认不注入 | 是，未知路径默认 no-injection |
 | Q-012 | 独立 App/WKWebView 的 direct Gateway request 是否稳定进入 Stash HTTP Engine，以及哪些 Gateway Request Kind 可安全复用 Session | Inter-App Gateway Session Reuse | Open；按应用/宿主版本取证 | 是，N02 前不得宣称已支持 |
 | Q-013 | raw authserver、WRD-wrapped authserver 与 tyxycg 的 redirect/service 目标如何在 Safe Auth Trace 中区分 | Auth flow diagnosis / 隐私 | Open；service 仅抽取 target hostname | Trace 实现可先并行，解释业务因果需实机 |
 | Q-014 | tyxycg 在 Gateway 已认证后是否会自行要求 CAS，哪些响应组合才足以判定 Gateway Session 失效 | 登录解释与 expired 判定 | Open；不得仅因再次出现 CAS 清除 Session | 是，tyxycg E2E 前保留为未知 |
