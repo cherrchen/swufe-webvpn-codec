@@ -15,7 +15,7 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 **In Progress**（2026-09-25）：P0、M1 Shared Core 与 Stash M2 基础实现已交付；Gateway Cookie capture/store、普通目标 WRD 注入，以及已知路径上的 direct Gateway request 注入已有本地实现和测试。客户端 ticket 优先、CAS-only redirect 不清 Session 与 Safe Auth Trace 已完成本地回归；用户已确认正常 Gateway logout 端点为 `/logout`，本地实现已对该精确路径清 Session 且不注入。callback 真实 endpoint 与跨 App/WKWebView 注入效果仍须真机取证。N02–N10 真机用例继续 Pending；现有真机观察只确认 Safari Gateway Session capture/persist，不确认 Inter-App Gateway Session Reuse。M3/M4 未开始。
+当前为 **In Progress**（2026-09-25）：P0、M1 Shared Core 与 Stash M2 基础实现已交付；Gateway Cookie capture/store、普通目标 WRD 注入，以及已知路径上的 direct Gateway request 注入已有本地实现和测试。客户端 ticket 优先、CAS-only redirect 不清 Session 与 Safe Auth Trace 已完成本地回归；用户已确认正常 Gateway logout 端点为 `/logout`，本地实现已对该精确路径清 Session 且不注入。N02 的 tyxycg 真机尝试已见注入决定，但 Gateway 仍重新进入登录，记为 Failed；原因待 Safe Trace 与上游 header 复核。N03–N10 仍 Pending，callback 真实 endpoint 未确认。M3/M4 未开始。
 
 | Gate | 含义 | 本 Spec 状态 |
 | --- | --- | --- |

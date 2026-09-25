@@ -99,13 +99,31 @@ describe("Stash adapter", () => {
   });
 
   it("rotates a gateway ticket and clears it only on an explicit deletion", () => {
-    const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/http/opaque/path", headers: {} }, response: { status: 200, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=B; Max-Age=3600` } } });
+    const logs: string[] = [];
+    const rt = runtime({ request: { url: "https://webvpn.swufe.edu.cn/http/opaque/path", headers: {} }, response: { status: 200, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=B; Max-Age=3600` } }, debug: (record) => logs.push(JSON.stringify(record)) });
     rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: `${TICKET_COOKIE_NAME}=A`, capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "valid" });
     handleStashResponse(rt);
     expect(JSON.parse(rt.store[STORAGE_KEYS.session] ?? "{}").cookieHeader).toContain(`${TICKET_COOKIE_NAME}=B`);
+    expect(logs.join("\n")).toContain("ticketSetCookie=rotated");
+    expect(logs.join("\n")).not.toContain(`${TICKET_COOKIE_NAME}=B`);
     rt.response = { status: 302, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=; Max-Age=0`, location: "/login" } };
     handleStashResponse(rt);
     expect(rt.store[STORAGE_KEYS.session]).toBeUndefined();
+    expect(logs.join("\n")).toContain("ticketSetCookie=expired");
+  });
+
+  it("traces a native WRD gateway response before the no-promotion return", () => {
+    const logs: string[] = [];
+    const url = new WrdCodec(DEFAULT_KEY, DEFAULT_KEY, "webvpn.swufe.edu.cn").encodeUrl("https://tyxycg.swufe.edu.cn/path", "https://webvpn.swufe.edu.cn");
+    const rt = runtime({ request: { url, headers: {} }, response: { status: 302, headers: { location: "https://webvpn.swufe.edu.cn/login?service=secret", "set-cookie": `${TICKET_COOKIE_NAME}=; Max-Age=0` } }, debug: (record) => logs.push(JSON.stringify(record)) });
+    handleStashResponse(rt);
+    expect(rt.responses[0]).toEqual({});
+    const output = logs.join("\n");
+    expect(output).toContain("gatewayKind=wrapped-resource");
+    expect(output).toContain("decodedOriginalHost=tyxycg.swufe.edu.cn");
+    expect(output).toContain("locationGatewayKind=login");
+    expect(output).toContain("ticketSetCookie=expired");
+    expect(output).not.toMatch(/secret|\/https\/[a-z0-9]+|wengine_vpn_ticketwebvpn_swufe_edu_cn=/);
   });
 
   it("traces raw authserver redirects using only the service hostname", () => {

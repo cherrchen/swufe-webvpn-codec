@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 7da9df0 */
+/* swufe-webvpn stash d1975c0 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -2159,11 +2159,14 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     const route = decideRoute(host, settings.routing).kind;
     const gatewayKind = route === "gateway" ? classifyGatewayRequest(url) : "-";
     const decoded = route === "gateway" ? deriveRewriteContext(url, settings.gatewayBase, settings.wrdKey, settings.wrdIv) : null;
-    const ticket = cookiePairValue(headerValue(headers ?? {}, "cookie"), TICKET_COOKIE_NAME) !== null;
+    const requestTicket = cookiePairValue(headerValue(headers ?? {}, "cookie"), TICKET_COOKIE_NAME);
+    const storedTicket = session ? cookiePairValue(session.cookieHeader, TICKET_COOKIE_NAME) : null;
+    const ticket = requestTicket !== null;
+    const ticketRelation = !ticket ? "missing" : storedTicket === null ? "no-stored-ticket" : requestTicket === storedTicket ? "same" : "different";
     const stored = clockExpired ? "expired" : session?.status ?? "missing";
     const action = decision === "inject_gateway_session" ? "inject" : decision === "capture_session" ? "capture" : "none";
     const serviceHost = serviceTargetHost(decoded?.originalUrl ?? url);
-    return `route=${route} gatewayKind=${gatewayKind} decodedOriginalHost=${decoded?.originalHost ?? "-"} requestTicket=${ticket ? "present" : "missing"} storedSession=${stored} sessionAction=${action} requestCookiePriority=${ticket ? "yes" : "not-applicable"} serviceHost=${serviceHost ?? "-"}`;
+    return `route=${route} gatewayKind=${gatewayKind} decodedOriginalHost=${decoded?.originalHost ?? "-"} requestTicket=${ticket ? "present" : "missing"} ticketRelation=${ticketRelation} storedSession=${stored} sessionAction=${action} requestCookiePriority=${ticket ? "yes" : "not-applicable"} serviceHost=${serviceHost ?? "-"}`;
   }
   function serviceTargetHost(url) {
     try {

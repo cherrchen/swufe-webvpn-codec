@@ -16,7 +16,7 @@
 | IOS-REQ-013 | K01..K21 | Pending |
 | IOS-REQ-014 | M01..M09 | Pending |
 | IOS-REQ-015 | K18..K23 + security review | Pending |
-| IOS-REQ-016 | N01..N07 + Gateway host / Realm security review | Pending |
+| IOS-REQ-016 | N01..N07 + Gateway host / Realm security review | Failed（N02：注入后仍进入 Gateway 登录；其余项待验证） |
 | IOS-REQ-017 | N02/N04/N05/N06/N10 + classifier matrix | Pending |
 | IOS-REQ-018 | N08/N09 + Trace allowlist / leakage review | Pending |
 | IOS-REQ-005 | A01..A09 | Passed |
@@ -86,9 +86,13 @@ M3 Loon 新增回归门槛：G13（HTTP/80 与 WRD `/http/`）、G14/G15（首�
 
 2026-09-25 最新 Stash M2 真机观察：Safari 完成 WebVPN 登录后，request/response 脚本捕获 Gateway ticket，并持久化到 `swufe.session.v1`；日志不包含 Cookie value。此证据支持 test case N01 = Passed，只确认 Safari 流量到 Plugin Gateway Session Store。它不证明第三方 App 的 direct Gateway request 已注入。
 
-N02–N10 真机项全部 Pending。当前本地实现对无 ticket、stored session 可用的已分类 Gateway 请求注入，其中 WRD 包装资源必须能解码到当前 Routing Scope 的目标域；Stash 以同 URL 的 headers-only `$done` 输出。它尚未证明第三方 App 的请求确实进入 Stash HTTP Engine，或服务端接受该 Cookie 集。`/login` 已见于既有真机链路，排除注入；用户另已确认正常 Gateway logout 精确端点为 `/logout`，本地实现清除 Session 且不注入，响应入口也阻止重新保存 ticket。callback 真实路径仍未确认，未知路径默认不注入。明确 ticket 删除、时钟到期或上述 logout 会清理 Session；CAS-only redirect 保留 Gateway Session。
+N02 真机结果为 Failed，其余 N03–N10 仍 Pending。当前本地实现对无 ticket、stored session 可用的已分类 Gateway 请求注入，其中 WRD 包装资源必须能解码到当前 Routing Scope 的目标域；Stash 以同 URL 的 headers-only `$done` 输出。`/login` 已见于既有真机链路，排除注入；用户另已确认正常 Gateway logout 精确端点为 `/logout`，本地实现清除 Session 且不注入，响应入口也阻止重新保存 ticket。callback 真实路径仍未确认，未知路径默认不注入。明确 ticket 删除、时钟到期或上述 logout 会清理 Session；CAS-only redirect 保留 Gateway Session。
 
-2026-09-25 本地回归：`pnpm --filter webvpn-core-js test` 75 passed，`typecheck` 通过；`pnpm --filter swufe-webvpn-stash test` 29 passed，bundle scan 与 `typecheck` 通过。覆盖 gateway classifier、ticket B precedence、direct WRD 注入、Settings/authserver 排除、`/logout` 请求与响应清理、过期、Set-Cookie rotation、CAS-only redirect 与既有 bootstrap/response reverse rewrite 防环。`pnpm docs:check`、`pnpm spec:check` 与 `git diff --check` 通过。Stash 官方 [Rewrite HTTP 文档](https://stash.wiki/en/script/rewrite-requests) 的 `$done(value)` 字段表允许只返回 `headers`；目标设备上的 headers-only 行为仍待验证。
+2026-09-25 tyxycg 脱敏日志复核：用户确认在打开 tyxycg 前 Safari WebVPN 页面和 Stash Tile 均显示已登录。21:22:22–28 Gateway request 捕获 ticket，CAS 结束后 Gateway 返回 200；21:22:39 tyxycg 请求 `route=rewrite`，随后 gateway WRD 请求 `decodedOriginalHost=tyxycg.swufe.edu.cn`、`requestTicket=missing`、`storedSession=captured`、`sessionAction=inject`。21:22:42 gateway 响应 302 到 raw authserver，`serviceHost=webvpn.swufe.edu.cn`，表明 Gateway 自身重进登录，而非已认证后 tyxycg 自行要求 CAS。21:22:49 出现明确 ticket 失效清理，随后 tyxycg 请求为 `NOT_LOGGED_IN`；21:23:12 `/logout` 的请求与响应均显示 `sessionAction=clear`，之后 Tile `session=missing`。日志证明 request 脚本作出了注入决定；尚不证明 Stash 向上游实际发送了修改后的 Cookie，也无法判断 ticket 是否在登录后轮换、Cookie 集是否完整或 Gateway 是否绑定其它客户端状态。原始日志不写入仓库。
+
+诊断 follow-up：原生 WRD gateway 响应的防环 early-return 曾只输出 `entered`，导致 21:22:39–40 首次注入后的响应状态不可见。现已在该分支加入安全 response trace：`gatewayKind`、`decodedOriginalHost`、`ticketSetCookie=none/new/same/rotated/expired`、`locationGatewayKind` 与既有 host/serviceHost；request capture 另记录 `ticketRelation` 的分类，不记录 ticket 值或 WRD token。下轮真机要先观察首次 WRD 注入后的响应是继续资源访问、回 `/login`，还是下发新的/删除 ticket，并核对 Stash 上游实际 Cookie header 是否存在。
+
+2026-09-25 本地回归：`pnpm --filter webvpn-core-js test` 75 passed，`typecheck` 通过；`pnpm --filter swufe-webvpn-stash test` 30 passed，bundle scan 与 `typecheck` 通过。覆盖 gateway classifier、ticket B precedence、direct WRD 注入、Settings/authserver 排除、`/logout` 请求与响应清理、过期、Set-Cookie rotation、CAS-only redirect 与既有 bootstrap/response reverse rewrite 防环；新增原生 WRD response 的安全状态/轮换诊断测试。`pnpm docs:check`、`pnpm spec:check` 与 `git diff --check` 通过。Stash 官方 [Rewrite HTTP 文档](https://stash.wiki/en/script/rewrite-requests) 的 `$done(value)` 字段表允许只返回 `headers`；目标设备上的 headers-only 行为仍待验证。
 
 ## 执行的命令与结果
 

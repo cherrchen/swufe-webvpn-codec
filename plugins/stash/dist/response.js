@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 7da9df0 */
+/* swufe-webvpn stash d1975c0 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1922,10 +1922,17 @@
       runtime.finishResponse({});
       return;
     }
-    observeGatewayTicket(runtime, settings.gatewayBase);
+    const ticketEvent = observeGatewayTicket(runtime, settings.gatewayBase);
     const rewriteSettings = toRewriteSettingsFromV2(settings);
     const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
     if (context && !context.gatewayOwned && isNativeGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
+      emit(runtime, settings.debug, {
+        ts: runtime.nowIso,
+        host: safeHost(runtime.request.url),
+        direction: "response",
+        action: "pass",
+        detail: responseDetail(runtime.response, runtime.request.url, rewriteSettings, ticketEvent)
+      });
       runtime.finishResponse({});
       return;
     }
@@ -1939,7 +1946,7 @@
       rewriteSettings
     );
     const host = context?.originalHost ?? safeHost(runtime.request.url);
-    const detail = responseDetail(runtime.response, runtime.request.url, rewriteSettings);
+    const detail = responseDetail(runtime.response, runtime.request.url, rewriteSettings, ticketEvent);
     const store = createSessionStore(kv(runtime));
     const session = store.load();
     const confirmedExpiry = result.sessionExpired && session?.status === "valid";
@@ -2061,25 +2068,32 @@
   function observeGatewayTicket(runtime, gatewayBase) {
     const request = runtime.request;
     const response = runtime.response;
-    if (!request?.url || !response) return;
+    if (!request?.url || !response) return "none";
     let host = "";
     try {
       host = new URL(request.url).hostname;
     } catch {
-      return;
+      return "none";
     }
     const gateway = gatewayHost(gatewayBase);
-    if (host.toLowerCase() !== gateway) return;
+    if (host.toLowerCase() !== gateway) return "none";
     const store = createSessionStore(kv(runtime));
     const setCookie = headerValue(response.headers ?? {}, "set-cookie");
     if (setCookie) {
-      const applied = applyTicketSetCookie(store.load(), setCookie, runtime.nowIso, gateway);
+      const previous = store.load();
+      const applied = applyTicketSetCookie(previous, setCookie, runtime.nowIso, gateway);
       if (applied.kind === "expired") {
         expireStoredSession(runtime, host);
-        return;
+        return "expired";
       }
-      if (applied.kind === "update") store.save(applied.session);
+      if (applied.kind === "update") {
+        store.save(applied.session);
+        const oldTicket = previous ? cookiePairValue(previous.cookieHeader, TICKET_COOKIE_NAME) : null;
+        const newTicket = cookiePairValue(applied.session.cookieHeader, TICKET_COOKIE_NAME);
+        return oldTicket === null ? "new" : oldTicket === newTicket ? "same" : "rotated";
+      }
     }
+    return "none";
   }
   function expireStoredSession(runtime, host) {
     createSessionStore(kv(runtime)).clear();
@@ -2131,7 +2145,7 @@
       return null;
     }
   }
-  function responseDetail(response, requestUrl2, settings) {
+  function responseDetail(response, requestUrl2, settings, ticketEvent) {
     const rawLocation = headerValue(response.headers ?? {}, "location");
     let locationUrl = null;
     try {
@@ -2140,8 +2154,12 @@
     }
     const locationHost = locationUrl ? safeHost(locationUrl) : null;
     const wrapped = locationUrl && locationHost === gatewayHost(settings.gatewayBase) ? deriveRewriteContext(locationUrl, settings.gatewayBase, settings.wrdKey, settings.wrdIv) : null;
+    const requestHost = safeHost(requestUrl2);
+    const requestGatewayKind = requestHost === gatewayHost(settings.gatewayBase) ? classifyGatewayRequest(requestUrl2) : "-";
+    const requestWrapped = requestGatewayKind === "wrapped-resource" ? deriveRewriteContext(requestUrl2, settings.gatewayBase, settings.wrdKey, settings.wrdIv) : null;
+    const locationGatewayKind = locationUrl && locationHost === gatewayHost(settings.gatewayBase) ? classifyGatewayRequest(locationUrl) : "-";
     const authKind = locationHost === "authserver.swufe.edu.cn" ? "raw-authserver" : wrapped?.originalHost === "authserver.swufe.edu.cn" ? "wrapped-authserver" : "none";
-    return `status=${response.status ?? 0} locationHost=${locationHost ?? "-"} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
+    return `status=${response.status ?? 0} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} ticketSetCookie=${ticketEvent} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
   }
   function safeHost(url) {
     try {
