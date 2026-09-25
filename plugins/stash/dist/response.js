@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 097ef3d */
+/* swufe-webvpn stash afff976 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1768,7 +1768,7 @@
     }
     const rewriteSettings = toRewriteSettingsFromV2(settings);
     const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
-    if (context?.originalHost === "jwxt.swufe.edu.cn" && safeHost(runtime.request.url) === gatewayHost(rewriteSettings.gatewayBase)) {
+    if (context?.originalHost === "jwxt.swufe.edu.cn" && isNativeJwxtGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
       runtime.finishResponse({});
       return;
     }
@@ -1795,7 +1795,7 @@
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail: `initial-auth-redirect ${detail}` });
     } else if (result.warning) {
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "body-skipped", detail: `${result.warning} ${detail}` });
-    } else if (result.changed) {
+    } else if (result.changed && !locationTargetsRequest(runtime.request.url, result.response.headers)) {
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "rewrite", detail });
     } else {
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail });
@@ -1803,7 +1803,7 @@
     if (context && !context.gatewayOwned && !result.sessionExpired && !result.changes.includes("promotion") && result.response.status >= 200 && result.response.status < 300 && session?.status === "captured") {
       store.save(promoteSession(session, runtime.nowIso));
     }
-    if (!result.changed) {
+    if (!result.changed || locationTargetsRequest(runtime.request.url, result.response.headers)) {
       runtime.finishResponse({});
       return;
     }
@@ -1812,6 +1812,27 @@
       headers: result.response.headers,
       body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : void 0
     });
+  }
+  function isNativeJwxtGatewayUrl(requestUrl2, gatewayBase) {
+    let url;
+    try {
+      url = new URL(requestUrl2);
+    } catch {
+      return false;
+    }
+    if (url.hostname.toLowerCase() !== gatewayHost(gatewayBase)) return false;
+    const scheme = url.pathname.replace(/^\/+/, "").split("/")[0] ?? "";
+    return /^https?(?:-\d+)?$/.test(scheme);
+  }
+  function locationTargetsRequest(requestUrl2, headers) {
+    if (!headers) return false;
+    const location = Object.entries(headers).find(([key]) => key.toLowerCase() === "location")?.[1];
+    if (!location) return false;
+    try {
+      return new URL(location, requestUrl2).href === new URL(requestUrl2).href;
+    } catch {
+      return false;
+    }
   }
   function deriveOriginalRequestContext(runtime, settings) {
     const request = runtime.request;

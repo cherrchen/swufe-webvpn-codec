@@ -156,7 +156,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
     ?? deriveOriginalRequestContext(runtime, rewriteSettings);
   // After a browser navigation has reached the WebVPN URL, its bootstrap
   // document must be served as-is. Promoting it to the same URL loops forever.
-  if (context?.originalHost === "jwxt.swufe.edu.cn" && safeHost(runtime.request.url) === gatewayHost(rewriteSettings.gatewayBase)) {
+  if (context?.originalHost === "jwxt.swufe.edu.cn" && isNativeJwxtGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
     runtime.finishResponse({});
     return;
   }
@@ -185,7 +185,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail: `initial-auth-redirect ${detail}` });
   } else if (result.warning) {
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "body-skipped", detail: `${result.warning} ${detail}` });
-  } else if (result.changed) {
+  } else if (result.changed && !locationTargetsRequest(runtime.request.url, result.response.headers)) {
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "rewrite", detail });
   } else {
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "response", action: "pass", detail });
@@ -194,7 +194,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
     && result.response.status >= 200 && result.response.status < 300 && session?.status === "captured") {
     store.save(promoteSession(session, runtime.nowIso));
   }
-  if (!result.changed) {
+  if (!result.changed || locationTargetsRequest(runtime.request.url, result.response.headers)) {
     runtime.finishResponse({});
     return;
   }
@@ -203,6 +203,29 @@ export function handleStashResponse(runtime: StashRuntime): void {
     headers: result.response.headers,
     body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : undefined,
   });
+}
+
+function isNativeJwxtGatewayUrl(requestUrl: string, gatewayBase: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return false;
+  }
+  if (url.hostname.toLowerCase() !== gatewayHost(gatewayBase)) return false;
+  const scheme = url.pathname.replace(/^\/+/, "").split("/")[0] ?? "";
+  return /^https?(?:-\d+)?$/.test(scheme);
+}
+
+function locationTargetsRequest(requestUrl: string, headers: Record<string, string> | undefined): boolean {
+  if (!headers) return false;
+  const location = Object.entries(headers).find(([key]) => key.toLowerCase() === "location")?.[1];
+  if (!location) return false;
+  try {
+    return new URL(location, requestUrl).href === new URL(requestUrl).href;
+  } catch {
+    return false;
+  }
 }
 
 export function nativeGatewayRedirect(request: StashRuntime["request"], result: HostRequestResult): string | null {

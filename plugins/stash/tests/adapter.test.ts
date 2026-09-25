@@ -138,12 +138,64 @@ describe("Stash adapter", () => {
       lastConfirmedAt: null,
       status: "captured",
     });
+    const other = runtime({
+      request: { url: "https://jwxt.swufe.edu.cn/xtgl/index_initMenu.html", method: "GET", headers: {} },
+      read: rt.read,
+    });
+    handleStashRequest(other);
+    const rewritten = other.requests[0] as { url: string };
+    rt.response = { status: 302, headers: { location: rewritten.url }, body: "" };
+    handleStashResponse(rt);
+    expect(rt.responses[0]).toMatchObject({ headers: { location: "https://jwxt.swufe.edu.cn/xtgl/index_initMenu.html" } });
+  });
+
+  it("does not emit a redirect whose target is the current browser URL", () => {
+    const rt = runtime({
+      request: { url: "https://jwxt.swufe.edu.cn/main", method: "GET", headers: {} },
+    });
+    rt.store[STORAGE_KEYS.session] = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: "webvpn.swufe.edu.cn",
+      cookieHeader: "route=fake",
+      capturedAt: NOW,
+      lastConfirmedAt: null,
+      status: "captured",
+    });
     const req = runtime({ request: rt.request, read: rt.read });
     handleStashRequest(req);
     const rewritten = req.requests[0] as { url: string };
     rt.response = { status: 302, headers: { location: rewritten.url }, body: "" };
     handleStashResponse(rt);
-    expect(rt.responses[0]).toMatchObject({ headers: { location: "https://jwxt.swufe.edu.cn/main" } });
+    expect(rt.responses[0]).toEqual({});
+  });
+
+  it("passes a native https WebVPN document without promoting it to itself", () => {
+    const req = runtime({
+      request: { url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} },
+    });
+    req.store[STORAGE_KEYS.session] = JSON.stringify({
+      schemaVersion: 1,
+      gatewayHost: "webvpn.swufe.edu.cn",
+      cookieHeader: "route=fake",
+      capturedAt: NOW,
+      lastConfirmedAt: null,
+      status: "captured",
+    });
+    handleStashRequest(req);
+    const rewritten = req.requests[0] as { url: string };
+    expect(rewritten.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn\/https\//);
+    const res = runtime({
+      request: { url: rewritten.url, method: "GET", headers: {} },
+      response: {
+        status: 200,
+        headers: { "content-type": "text/html" },
+        body: '<script>var __vpn_x=1</script><script src="/wengine-vpn/js/main.js"></script>',
+      },
+      read: (key) => req.store[key] ?? null,
+      write: req.write,
+    });
+    handleStashResponse(res);
+    expect(res.responses[0]).toEqual({});
   });
 
   it("keeps a captured session when the login page redirects to CAS", () => {
