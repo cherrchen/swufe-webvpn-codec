@@ -93,6 +93,7 @@
 | Q-007 | wildcard MitM、SWUFE 子域 script match、HTTP 子域 force-http-engine | 动态自定义 Domain | Open / Gate D | 是；失败时改用静态 interception 列表 |
 | Q-008 | `DOMAIN-SUFFIX,swufe.edu.cn` QUIC 规则在目标 iOS Override 真机命中与 TCP 回落 | 子域 HTTPS script | Open / Gate D | M2 发布前 |
 | Q-009 | Tile `$done({url})` 动态切换到 Settings 是否可靠 | Tile Journey | Open / M2 | 否；固定 Settings + 独立登录按钮为退化 |
+| Q-010 | 独立 App 已携带与 Safari 不同、且被 Gateway 拒绝的 ticket 时，如何在请求 Cookie 优先规则下复用 Safari Session；是否需要候选 Session 与可信度/客户端关联，或经明确失效证据后受限回退 | 跨 App Gateway Session 正确性及安全边界 | Open / M2；N02 真机失败 | 是；不得直接覆盖请求自带 ticket |
 | Q-010 | 16 KiB 以上 Settings POST 能否本地 413 且保证不被 Stash `max-size` 跳过后发往 upstream | Settings API 安全 | Open / Gate D | 是；失败则不能交付 POST API |
 
 | Q-011 | LOGIN、LOGOUT、AUTH_CALLBACK 与 GATEWAY_OWNED 的真实 pathname / request intent 是什么 | Gateway classifier 与登录/登出安全 | 部分确认：`/login` 已见于既有链路；用户真机确认正常 logout 为精确 `/logout`；callback 与其它 owned 路径仍 Open、默认不注入 | 是，未知路径默认 no-injection |

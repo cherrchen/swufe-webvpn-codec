@@ -110,6 +110,10 @@ N02 真机结果为 Failed，其余 N03–N10 仍 Pending。当前本地实现�
 
 0.1.15-m2 本地回归（不是真机结论）：Core 75 个测试、Stash 33 个测试，两包 typecheck、Stash bundle scan、`docs:check`、`spec:check` 与 `git diff --check` 均通过。新增 Adapter 测试覆盖无 ticket/不同 ticket 请求的 Set-Cookie 不覆盖已有共享 Session，匹配的 ticket rotation 仍可更新。
 
+2026-09-25 0.1.15-m2 App 失败在前、Web 成功在后的脱敏对照日志：约 22:09:43–22:10:17（用户标记为独立 App）有 8 次 tyxycg ordinary rewrite、10 次无 ticket Gateway WRD `sessionAction=inject`；WRD 响应既有 200 也有 14 次 302 到 Gateway `/login`，后者再跳 raw authserver，`serviceHost=webvpn.swufe.edu.cn`。22:09:44 两次无 ticket Gateway-owned 200 下发 ticket 均记为 `unbound-ignored`，证实 0.1.15 的响应侧隔离已运行；但紧接着两个 Gateway-owned 请求自带与 stored 不同的 ticket，request 侧按既定 B 优先规则 `sessionAction=capture`，会把新客户端 ticket 写入唯一的 `swufe.session.v1`。之后 App WRD 带 ticket 仍反复进入 Gateway `/login`。约 22:10:27–22:10:55（用户标记为 Web 成功）首次 tyxycg WRD request 的 ticket 与当时 stored ticket 不同，亦被 capture；随后同一目标约 49 次 WRD 200、2 次 301 和 1 次 307，另有一次 500，整体 Web 页面由用户确认为可用。可见浏览器使用自身 ticket 成功，而共享 store 在客户端切换时跟随不同 request ticket 改写；`captured` 状态本身不能证明所存 ticket 可在其它客户端复用。现有日志没有客户端标识、请求关联 ID 或安全的服务器验证信号，不能仅凭 200 与时间关系认定每个响应的调用方，也不能断言 Gateway 额外绑定条件的具体种类。22:09:55–22:10:17 `/login` 的 ticket 删除响应均为 `expired-ignored`，Session 未被误清；22:11:01 明确 `/logout` 才清理 Session。N02 继续 Failed。原始日志不写入仓库。
+
+这轮结果暴露 Scope 冲突：现行 N03 要求请求自带 ticket B 时 B 优先且立即更新唯一 store；一旦独立 App 已有自己的 B，即使它无法通过 Gateway，该规则也会阻止注入 Safari 的 A，并可能把 store 改成 B。仅拦截响应侧的无 ticket rotation 无法解决请求侧覆盖。是否允许在 Gateway 明确拒绝 B 后进行受限回退，或引入并行候选 Session/可信度与客户端关联，需单独设计；当前证据不足以安全地把 A 强行覆盖到已有 B 的请求。CAS Cookie 跨 App 共享仍不在 M2 范围。
+
 2026-09-25 本地回归：`pnpm --filter webvpn-core-js test` 75 passed，`typecheck` 通过；`pnpm --filter swufe-webvpn-stash test` 30 passed，bundle scan 与 `typecheck` 通过。覆盖 gateway classifier、ticket B precedence、direct WRD 注入、Settings/authserver 排除、`/logout` 请求与响应清理、过期、Set-Cookie rotation、CAS-only redirect 与既有 bootstrap/response reverse rewrite 防环；新增原生 WRD response 的安全状态/轮换诊断测试。`pnpm docs:check`、`pnpm spec:check` 与 `git diff --check` 通过。Stash 官方 [Rewrite HTTP 文档](https://stash.wiki/en/script/rewrite-requests) 的 `$done(value)` 字段表允许只返回 `headers`；目标设备上的 headers-only 行为仍待验证。
 
 ## 执行的命令与结果
