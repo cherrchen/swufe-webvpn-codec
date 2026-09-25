@@ -1,4 +1,4 @@
-/* swufe-webvpn stash afff976 */
+/* swufe-webvpn stash e52bd49 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1871,7 +1871,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     } catch {
       return null;
     }
-    if (url.protocol !== "http:" || url.hostname.toLowerCase() !== "jwxt.swufe.edu.cn" || (request.method ?? "GET").toUpperCase() !== "GET") return null;
+    if (url.protocol !== "http:" && url.protocol !== "https:" || (request.method ?? "GET").toUpperCase() !== "GET") return null;
     const accept = Object.entries(request.headers ?? {}).find(([key]) => key.toLowerCase() === "accept")?.[1] ?? "";
     return url.pathname === "/" || accept.toLowerCase().includes("text/html") ? result.url : null;
   }

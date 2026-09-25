@@ -1,4 +1,4 @@
-/* swufe-webvpn stash afff976 */
+/* swufe-webvpn stash e52bd49 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1768,7 +1768,7 @@
     }
     const rewriteSettings = toRewriteSettingsFromV2(settings);
     const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
-    if (context?.originalHost === "jwxt.swufe.edu.cn" && isNativeJwxtGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
+    if (context && !context.gatewayOwned && isNativeGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
       runtime.finishResponse({});
       return;
     }
@@ -1813,7 +1813,7 @@
       body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : void 0
     });
   }
-  function isNativeJwxtGatewayUrl(requestUrl2, gatewayBase) {
+  function isNativeGatewayUrl(requestUrl2, gatewayBase) {
     let url;
     try {
       url = new URL(requestUrl2);

@@ -98,8 +98,9 @@ describe("Stash adapter", () => {
     expect(nativeGatewayRedirect({ url: "http://jwxt.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBe(rewritten.url);
     expect(nativeGatewayRedirect({ url: "http://jwxt.swufe.edu.cn/xtgl/index_initMenu.html", method: "GET", headers: { Accept: "text/html,application/xhtml+xml" } }, rewritten)).toBe(rewritten.url);
     expect(nativeGatewayRedirect({ url: "http://jwxt.swufe.edu.cn/api", method: "GET", headers: { Accept: "application/json" } }, rewritten)).toBeNull();
-    expect(nativeGatewayRedirect({ url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBeNull();
-    expect(nativeGatewayRedirect({ url: "http://other.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBeNull();
+    expect(nativeGatewayRedirect({ url: "https://jwxt.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBe(rewritten.url);
+    expect(nativeGatewayRedirect({ url: "http://resource.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBe(rewritten.url);
+    expect(nativeGatewayRedirect({ url: "https://resource.swufe.edu.cn/", method: "GET", headers: {} }, rewritten)).toBe(rewritten.url);
   });
 
   it("passes the native WebVPN bootstrap document without redirecting to itself", () => {

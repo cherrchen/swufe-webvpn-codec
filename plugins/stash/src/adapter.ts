@@ -156,7 +156,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
     ?? deriveOriginalRequestContext(runtime, rewriteSettings);
   // After a browser navigation has reached the WebVPN URL, its bootstrap
   // document must be served as-is. Promoting it to the same URL loops forever.
-  if (context?.originalHost === "jwxt.swufe.edu.cn" && isNativeJwxtGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
+  if (context && !context.gatewayOwned && isNativeGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
     runtime.finishResponse({});
     return;
   }
@@ -205,7 +205,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
   });
 }
 
-function isNativeJwxtGatewayUrl(requestUrl: string, gatewayBase: string): boolean {
+function isNativeGatewayUrl(requestUrl: string, gatewayBase: string): boolean {
   let url: URL;
   try {
     url = new URL(requestUrl);
@@ -236,8 +236,7 @@ export function nativeGatewayRedirect(request: StashRuntime["request"], result: 
   } catch {
     return null;
   }
-  if (url.protocol !== "http:" || url.hostname.toLowerCase() !== "jwxt.swufe.edu.cn"
-    || (request.method ?? "GET").toUpperCase() !== "GET") return null;
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || (request.method ?? "GET").toUpperCase() !== "GET") return null;
   const accept = Object.entries(request.headers ?? {}).find(([key]) => key.toLowerCase() === "accept")?.[1] ?? "";
   return url.pathname === "/" || accept.toLowerCase().includes("text/html") ? result.url : null;
 }
