@@ -8,7 +8,7 @@ homepage: https://github.com/cherrchen/swufe-webvpn-codec
 icon: network
 category: SWUFE
 date: 2026-09-24
-version: 0.1.12-m2
+version: 0.1.13-m2
 
 tiles:
   - name: swufe-webvpn-tile
@@ -22,16 +22,16 @@ tiles:
 
 script-providers:
   swufe-webvpn-request:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.12-m2
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.13-m2
     interval: 86400
   swufe-webvpn-request-settings:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.12-m2
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/request.js?v=0.1.13-m2
     interval: 86400
   swufe-webvpn-response:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/response.js?v=0.1.12-m2
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/response.js?v=0.1.13-m2
     interval: 86400
   swufe-webvpn-tile:
-    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/tile.js?v=0.1.12-m2
+    url: https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/stash/dist/tile.js?v=0.1.13-m2
     interval: 86400
 
 # HTTP/3 does not enter the Stash HTTP Engine. Reject QUIC only for the SWUFE

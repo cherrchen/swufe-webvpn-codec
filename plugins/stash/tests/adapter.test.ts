@@ -94,6 +94,7 @@ describe("Stash adapter", () => {
     expect(output).toContain("route=gateway");
     expect(output).toContain("gatewayKind=wrapped-resource");
     expect(output).toContain("decodedOriginalHost=tyxycg.swufe.edu.cn");
+    expect(output).toContain("sourceScheme=https targetScheme=http");
     expect(output).toContain("serviceHost=tyxycg.swufe.edu.cn");
     expect(output).not.toMatch(/secret-ticket|%2Fsecret|service=https|cookieHeader=|\/http\/[a-z0-9]+/);
   });
@@ -121,9 +122,26 @@ describe("Stash adapter", () => {
     const output = logs.join("\n");
     expect(output).toContain("gatewayKind=wrapped-resource");
     expect(output).toContain("decodedOriginalHost=tyxycg.swufe.edu.cn");
+    expect(output).toContain("targetScheme=https responseVisibleTicket=missing");
     expect(output).toContain("locationGatewayKind=login");
+    expect(output).toContain("locationGatewaySignal=-");
     expect(output).toContain("ticketSetCookie=expired");
     expect(output).not.toMatch(/secret|\/https\/[a-z0-9]+|wengine_vpn_ticketwebvpn_swufe_edu_cn=/);
+  });
+
+  it("classifies an observed gateway failed redirect without logging request secrets", () => {
+    const logs: string[] = [];
+    const url = new WrdCodec(DEFAULT_KEY, DEFAULT_KEY, "webvpn.swufe.edu.cn").encodeUrl("http://tyxycg.swufe.edu.cn/api?service=https%3A%2F%2Ftyxycg.swufe.edu.cn%2Fprivate", "https://webvpn.swufe.edu.cn");
+    const rt = runtime({
+      request: { url, headers: { Cookie: `${TICKET_COOKIE_NAME}=private-ticket` } },
+      response: { status: 302, headers: { location: "https://webvpn.swufe.edu.cn/wengine-vpn/failed?reason=private-reason" } },
+      debug: (record) => logs.push(JSON.stringify(record)),
+    });
+    handleStashResponse(rt);
+    const output = logs.join("\n");
+    expect(output).toContain("targetScheme=http responseVisibleTicket=present");
+    expect(output).toContain("locationGatewayKind=gateway-owned locationGatewaySignal=failed");
+    expect(output).not.toMatch(/private-ticket|private-reason|\/http\/[a-z0-9]+|service=https|cookieHeader=/);
   });
 
   it("traces raw authserver redirects using only the service hostname", () => {

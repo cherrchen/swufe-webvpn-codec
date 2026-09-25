@@ -94,6 +94,12 @@ N02 真机结果为 Failed，其余 N03–N10 仍 Pending。当前本地实现�
 
 用户补充：可登录的 `jwxt` 用例发生在 Safari，失败的 `tyxycg` 用例发生在独立 App/WKWebView；前者使用 Safari 自身 Cookie Jar，不能作为跨 App 注入成功的对照。`tyxycg` 在 Settings 当前选 HTTP，Core 会对该主机强制编码为 WRD `/http/`，即使源请求是 HTTPS；原日志未记录 WRD 协议段，也未确认目标实际要求的协议。下一轮先在同一独立 App、同一 Safari 登录状态下分别试 tyxycg 的 HTTP 与 HTTPS 站点设置，比较首个 WRD 响应；单独改变此设置，不同时改变 Session/CAS 逻辑。协议不匹配目前仅是待验证假设。
 
+2026-09-25 后续 HTTP/HTTPS 真机日志（用户报告：HTTP 页面内 API WebView 组件出现 `errMsg: request:fail`；HTTPS 进入 CAS，登录后落在 Gateway 根页，App 仍不可访问）：HTTP 组约 21:36:59 的 tyxycg 请求先改写，随后 Gateway WRD `decodedOriginalHost=tyxycg.swufe.edu.cn` 且 `sessionAction=inject`；首批 WRD 响应包含 403 和 200，当前脱敏日志没有请求路径/关联 ID，不能把 403 精确归因到报错的 API。约 21:37:00 Gateway-owned 200 下发旋转后的 ticket；随后 WRD 出现客户端自带 ticket，但约 21:37:01 又转入 Gateway `/login`。HTTPS 组约 21:37:55 同样执行注入，首批 WRD 302 到 Gateway `/login`，登录响应通过 Set-Cookie 删除 ticket，存储随之清除；CAS 回来后 Gateway `/login` 再 302 到根页。约 21:38:19 再访问 tyxycg 时，WRD 响应 302 到一个 Gateway-owned 路径，其精确路径在当前日志中不可见。两组都未证明 Gateway Session 跨 App 复用成功；CAS 的 `serviceHost=webvpn.swufe.edu.cn` 表明已见的 CAS 往返属于 Gateway 登录链，不是已确认的 tyxycg 业务 CAS。用户在 Stash 界面找不到相应上游请求详情，因此实际上游 Cookie header 是否存在仍未确认。原始日志不写入仓库。
+
+下一版 Safe Trace 增加 `sourceScheme`、`targetScheme`、`responseVisibleTicket` 和 `locationGatewaySignal`。`responseVisibleTicket` 只表示 Stash 响应脚本所见 `$request.headers` 是否包含核心 ticket，不能证明上游收到它；`locationGatewaySignal=failed` 仅在 Location 精确指向仓库已有证据的 `/wengine-vpn/failed` 时输出。所有字段只输出协议或分类，不输出 Cookie、WRD token、完整 URL/query 或 service URL。下一轮先复核这些字段与首次 WRD 响应，必要时继续寻找宿主上游请求头的独立证据。N02 保持 Failed。
+
+2026-09-25 0.1.13-m2 本地回归（不是真机结论）：Core 75 个测试、Stash 31 个测试、两包 typecheck、Stash bundle scan、`docs:check`、`spec:check` 与 `git diff --check` 均通过。新增测试覆盖 HTTP/HTTPS 目标协议分类、响应脚本可见 ticket 标记和 `/wengine-vpn/failed` Location 分类的脱敏性；真实 Stash 响应脚本是否能看到改写后的 header 尚待真机。
+
 2026-09-25 本地回归：`pnpm --filter webvpn-core-js test` 75 passed，`typecheck` 通过；`pnpm --filter swufe-webvpn-stash test` 30 passed，bundle scan 与 `typecheck` 通过。覆盖 gateway classifier、ticket B precedence、direct WRD 注入、Settings/authserver 排除、`/logout` 请求与响应清理、过期、Set-Cookie rotation、CAS-only redirect 与既有 bootstrap/response reverse rewrite 防环；新增原生 WRD response 的安全状态/轮换诊断测试。`pnpm docs:check`、`pnpm spec:check` 与 `git diff --check` 通过。Stash 官方 [Rewrite HTTP 文档](https://stash.wiki/en/script/rewrite-requests) 的 `$done(value)` 字段表允许只返回 `headers`；目标设备上的 headers-only 行为仍待验证。
 
 ## 执行的命令与结果

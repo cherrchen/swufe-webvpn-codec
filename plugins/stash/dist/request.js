@@ -1,4 +1,4 @@
-/* swufe-webvpn stash d1975c0 */
+/* swufe-webvpn stash dd1140d */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -2166,7 +2166,25 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     const stored = clockExpired ? "expired" : session?.status ?? "missing";
     const action = decision === "inject_gateway_session" ? "inject" : decision === "capture_session" ? "capture" : "none";
     const serviceHost = serviceTargetHost(decoded?.originalUrl ?? url);
-    return `route=${route} gatewayKind=${gatewayKind} decodedOriginalHost=${decoded?.originalHost ?? "-"} requestTicket=${ticket ? "present" : "missing"} ticketRelation=${ticketRelation} storedSession=${stored} sessionAction=${action} requestCookiePriority=${ticket ? "yes" : "not-applicable"} serviceHost=${serviceHost ?? "-"}`;
+    const sourceScheme = schemeOf(url);
+    const targetScheme = route === "rewrite" ? settings.hostSchemes?.[host] ?? "http" : gatewayKind === "wrapped-resource" ? wrappedSchemeOf(url) : "-";
+    return `route=${route} gatewayKind=${gatewayKind} decodedOriginalHost=${decoded?.originalHost ?? "-"} sourceScheme=${sourceScheme} targetScheme=${targetScheme} requestTicket=${ticket ? "present" : "missing"} ticketRelation=${ticketRelation} storedSession=${stored} sessionAction=${action} requestCookiePriority=${ticket ? "yes" : "not-applicable"} serviceHost=${serviceHost ?? "-"}`;
+  }
+  function schemeOf(url) {
+    try {
+      const protocol = new URL(url).protocol;
+      return protocol === "http:" ? "http" : protocol === "https:" ? "https" : "other";
+    } catch {
+      return "other";
+    }
+  }
+  function wrappedSchemeOf(url) {
+    try {
+      const first = new URL(url).pathname.split("/")[1] ?? "";
+      return /^http(?:-\d+)?$/.test(first) ? "http" : /^https(?:-\d+)?$/.test(first) ? "https" : "-";
+    } catch {
+      return "-";
+    }
   }
   function serviceTargetHost(url) {
     try {

@@ -198,7 +198,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
       host: safeHost(runtime.request.url),
       direction: "response",
       action: "pass",
-      detail: responseDetail(runtime.response, runtime.request.url, rewriteSettings, ticketEvent),
+      detail: responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent),
     });
     runtime.finishResponse({});
     return;
@@ -213,7 +213,7 @@ export function handleStashResponse(runtime: StashRuntime): void {
     rewriteSettings,
   );
   const host = context?.originalHost ?? safeHost(runtime.request.url);
-  const detail = responseDetail(runtime.response, runtime.request.url, rewriteSettings, ticketEvent);
+  const detail = responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent);
   const store = createSessionStore(kv(runtime));
   const session = store.load();
   const confirmedExpiry = result.sessionExpired && session?.status === "valid";
@@ -530,7 +530,24 @@ function authTraceDetail(
   const stored = clockExpired ? "expired" : session?.status ?? "missing";
   const action = decision === "inject_gateway_session" ? "inject" : decision === "capture_session" ? "capture" : "none";
   const serviceHost = serviceTargetHost(decoded?.originalUrl ?? url);
-  return `route=${route} gatewayKind=${gatewayKind} decodedOriginalHost=${decoded?.originalHost ?? "-"} requestTicket=${ticket ? "present" : "missing"} ticketRelation=${ticketRelation} storedSession=${stored} sessionAction=${action} requestCookiePriority=${ticket ? "yes" : "not-applicable"} serviceHost=${serviceHost ?? "-"}`;
+  const sourceScheme = schemeOf(url);
+  const targetScheme = route === "rewrite" ? settings.hostSchemes?.[host] ?? "http"
+    : gatewayKind === "wrapped-resource" ? wrappedSchemeOf(url) : "-";
+  return `route=${route} gatewayKind=${gatewayKind} decodedOriginalHost=${decoded?.originalHost ?? "-"} sourceScheme=${sourceScheme} targetScheme=${targetScheme} requestTicket=${ticket ? "present" : "missing"} ticketRelation=${ticketRelation} storedSession=${stored} sessionAction=${action} requestCookiePriority=${ticket ? "yes" : "not-applicable"} serviceHost=${serviceHost ?? "-"}`;
+}
+
+function schemeOf(url: string): "http" | "https" | "other" {
+  try {
+    const protocol = new URL(url).protocol;
+    return protocol === "http:" ? "http" : protocol === "https:" ? "https" : "other";
+  } catch { return "other"; }
+}
+
+function wrappedSchemeOf(url: string): "http" | "https" | "-" {
+  try {
+    const first = new URL(url).pathname.split("/")[1] ?? "";
+    return /^http(?:-\d+)?$/.test(first) ? "http" : /^https(?:-\d+)?$/.test(first) ? "https" : "-";
+  } catch { return "-"; }
 }
 
 function serviceTargetHost(url: string): string | null {
@@ -540,7 +557,7 @@ function serviceTargetHost(url: string): string | null {
   } catch { return null; }
 }
 
-function responseDetail(response: NonNullable<StashRuntime["response"]>, requestUrl: string, settings: ReturnType<typeof toRewriteSettingsFromV2>, ticketEvent: GatewayTicketEvent): string {
+function responseDetail(response: NonNullable<StashRuntime["response"]>, requestUrl: string, requestHeaders: Record<string, string> | undefined, settings: ReturnType<typeof toRewriteSettingsFromV2>, ticketEvent: GatewayTicketEvent): string {
   const rawLocation = headerValue(response.headers ?? {}, "location");
   let locationUrl: string | null = null;
   try { if (rawLocation) locationUrl = new URL(rawLocation, requestUrl).href; } catch { /* omit malformed target */ }
@@ -553,9 +570,19 @@ function responseDetail(response: NonNullable<StashRuntime["response"]>, request
     ? deriveRewriteContext(requestUrl, settings.gatewayBase, settings.wrdKey, settings.wrdIv) : null;
   const locationGatewayKind = locationUrl && locationHost === gatewayHost(settings.gatewayBase)
     ? classifyGatewayRequest(locationUrl) : "-";
+  const locationGatewaySignal = locationUrl && locationGatewayKind === "gateway-owned"
+    ? gatewayOwnedSignal(locationUrl) : "-";
+  const responseVisibleTicket = requestHost === gatewayHost(settings.gatewayBase)
+    ? (cookiePairValue(headerValue(requestHeaders ?? {}, "cookie"), TICKET_COOKIE_NAME) !== null ? "present" : "missing")
+    : "-";
   const authKind = locationHost === "authserver.swufe.edu.cn" ? "raw-authserver"
     : wrapped?.originalHost === "authserver.swufe.edu.cn" ? "wrapped-authserver" : "none";
-  return `status=${response.status ?? 0} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} ticketSetCookie=${ticketEvent} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
+  return `status=${response.status ?? 0} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} targetScheme=${requestGatewayKind === "wrapped-resource" ? wrappedSchemeOf(requestUrl) : "-"} responseVisibleTicket=${responseVisibleTicket} ticketSetCookie=${ticketEvent} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationGatewaySignal=${locationGatewaySignal} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
+}
+
+function gatewayOwnedSignal(url: string): "failed" | "other" {
+  try { return new URL(url).pathname === "/wengine-vpn/failed" ? "failed" : "other"; }
+  catch { return "other"; }
 }
 
 function safeHost(url: string): string | null {

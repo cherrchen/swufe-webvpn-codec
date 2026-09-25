@@ -1,4 +1,4 @@
-/* swufe-webvpn stash d1975c0 */
+/* swufe-webvpn stash dd1140d */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1931,7 +1931,7 @@
         host: safeHost(runtime.request.url),
         direction: "response",
         action: "pass",
-        detail: responseDetail(runtime.response, runtime.request.url, rewriteSettings, ticketEvent)
+        detail: responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent)
       });
       runtime.finishResponse({});
       return;
@@ -1946,7 +1946,7 @@
       rewriteSettings
     );
     const host = context?.originalHost ?? safeHost(runtime.request.url);
-    const detail = responseDetail(runtime.response, runtime.request.url, rewriteSettings, ticketEvent);
+    const detail = responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent);
     const store = createSessionStore(kv(runtime));
     const session = store.load();
     const confirmedExpiry = result.sessionExpired && session?.status === "valid";
@@ -2137,6 +2137,14 @@
     const always = safeDiagnostic({ ...record, direction: "system" }, false);
     if (always) runtime.debug(always);
   }
+  function wrappedSchemeOf(url) {
+    try {
+      const first = new URL(url).pathname.split("/")[1] ?? "";
+      return /^http(?:-\d+)?$/.test(first) ? "http" : /^https(?:-\d+)?$/.test(first) ? "https" : "-";
+    } catch {
+      return "-";
+    }
+  }
   function serviceTargetHost(url) {
     try {
       const service = new URL(url).searchParams.get("service");
@@ -2145,7 +2153,7 @@
       return null;
     }
   }
-  function responseDetail(response, requestUrl2, settings, ticketEvent) {
+  function responseDetail(response, requestUrl2, requestHeaders, settings, ticketEvent) {
     const rawLocation = headerValue(response.headers ?? {}, "location");
     let locationUrl = null;
     try {
@@ -2158,8 +2166,17 @@
     const requestGatewayKind = requestHost === gatewayHost(settings.gatewayBase) ? classifyGatewayRequest(requestUrl2) : "-";
     const requestWrapped = requestGatewayKind === "wrapped-resource" ? deriveRewriteContext(requestUrl2, settings.gatewayBase, settings.wrdKey, settings.wrdIv) : null;
     const locationGatewayKind = locationUrl && locationHost === gatewayHost(settings.gatewayBase) ? classifyGatewayRequest(locationUrl) : "-";
+    const locationGatewaySignal = locationUrl && locationGatewayKind === "gateway-owned" ? gatewayOwnedSignal(locationUrl) : "-";
+    const responseVisibleTicket = requestHost === gatewayHost(settings.gatewayBase) ? cookiePairValue(headerValue(requestHeaders ?? {}, "cookie"), TICKET_COOKIE_NAME) !== null ? "present" : "missing" : "-";
     const authKind = locationHost === "authserver.swufe.edu.cn" ? "raw-authserver" : wrapped?.originalHost === "authserver.swufe.edu.cn" ? "wrapped-authserver" : "none";
-    return `status=${response.status ?? 0} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} ticketSetCookie=${ticketEvent} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
+    return `status=${response.status ?? 0} gatewayKind=${requestGatewayKind} decodedOriginalHost=${requestWrapped?.originalHost ?? "-"} targetScheme=${requestGatewayKind === "wrapped-resource" ? wrappedSchemeOf(requestUrl2) : "-"} responseVisibleTicket=${responseVisibleTicket} ticketSetCookie=${ticketEvent} locationHost=${locationHost ?? "-"} locationGatewayKind=${locationGatewayKind} locationGatewaySignal=${locationGatewaySignal} locationAuth=${authKind} serviceHost=${locationUrl ? serviceTargetHost(wrapped?.originalUrl ?? locationUrl) ?? "-" : "-"}`;
+  }
+  function gatewayOwnedSignal(url) {
+    try {
+      return new URL(url).pathname === "/wengine-vpn/failed" ? "failed" : "other";
+    } catch {
+      return "other";
+    }
   }
   function safeHost(url) {
     try {
