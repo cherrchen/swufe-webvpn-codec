@@ -92,6 +92,8 @@ N02 真机结果为 Failed，其余 N03–N10 仍 Pending。当前本地实现�
 
 诊断 follow-up：原生 WRD gateway 响应的防环 early-return 曾只输出 `entered`，导致 21:22:39–40 首次注入后的响应状态不可见。现已在该分支加入安全 response trace：`gatewayKind`、`decodedOriginalHost`、`ticketSetCookie=none/new/same/rotated/expired`、`locationGatewayKind` 与既有 host/serviceHost；request capture 另记录 `ticketRelation` 的分类，不记录 ticket 值或 WRD token。下轮真机要先观察首次 WRD 注入后的响应是继续资源访问、回 `/login`，还是下发新的/删除 ticket，并核对 Stash 上游实际 Cookie header 是否存在。
 
+用户补充：可登录的 `jwxt` 用例发生在 Safari，失败的 `tyxycg` 用例发生在独立 App/WKWebView；前者使用 Safari 自身 Cookie Jar，不能作为跨 App 注入成功的对照。`tyxycg` 在 Settings 当前选 HTTP，Core 会对该主机强制编码为 WRD `/http/`，即使源请求是 HTTPS；原日志未记录 WRD 协议段，也未确认目标实际要求的协议。下一轮先在同一独立 App、同一 Safari 登录状态下分别试 tyxycg 的 HTTP 与 HTTPS 站点设置，比较首个 WRD 响应；单独改变此设置，不同时改变 Session/CAS 逻辑。协议不匹配目前仅是待验证假设。
+
 2026-09-25 本地回归：`pnpm --filter webvpn-core-js test` 75 passed，`typecheck` 通过；`pnpm --filter swufe-webvpn-stash test` 30 passed，bundle scan 与 `typecheck` 通过。覆盖 gateway classifier、ticket B precedence、direct WRD 注入、Settings/authserver 排除、`/logout` 请求与响应清理、过期、Set-Cookie rotation、CAS-only redirect 与既有 bootstrap/response reverse rewrite 防环；新增原生 WRD response 的安全状态/轮换诊断测试。`pnpm docs:check`、`pnpm spec:check` 与 `git diff --check` 通过。Stash 官方 [Rewrite HTTP 文档](https://stash.wiki/en/script/rewrite-requests) 的 `$done(value)` 字段表允许只返回 `headers`；目标设备上的 headers-only 行为仍待验证。
 
 ## 执行的命令与结果

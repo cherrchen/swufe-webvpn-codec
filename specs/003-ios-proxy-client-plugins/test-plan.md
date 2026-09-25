@@ -38,6 +38,7 @@ release bundle：单文件可解析、无 Node built-in、无 unresolved imports
 3. 分别复核解码目标已在 Routing Scope 的 `/http/<token>/...`、`/https/<token>/...` 和无 query 的 gateway 根路径 GET/HEAD；验证请求头注入后 URL 不变。解码失败或目标未入选的 WRD、Settings、raw authserver、`/login`、`/wengine-vpn/...`、未知路径与带 query 的根路径均不注入。对用户已确认的 gateway `/logout`，验证请求不注入、`swufe.session.v1` 清除，且响应不会重新保存 ticket。
 4. 验证 ticket B 请求遇到 stored ticket A 时 B 优先且 store 更新；核对 Set-Cookie rotation、明确 ticket 删除、时钟过期、普通 jwxt 改写、响应反向改写和导航无重定向环。
 5. 若注入后仍跳 gateway `/login`，检查网关所需 Cookie 集、path/domain、rotation 或其他绑定状态；若网关复用成功后 `tyxycg` 再跳 raw authserver，只记录为独立业务 CAS 流程，不在 M2 扩展 CAS Cookie 共享。
+6. 对照必须使用同一独立 App 的网络环境。Safari 中 `jwxt` 成功只证明 Safari 自身 Cookie 可用；它不是跨 App Gateway Session 复用对照。若 tyxycg 当前站点协议设为 HTTP，保持其它条件相同后改为 HTTPS 再试一次，记录首个 WRD response 的状态与安全分类；不记录 WRD token 或完整 URL。
 
 Stash Settings E2E 另验证 synthetic HTML、同源 API GET/POST、pseudo endpoint 未上游、Tile 动态/固定退化 URL、离线已缓存运行、Dark Mode/safe-area 与保存后路由即时变化。
 
