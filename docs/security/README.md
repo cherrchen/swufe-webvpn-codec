@@ -1,9 +1,9 @@
 # 安全文档
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-25
 
 **用途**：记录本项目的信任边界、认证授权、密钥与不可信输入等长期安全事实与约束。
-**范围**：SWUFE WebVPN Bridge Phase 1（本机 Electron 应用 + mitmproxy sidecar）。长期设计文档中的安全结论以本文件与相关 ADR 为准；具体实现的安全验证项登记在 Spec 的 Security Considerations 与 `verification.md`。
+**范围**：桌面 Phase 1（本机 Electron 应用 + mitmproxy sidecar）与 [Spec 003 iOS 代理客户端插件](../../specs/003-ios-proxy-client-plugins/)。两种宿主的拦截边界不同；下文旧有 Phase 1 细节按桌面语境理解，移动端新增边界见第 11 节、[ADR-0014](../architecture/adr/ADR-0014-stash-local-settings-and-routing-scope.md) 与 Spec 003。
 
 ---
 
@@ -119,4 +119,12 @@ flowchart LR
 - 安全验证项 ⇒ [verification-strategy.md](../verification/verification-strategy.md)
 - 每个 Spec 必须填写 Security Considerations（见 [specs/_template/design.md](../../specs/_template/design.md)）；Phase 1 见 [specs/001-phase1-local-bridge/design.md](../../specs/001-phase1-local-bridge/design.md) 的 Security Considerations
 - 配置与运行约束 ⇒ [operations/README.md](../operations/README.md)
+
+## 11. 移动代理插件安全边界（Spec 003）
+
+Stash/Loon 插件复用宿主 Network Extension、HTTP Engine、MitM CA 和 Script；这些能力由用户在代理客户端内配置。移动插件不接收账号密码/MFA；WebVPN Session 仅在本机宿主持久化，只能注入已选择目标改写后的 gateway upstream 请求。
+
+Stash 为支持保存后动态启用新的 SWUFE 子域，Interception Scope 可能宽于 Routing Scope：`*.swufe.edu.cn` 可在设备本地进入 HTTP Engine/MitM；Routing Scope 仍只包含 Settings 中启用的精确 hostname。被拦截不代表会经 WebVPN。未选中 host 必须原样 PASS，不改 URL/header/body、不注入 Cookie、不请求 gateway；用户说明必须明确这一点以及 Stash 本地可解密范围。Wildcard 配置当前仍待项目目标 Stash 版本实机验证。
+
+Settings WebUI 由 Stash bundle 本地提供，Settings namespace 在 Session/Routing/Codec 之前由 Script synthetic response short-circuit，永不发送到 gateway server。`POST /__swufe_bridge__/api/settings` 只写站点配置，需使用设备本地 one-use nonce、来源与 Content-Type 校验、严格 schema 和 16 KiB body limit；未知路径/方法、处理异常及 oversized body 必须本地终止，不能 fall through upstream。API 和日志不得暴露 Cookie、Authorization、MFA、WRD secret 或 raw POST body。具体契约与尚待设备验证项见 [Spec 003 interfaces](../../specs/003-ios-proxy-client-plugins/interfaces.md)、[verification](../../specs/003-ios-proxy-client-plugins/verification.md)。
 - 威胁相关测试用例（代理冲突、会话过期、响应改写）⇒ [testing-strategy.md](../development/testing-strategy.md)

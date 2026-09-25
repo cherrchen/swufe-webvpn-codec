@@ -12,7 +12,10 @@
 | IOS-REQ-001 | G01/H01 + disable/update cases | Pending |
 | IOS-REQ-002 | I01/I03 + G07/H04 | Pending |
 | IOS-REQ-003 | C01..C10 + I02/I04 | Pending |
-| IOS-REQ-004 | B01..B09 | Passed |
+| IOS-REQ-004 | B01..B09 + K04–K06 + M01–M04 | Pending |
+| IOS-REQ-013 | K01..K21 | Pending |
+| IOS-REQ-014 | M01..M09 | Pending |
+| IOS-REQ-015 | K18..K23 + security review | Pending |
 | IOS-REQ-005 | A01..A09 | Passed |
 | IOS-REQ-006 | D01..D09 | Passed |
 | IOS-REQ-007 | E01..E11 | Passed |
@@ -49,6 +52,28 @@ M3 Loon 新增回归门槛：G13（HTTP/80 与 WRD `/http/`）、G14/G15（首�
 | AC-IOS-008 | G01/G10/G11 + H01/H10/H11 | Pending |
 | AC-IOS-009 | J01 | Pending |
 | AC-IOS-010 | I01..I04 已记录；I05/I06 仍 Pending | Passed |
+
+## Settings Feature Requirement → Evidence
+
+| Requirement | Test / Evidence | Status |
+| --- | --- | --- |
+| AC-SETTINGS-001 | K01, K09 + Stash Tile device capture | Pending |
+| AC-SETTINGS-002 | K01/K02/K11 + bundle inventory, airplane/offline after install | Pending |
+| AC-SETTINGS-003 | K04 + persisted V2 readback | Pending |
+| AC-SETTINGS-004 | K05, L01 + valid hostname persisted | Pending |
+| AC-SETTINGS-005 | K14–K15, L02–L03 | Pending |
+| AC-SETTINGS-006 | K16 + route reserved-host negative cases | Pending |
+| AC-SETTINGS-007 | K13 + Stash `$persistentStore` inspection without exposing secrets | Pending |
+| AC-SETTINGS-008 | M04 immediate next-request test | Pending |
+| AC-SETTINGS-009 | M02–M04 URL/header/body unchanged evidence | Pending |
+| AC-SETTINGS-010 | M02–M03 gateway upstream Cookie absence | Pending |
+| AC-SETTINGS-011 | K10/K21/K22/M05 origin-side request capture shows no upstream request, including handler exceptions | Pending |
+| AC-SETTINGS-012 | bundle dependency/manifest scan | Pending |
+| AC-SETTINGS-013 | architecture + bundle/request trace review | Pending |
+| AC-SETTINGS-014 | L04–L07 migration fixture matrix | Pending |
+| AC-SETTINGS-015 | L08 before/after session value equality | Pending |
+| AC-SETTINGS-016 | config review + separate M06 interception and M01/M02 routing evidence | Pending |
+| AC-SETTINGS-017 | M02/M03/M06/M07 selected vs unselected SWUFE host capture | Pending |
 
 ## 执行的命令与结果
 
@@ -120,7 +145,7 @@ Q-001、Q-002 因此关闭。Gate A 通过。I05（Safari 是否总能捕获）�
 | Session 不进日志/通知 | Passed | F01..F03 单元测试 |
 | 非 gateway 不注入 Session | Passed | D09 |
 | authserver 不持久化认证 Cookie | Passed | C03 |
-| MitM scope 最小化 | Pending | 配置审查 + 真机 |
+| Interception vs Routing scope | Pending | Override + user notice review; M02/M06/M07 device evidence |
 
 ## 文档同步
 
@@ -135,6 +160,12 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 | 最小 Session Cookie 集 | 只见到与 desktop 相同的一组名字，尚未做裁剪实验 | P0 日志中的 Cookie 名 | OQ-003 仍 Open |
 | Loon 局部 QUIC 策略 | 需实际配置验证 | 尚未真机 | M2 |
 | body size/time limit | 宿主运行时限制 | 尚未压测 | M4 |
+| Settings pseudo route body response / content type | Existing Stash Demo contains no synthetic Settings endpoint | Not tested | T040–T043 device checks |
+| Stash wildcard MitM and script match on arbitrary subdomain | Existing override lists only jwxt/gateway/authserver | Not tested in this repository/device evidence | T046 / M06 |
+| wildcard HTTP force-engine behavior | Existing config has only jwxt:80 | Not tested | T046; adopt static fallback if unsupported |
+| suffix-scoped QUIC reject in Override | Demo currently has three exact QUIC rules | Official syntax exists; repo config/device behavior unverified | T046 / M07 |
+| CSRF nonce random source/Origin visibility | No Settings API exists in current adapter | Not tested; must be prerequisite | T039 |
+| Tile dynamic URL to Settings | Current tile ViewModel always links gateway login | Official API allows override, project device behavior untested | T044 / K09 |
 
 ## 结论
 

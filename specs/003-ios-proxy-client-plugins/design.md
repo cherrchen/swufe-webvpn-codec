@@ -3,7 +3,7 @@
 > Spec ID: 003  
 > Status: Approved  
 > Owner: cherrchen  
-> Last Updated: 2026-09-24
+> Last Updated: 2026-09-25
 
 本文件是仓库 Spec 体系的 **How** 入口。完整技术内容拆分为：
 
@@ -29,7 +29,7 @@ Desktop 当前由 Electron + mitmproxy + Python `WrdCodec` 实现。Loon/Stash �
 | 接口 | 是 | 新增 Core/Adapter contracts | architecture/interfaces + api |
 | 数据模型 | 是 | 新增 PluginSettings/SessionRecord | architecture/data-model |
 | desktop | 否 | 行为保持不变，作为回归与协议基线 | 仅补总体架构描述 |
-| ADR | 是 | 第三方宿主、共享 Core、AES backend | 新 ADR |
+| ADR | 是 | Settings pseudo WebUI、动态 Routing/Interception 边界 | [ADR-0014](../../docs/architecture/adr/ADR-0014-stash-local-settings-and-routing-scope.md) |
 
 ## Components
 
@@ -53,7 +53,7 @@ Desktop 当前由 Electron + mitmproxy + Python `WrdCodec` 实现。Loon/Stash �
 
 ## Security Considerations
 
-核心约束：不存密码；Session 只注入 gateway；authserver 不持久化认证 Cookie/表单；日志脱敏；MitM scope 最小化；无自建云端后端。
+核心约束：不存密码；Session 只注入 gateway；authserver 不持久化认证 Cookie/表单；日志脱敏；Stash Interception Scope 与 WebVPN Routing Scope 分开；无自建云端后端。Settings synthetic route、CSRF 防护与 wildcard MITM 的安全边界见 [architecture.md §12–14](architecture.md)。
 
 ## Performance Considerations
 
@@ -70,11 +70,11 @@ Desktop 当前由 Electron + mitmproxy + Python `WrdCodec` 实现。Loon/Stash �
 
 ## Migration
 
-Desktop 无数据迁移。移动端 storage 使用独立 schema；无法安全迁移的 Session 直接清除并要求重新登录。
+Desktop 无数据迁移。Settings V1 → V2 migration 按 [data-model.md §16](data-model.md) 执行，且必须保留 `swufe.session.v1`。Session 自身 schema 兼容属于独立判断，Settings 升级不清 Session。
 
 ## Alternatives Considered
 
-见 [architecture.md §16](architecture.md)。
+见 [architecture.md §18](architecture.md)。
 
 ## Risks
 

@@ -1,8 +1,10 @@
 # 参考资料与事实来源
 
-> Last Checked: 2026-09-24
+> Last Checked: 2026-09-25
 
 本文记录本 Feature 使用的仓库既有事实、Loon/Stash 官方能力与需要实机验证的边界。实现时若宿主 App 版本发生变化，应重新核对对应官方文档。
+
+2026-09-25 检查的 Stash 官方文档确认：Override MitM 项支持 `*.domain` wildcard；HTTP Engine 文档明确 HTTP/3 不进入 HTTP Engine；Rule Types 文档列出 `DOMAIN-SUFFIX`、`PROTOCOL,QUIC`、`AND`；HTTP Rewrite Script 文档定义 `$done({response:{status,headers,body}})` 可直接替换响应，并说明 `require-body`、request body 上限与 `webkit` engine 可使用 `crypto`/`TextEncoder` 等 Web API；Tile 文档允许 `$done({url})` 更新点击 URL；Script Interface 文档定义 `$persistentStore.read/write`。这些是官方公开能力描述，不代表本项目配置或 Settings flow 已真机验证。
 
 ## 1. 仓库现有事实
 
@@ -97,6 +99,19 @@
 `https://stash.wiki/en/http-engine/intro`
 
 用于确认 HTTPS MitM/HTTP Engine，以及 HTTP/3 当前不进入 HTTP Engine、而作为 UDP 流量处理这一兼容边界。
+
+### Stash rule syntax
+
+- `https://stash.wiki/en/rules/rule-types` — `DOMAIN-SUFFIX`、`PROTOCOL,QUIC`、`AND` 规则类型。
+- `https://stash.wiki/en/http-engine/mitm` — MitM host pattern 支持 `*.example.com` 和端口表达方式。
+
+### Stash Synthetic Response / runtime
+
+- `https://stash.wiki/en/script/rewrite-requests` — request `$done` 可返回 response 来替换响应、不实际发起请求；并定义 request body/max-size/script engine。
+- `https://stash.wiki/en/script/syntax-and-interface` — `$persistentStore` API；WebKit engine 可以使用包括 `crypto` 在内的部分 Web API。
+- `https://stash.wiki/en/script/tile` — Tile `$done` 可更新 URL；目标 Stash 版本的动态 URL 行为仍需真机确认。
+
+Settings token 的候选实现为 request script `engine: webkit` + `crypto.getRandomValues`。官方页面确认 `crypto` Web API 可用性范围，但具体随机方法及运行环境仍需设备验证；无法安全生成 nonce 时 fail closed。
 
 ### URL Schema
 

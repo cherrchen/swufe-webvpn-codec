@@ -1,6 +1,6 @@
 # Architecture Overview
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-25
 >
 > Chinese source of truth: [overview.md](overview.md)
 
@@ -19,6 +19,8 @@ Runtime:         Electron / Node (App) + Python (sidecar process)
 ```
 
 Phase 1 has no TUN-level takeover; the optional future `sing-box TUN → 127.0.0.1:mitm` is not part of this deployable unit (see C-003).
+
+Mobile is a separate deployment shape: Stash (first) / Loon plugins reuse the third-party proxy client's Network Extension, HTTP Engine, MitM, and Script. They are not part of the desktop Electron/mitmproxy deployable unit. Mobile components and traffic boundaries are described in [Spec 003](../../specs/003-ios-proxy-client-plugins/architecture.md). Stash Settings are recorded in [ADR-0014](adr/ADR-0014-stash-local-settings-and-routing-scope.en.md): Interception Scope may be wider than the exact Routing Scope, while unselected targets still PASS unchanged.
 
 ## System context
 
@@ -69,6 +71,7 @@ Decisions are not expanded here; this is an index into the ADRs:
 | Phase 1 uses an Electron GUI instead of a pure CLI | Accepted | [adr/ADR-0003-electron-gui-for-phase-1.md](adr/ADR-0003-electron-gui-for-phase-1.md) |
 | Refuse to start when the system proxy is already in use | Accepted | [adr/ADR-0004-refuse-start-when-system-proxy-in-use.md](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md) |
 | Ship a built-in default WRD key while keeping a config override | Accepted | [adr/ADR-0005-builtin-wrd-key-with-override.md](adr/ADR-0005-builtin-wrd-key-with-override.md) |
+| Stash uses a local pseudo WebUI to manage exact WebVPN sites, separating interception from routing scope | Accepted | [adr/ADR-0014-stash-local-settings-and-routing-scope.en.md](adr/ADR-0014-stash-local-settings-and-routing-scope.en.md) |
 
 ## Known architectural risks
 

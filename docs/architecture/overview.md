@@ -1,6 +1,6 @@
 # 架构总览
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-25
 
 **用途**：用最少的篇幅说明系统的整体形态与边界，使读者在 5 分钟内建立正确的系统心智模型。
 **不写**：组件细节（→ [components.md](components.md)）、数据字段（→ [data-model.md](data-model.md)）、接口字段（→ [interfaces.md](interfaces.md)、[docs/api/](../api/README.md)）。
@@ -17,6 +17,8 @@
 ```
 
 第一期不包含 TUN 级接管；后续可选的 `sing-box TUN → 127.0.0.1:mitm` 不在本期部署单元中（见 C-003）。
+
+移动端是独立部署形态：Stash（首发）/Loon 插件复用第三方代理客户端的 Network Extension、HTTP Engine、MitM 与 Script，不属于桌面 Electron/mitmproxy 部署单元。移动端组件与流量边界由 [Spec 003](../../specs/003-ios-proxy-client-plugins/architecture.md) 描述。Stash 的 Settings 设计见 [ADR-0014](adr/ADR-0014-stash-local-settings-and-routing-scope.md)：Interception Scope 可以宽于精确 Routing Scope，未选择目标仍原样 PASS。
 
 ## 上下文图（System Context）
 
@@ -67,6 +69,7 @@ flowchart LR
 | Phase 1 采用 Electron GUI，而非纯 CLI | Accepted | [adr/ADR-0003-electron-gui-for-phase-1.md](adr/ADR-0003-electron-gui-for-phase-1.md) |
 | 系统代理被占用时拒绝启动 | Accepted | [adr/ADR-0004-refuse-start-when-system-proxy-in-use.md](adr/ADR-0004-refuse-start-when-system-proxy-in-use.md) |
 | WRD 默认密钥内置并保留配置覆盖 | Accepted | [adr/ADR-0005-builtin-wrd-key-with-override.md](adr/ADR-0005-builtin-wrd-key-with-override.md) |
+| Stash 使用本地 pseudo WebUI 管理精确 WebVPN 站点，拦截与路由范围分离 | Accepted | [adr/ADR-0014-stash-local-settings-and-routing-scope.md](adr/ADR-0014-stash-local-settings-and-routing-scope.md) |
 
 ## 已知的架构风险
 

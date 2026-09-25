@@ -41,7 +41,7 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 | G-IOS-003 | 登录使用官方网页，并如实描述打开位置 | 2026-09-24 真机：Loon 通知与 Stash Tile 都打开系统 Safari。文案写「打开网页登录」，不称应用内登录 |
 | G-IOS-004 | 不收集学校密码 | 插件代码、存储和日志均不存在用户名/密码保存路径 |
 | G-IOS-005 | 两客户端共享业务逻辑 | Loon/Stash 仅包含薄 Adapter，核心 codec/routing/rewrite/session 由共享包提供 |
-| G-IOS-006 | 安全范围最小化 | 仅对 gateway + allowlist 所需域名启用 MitM/改写，不默认解密普通互联网流量 |
+| G-IOS-006 | 分离拦截与路由范围 | Stash 可预先拦截 SWUFE 子域以支持动态选择；只有启用的精确 hostname 才改写并通过 WebVPN |
 
 ## 5. Non-goals
 
@@ -51,9 +51,10 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 | NG-IOS-002 | 替代学校 SSLVPN、提供任意 TCP/UDP 内网访问 | WebVPN bridge 仍只处理被支持的 HTTP/HTTPS |
 | NG-IOS-003 | 绕过 CAS/MFA、自动填写密码 | 登录必须由官方页面和用户自行完成 |
 | NG-IOS-004 | 兼容所有证书 pinning App | MitM 架构天然不保证 pinning 客户端 |
-| NG-IOS-005 | 默认代理/解密全部 `*.swufe.edu.cn` | 遵循最小范围；通配必须显式打开 |
-| NG-IOS-006 | 在插件内实现完整浏览器 UI | 第三方脚本没有稳定的原生 WebView API；只使用客户端已有 URL 入口 |
+| NG-IOS-005 | 默认将所有 `*.swufe.edu.cn` 路由到 WebVPN | 只有用户启用的精确 hostname 进入 Routing Scope |
+| NG-IOS-006 | 实现完整浏览器或独立服务 | Settings 只是轻量管理页，不承载 WebVPN 浏览 |
 | NG-IOS-007 | 首期支持 Surge/Quantumult X/Shadowrocket | 先完成 Stash 与 Loon，之后再评估 Adapter 扩展 |
+| NG-IOS-008 | BoxJS、外部设置后端、GitHub Pages、localhost server、CDN UI | Stash 插件自包含，设置由宿主 persistent store 保存 |
 
 ## 6. 核心用户旅程
 
@@ -84,6 +85,15 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 3. Tile/通知状态变为“登录已失效”。
 4. 用户点击“重新登录”，重复官方登录流程。
 
+### 6.4 管理代理网站（Stash 首发）
+
+1. 用户点击 Stash Tile 进入 `https://webvpn.swufe.edu.cn/__swufe_bridge__/`。
+2. Stash request script 优先识别保留 Settings 命名空间，并从插件内 bundle 合成 HTML，不联系真实 gateway。
+3. 页面通过同源 pseudo API 读取设置；用户启用/禁用内置站点，或输入 hostname 添加自定义站点。
+4. Core 负责 hostname 规范化、限制 `.swufe.edu.cn` 和拒绝保留 host；UI 显示 inline 错误。
+5. 保存时页面 POST JSON 与设备本地 token；Stash Adapter 验证、归一化并写入 `swufe.settings.v2`。
+6. 后续每个业务请求读取最新 Settings 并生成精确 RoutingPolicy，无需重装 Override。`Intercepted != Routed through WebVPN`：未选 hostname 原样 PASS。
+
 ## 7. 功能需求
 
 ### IOS-REQ-001 插件安装与启用
@@ -110,11 +120,35 @@ iOS 已有 Stash、Loon 这类 App Store 代理应用，可以承担 Network Ext
 
 ### IOS-REQ-004 Allowlist
 
-- 默认至少包含 `jwxt.swufe.edu.cn`。
-- 支持精确 hostname。
-- 可选启用 `*.swufe.edu.cn`，但必须是用户显式配置。
+- Stash Settings 可启用/禁用已知内置站点、添加/删除自定义 hostname，并持久化设置。
+- 默认仅预置已知的 `jwxt.swufe.edu.cn`。站点目录只能由可靠来源确认后扩展。
+- 自定义项仅允许合法、精确的 `.swufe.edu.cn` 子域名；不提供 wildcard 路由开关。
+- 保存后下一请求即时读取新 Routing Scope，无需重新下载/安装插件。
 - `webvpn.swufe.edu.cn`、`authserver.swufe.edu.cn` 永远排除普通 WRD 二次包装。
-- 非 allowlist 流量不得注入 WebVPN Cookie。
+- 未启用项以及其它被拦截的 SWUFE 子域必须 PASS：不改 URL/Header/body、不注入 Cookie、不执行 WRD rewrite。
+
+### IOS-REQ-013 本地 Settings WebUI 与 pseudo API（Stash）
+
+- Settings HTML/CSS/JS 在插件构建阶段打包进 Stash script bundle；Safari 访问合成的 `https://webvpn.swufe.edu.cn/__swufe_bridge__/` 页面。
+- 保留前缀 `__swufe_bridge__` 在 request/response 正常业务链之前 short-circuit；不得触发 Session Capture、routing、WRD 或流向真实 gateway。
+- 对已识别 Settings namespace 的解析、存储或处理异常必须本地返回合成错误响应；不能沿用普通业务 handler 的 pass-through catch。
+- API 仅包含 `GET /__swufe_bridge__/api/settings` 和 `POST /__swufe_bridge__/api/settings`；读写使用 Stash `$persistentStore`，不需要 BoxJS/云端/socket server。
+- 页面允许未登录时配置站点；网页登录是独立动作；Settings 不保存密码、CAS Cookie、MFA、Session 或 WRD secret。
+- 保存通过本机 token、Origin/Referer、Content-Type、Host/path/method、schema 与 16 KiB UTF-8 body 上限验证。超限必须在本地返回 413，绝不能绕过 handler 到真实 gateway；错误返回稳定机器码，不返回存储内容或敏感字段。
+
+### IOS-REQ-014 拦截与路由边界
+
+- Stash 首发方案预定 `*.swufe.edu.cn` HTTPS MitM 和必要 HTTP Engine 范围，以便用户安装后动态启用新子域；这是相对旧设计“仅明确目标 MitM”的安全语义变化。
+- 只有 Routing Scope 精确选中 hostname 可以执行 WebVPN rewrite。宽拦截只让 HTTP Engine 执行 PASS 决定，不构成转发授权。
+- 用户说明、README、安全说明须披露：被 Stash 本地解密的未选子域仍原样 PASS；只有已选域经过 WebVPN；Cookie 不注入未选域。
+- Wildcard MitM、HTTP `force-http-engine` 与子域 QUIC 规则须由目标 Stash 版本真机验证后才可宣称完成。
+- 若 wildcard interception 实机不可用，静态 fallback 只能让 Settings 管理 Override 已声明 hostname；任意自定义域功能需暂缓，重新评审并显式调整 AC-SETTINGS-004/008 和用户预期。
+
+### IOS-REQ-015 Settings API 安全
+
+- Settings POST 仅接受同源 Settings UI 发出的 JSON、自定义设备 token 和限定大小的合法 V2 schema；检查 Origin/Referer（若 Stash 暴露）、Host、path、method 和 Content-Type，任何检查不能由 UI 自己替代。
+- 页面 GET 生成短期 nonce 的能力及 Stash JS runtime 可用的安全随机源待实现前验证；没有可靠 token 时 POST 必须 fail-closed。不得用固定 bundle token 或 `Math.random()` 充当安全随机数。
+- API 只读写站点设置；响应不得包含 Session/CAS Cookie、Authorization、MFA、WRD key/iv 或完整敏感请求。Debug 不打印 Settings POST 原文。
 
 ### IOS-REQ-005 WRD 请求改写
 
@@ -161,7 +195,7 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 - Session Cookie 只存代理客户端的本地持久化存储。
 - 不同步到本项目自建服务器；本 Feature 不引入云后端。
 - 日志默认关闭；即使调试开启，也不得输出完整 URL token、Cookie、Body 或认证参数。
-- 文档明确说明启用 MitM 意味着目标域名 HTTPS 会在设备本地被代理客户端解密。
+- 文档明确说明启用 MitM 意味着列入 Interception Scope 的 HTTPS 会在设备本地被代理客户端解密；未选目标仍 PASS，但不代表其未被本地解密。
 
 ### IOS-REQ-010 QUIC/HTTP3 处理
 
@@ -220,3 +254,23 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 - [ ] AC-IOS-008：Stash 与 Loon 各自至少通过安装/启用/禁用/更新/卸载冒烟测试。
 - [ ] AC-IOS-009：desktop 原有测试不受影响。
 - [x] AC-IOS-010：OQ-001/OQ-002 的 P0 实机结论已记录；Safari 降级已写入 PRD 与 UI/UX。
+
+### Settings 验收标准
+
+- [ ] AC-SETTINGS-001：用户可从 Stash Tile 进入 SWUFE WebVPN Settings。
+- [ ] AC-SETTINGS-002：页面由 Stash Script synthetic response 提供，不依赖远程 WebUI/backend。
+- [ ] AC-SETTINGS-003：用户可启用/禁用内置站点。
+- [ ] AC-SETTINGS-004：用户可添加合法 `.swufe.edu.cn` 自定义 hostname。
+- [ ] AC-SETTINGS-005：非法 hostname 被拒绝并显示 inline error。
+- [ ] AC-SETTINGS-006：gateway/authserver 不可作为普通 target。
+- [ ] AC-SETTINGS-007：保存结果写入 `$persistentStore` 的 `swufe.settings.v2`。
+- [ ] AC-SETTINGS-008：保存后最新配置即时参与 request routing。
+- [ ] AC-SETTINGS-009：未选 host 不执行 WebVPN rewrite。
+- [ ] AC-SETTINGS-010：未选 host 不注入 WebVPN Cookie。
+- [ ] AC-SETTINGS-011：Settings namespace 永不发送到 gateway upstream。
+- [ ] AC-SETTINGS-012：插件无 BoxJS 依赖。
+- [ ] AC-SETTINGS-013：插件无远程 Settings Backend。
+- [ ] AC-SETTINGS-014：V1 Settings 可迁移到 V2。
+- [ ] AC-SETTINGS-015：Settings schema 升级不清除 `swufe.session.v1`。
+- [ ] AC-SETTINGS-016：Interception Scope 与 Routing Scope 在文档和测试中分开验证。
+- [ ] AC-SETTINGS-017：`*.swufe.edu.cn` 中未选流量保持 PASS。

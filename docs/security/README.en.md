@@ -1,11 +1,11 @@
 # Security Documentation
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-25
 >
 > Chinese source of truth: [README.md](README.md)
 
 **Purpose**: record long-lived security facts and constraints for this project: trust boundaries, authentication and authorisation, secrets and untrusted input.
-**Scope**: SWUFE WebVPN Bridge Phase 1 (a local Electron app plus a mitmproxy sidecar). Security conclusions in long-lived design docs defer to this file and the related ADRs; per-spec security verification entries live in the spec's Security Considerations and `verification.md`.
+**Scope**: Desktop Phase 1 (local Electron app plus mitmproxy sidecar) and [Spec 003 iOS proxy-client plugins](../../specs/003-ios-proxy-client-plugins/). Their interception boundaries differ; existing Phase 1 details below use the desktop context. See §11, [ADR-0014](../architecture/adr/ADR-0014-stash-local-settings-and-routing-scope.en.md), and Spec 003 for the mobile boundary.
 
 ---
 
@@ -126,3 +126,11 @@ These operations are those of a local single-user tool; phase 1 introduces no mu
 - Every spec must fill in Security Considerations (see [specs/_template/design.md](../../specs/_template/design.md)); for phase 1 see the Security Considerations of [specs/001-phase1-local-bridge/design.md](../../specs/001-phase1-local-bridge/design.md)
 - Configuration and runtime constraints ⇒ [operations/README.md](../operations/README.md)
 - Threat-related test cases (proxy conflict, session expiry, response rewriting) ⇒ [testing-strategy.md](../development/testing-strategy.md)
+
+## 11. Mobile Proxy Plugin Security Boundary (Spec 003)
+
+Stash/Loon plugins reuse the host's Network Extension, HTTP Engine, MitM CA, and Script capabilities, which users configure in the proxy client. Mobile plugins do not receive account passwords or MFA. WebVPN Sessions stay in host-local persistence and may only be injected into the gateway upstream request for a selected target that is being rewritten.
+
+To let Stash dynamically enable a new SWUFE subdomain after saving Settings, its Interception Scope may be wider than its Routing Scope: `*.swufe.edu.cn` can enter the local HTTP Engine/MitM, while Routing Scope still contains only exact hostnames enabled in Settings. Interception does not imply WebVPN routing. An unselected host must PASS unchanged, without URL/header/body changes, Cookie injection, or a gateway request. User-facing instructions must disclose the local decryption scope. The wildcard configuration is still pending device validation on the target Stash version.
+
+The Settings WebUI is served locally from the Stash bundle. A Script synthetic response short-circuits the Settings namespace before Session/Routing/Codec logic and never sends it to the gateway server. `POST /__swufe_bridge__/api/settings` only writes site configuration and requires a device-local one-use nonce, origin and Content-Type checks, strict schema validation, and a 16 KiB body limit. Unknown paths/methods, handler exceptions, and oversized requests must terminate locally without falling through upstream. The API and logs must not expose Cookies, Authorization, MFA, WRD secrets, or raw POST bodies. See the [Spec 003 interface contract](../../specs/003-ios-proxy-client-plugins/interfaces.md) and [verification matrix](../../specs/003-ios-proxy-client-plugins/verification.md) for details and pending device evidence.

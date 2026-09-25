@@ -26,8 +26,8 @@
 
 ### Phase M2 — Stash（首发宿主）
 
-- 目标：Stash Adapter、`.stoverride`、Tile、HTTP/3 fallback、E2E。
-- 退出条件：Stash 主路径通过，或宿主限制已明确记入产品范围。
+- 目标：Stash Adapter、`.stoverride`、Tile、HTTP/3 fallback、bundled Settings WebUI/pseudo API、Settings V2 migration、动态精确 allowlist、E2E。
+- 退出条件：Stash 主路径和 Settings E2E 通过；wildcard interception 通过真机，或产品明确退化为静态 interception；未选目标 PASS 与 Settings endpoint no-upstream 已有证据。
 
 ### Phase M3 — Loon
 
@@ -51,7 +51,7 @@
 
 ## Migration
 
-Desktop 不迁移。移动端使用新的独立 storage schema；旧/未知 Session schema 不能安全迁移时清除并要求重新登录。
+Settings 从 `swufe.settings.v1` 迁移到 `swufe.settings.v2`，V1 exact hosts 规范化为 builtin/custom host，V1 wildcard 强制关闭；详见 [data-model.md §16](data-model.md)。Settings migration 不触碰独立的 `swufe.session.v1`。未知 Session schema 仅按 Session 自身兼容规则处理，不因 Settings 升级主动清除。
 
 ## Rollback
 
@@ -72,4 +72,4 @@ Desktop 不迁移。移动端使用新的独立 storage schema；旧/未知 Sess
 
 ## Open Questions
 
-见 [README.md](README.md) 的 P0/工程假设表。
+实现前 Gate D 需确认安全 nonce source、Origin/Referer/body host interface、synthetic response、wildcard MitM、HTTP force-engine 与 QUIC suffix rule；见 [project-management.md §10](project-management.md) 与 [verification.md](verification.md)。

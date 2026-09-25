@@ -9,7 +9,7 @@
 
 移动端插件没有数据库。持久状态只使用 Loon/Stash 提供的本地 persistent store，且保持最少。配置为低敏感；Session 高敏感；通知节流低敏感；错误状态只能保存脱敏信息；RewriteContext 默认只在运行时存在。
 
-## 2. PluginSettingsV1
+## 2. PluginSettingsV1 (legacy)
 
 ```json
 {
@@ -137,3 +137,45 @@ Session 若无法安全迁移，直接清除并要求重新登录，不猜测转
 ## 14. 卸载与清除
 
 第三方客户端“卸载插件”是否自动清 `$persistentStore` 不应被假设。若宿主允许，提供显式 reset：清 Session、LastError、Throttle，Settings 可恢复默认。不得尝试删除宿主 CA。
+
+## 15. PluginSettingsV2（动态站点设置）
+
+持久化 key：`swufe.settings.v2`。站点目录（显示名、builtin 标志、域名）由插件版本内置，用户配置只存稳定 builtin id 的开关状态和 custom hostname，避免客户端篡改 `builtin` 属性或存储重复展示文案。
+
+```json
+{
+  "schemaVersion": 2,
+  "enabled": true,
+  "gatewayBase": "https://webvpn.swufe.edu.cn",
+  "builtinSiteStates": { "jwxt": true },
+  "customHosts": [],
+  "debug": false,
+  "bodyRewriteMaxBytes": 1048576,
+  "migrationWarnings": []
+}
+```
+
+`bodyRewriteMaxBytes` 的数值仍是 schema 示例/沿用字段，最终默认必须依据宿主压测冻结。V2 去除 `exactHosts` 与 `includeSwufeWildcard` 两个 V1 Routing 层字段。唯一 builtin 是有可靠事实支持的 `jwxt.swufe.edu.cn`，id 为 `jwxt`；未来加入 builtin 需确认官方 hostname 并稳定 id。
+
+`SiteDefinition` 是 UI view model：`{ id, name, host, enabled, builtin }`。Core Settings 持久格式不保存任意 SiteDefinition 数组，避免 UI concern 渗入 routing Core；SettingsService 从 source catalog + V2 状态合成列表，再归一化为 exact RoutingPolicy。自定义项显示名可由 hostname 生成，不存独立任意标签。
+
+方案比较：直接持久化 `SiteDefinition[]` 对 UI 直观，但会把显示名、builtin 可删除性与 Core storage schema 绑定，也允许客户端伪造 builtin 标志；本 Spec 选择 `builtinSiteStates + customHosts`，migration 可按 stable builtin id 映射，Core 只需处理 DTO/host，不依赖 UI 文案。
+
+## 16. V1 → V2 migration
+
+读取顺序：先读 `swufe.settings.v2`；若不存在，再读 `swufe.settings.v1` 并纯函数迁移；若两者都不存在，使用 V2 defaults。只有 schema 校验成功后才写入 v2。未知 future schema 不覆盖原值，返回 `RUNTIME_INCOMPATIBLE`。
+
+迁移规则：
+
+1. 保留合法的 `enabled`、`gatewayBase`、`debug`、key/iv overrides、`bodyRewriteMaxBytes`。
+2. 规范化 V1 `exactHosts`；与 `webvpn.swufe.edu.cn`、`authserver.swufe.edu.cn` 相同的项丢弃。
+3. `jwxt.swufe.edu.cn` 映射到 `{builtinSiteStates: {jwxt: true}}`。
+4. 其他合法精确 host 仅在严格满足 `.swufe.edu.cn` 子域规则时放入 `customHosts`；非法、外部域、IP、apex 和 wildcard 项丢弃，并设置不含原始值的 `migrationWarnings: [DROPPED_INVALID_OR_OUT_OF_SCOPE_HOST]` 供 UI 摘要提示。成功保存新 Settings 后清空该 warning。
+5. 一律把旧 `includeSwufeWildcard` 设为不迁移/关闭。用户必须明确逐项选择目标，不能由通配符隐式扩大 Routing Scope。
+6. 将 normalized V2 写到 `swufe.settings.v2`。迁移不调用 SessionStore，不读写、不清除 `swufe.session.v1`；Settings 保存也不得改变 Session。
+
+迁移过程中若 v2 写入失败，保留 v1 原值、当前页面显示错误并 fail closed 使用默认路由；不得因迁移失败回退为 wildcard routing。迁移结果的 warnings 不包含被丢弃 hostname 明文。
+
+## 17. 默认与敏感性
+
+默认 `builtinSiteStates.jwxt = true`，`customHosts = []`，无 wildcard routing。Settings API 返回 public Settings DTO 时不包含 WRD key/iv overrides。敏感性：站点选择为低敏感；CSRF nonce 为短期本机秘密；WebVPN Cookie 仍是独立高敏感 `swufe.session.v1`。

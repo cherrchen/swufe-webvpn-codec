@@ -15,12 +15,12 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 **`In Progress`**（2026-09-24）：P0 宿主能力验证（Gate A）与文档评审已通过；M1 Shared Core 与 M2 Stash 实现已开始。M3/M4 未开始。
+当前为 **`In Progress`**（2026-09-25）：Gate A 与 Core parity 已通过；Stash 基础 Adapter/Demo 已开发并有部分设备日志。2026-09-25 修订确认动态站点 Settings、pseudo HTTP API、精确 Routing Scope 与较宽 Interception Scope 的架构方向；Settings 实现、wildcard MitM/QUIC 实机确认与 Settings E2E 尚未通过。M3/M4 未开始。
 
 | Gate | 含义 | 本 Spec 状态 |
 | --- | --- | --- |
 | **Gate A** | P0 登录链路与 Script 可观察性（见 [project-management.md §10](project-management.md)） | **已通过**（2026-09-24 真机；见 [verification.md](verification.md)） |
-| **文档评审** | PRD / 架构 / 任务 / 验证计划一致，产品决策已冻结（含 Stash 首发宿主、GitHub 分发） | **已通过**（2026-09-24） |
+| **文档评审** | PRD / 架构 / 任务 / 验证计划一致，产品决策已冻结（含 Stash 首发、自包含 Settings、无 BoxJS/backend、GitHub 只分发） | **已通过**（本轮文档修订；宿主能力仍需 Gate D） |
 | **Approved** | Gate A + 文档评审通过 | **当前** |
 | **Gate B** | M1 退出：Python/JS 共享向量全绿、Core 无 Host API 泄漏（见 [project-management.md §10](project-management.md)） | **已通过**（2026-09-24 本地向量与隔离扫描；真机 E2E 仍待 T027） |
 | **In Progress** | Gate B 通过后进入 M2/M3 实现 | **当前**（M1/M2 实现中；Gate B 以向量全绿为准） |
@@ -68,7 +68,9 @@
 - 当前公开 Script API 没有稳定的第三方 `presentWebView()` 契约；
 - Stash HTTP/3 不进入其 HTTP Engine；
 - Session 必须本地、最小化、不可进入日志；
-- JS Core 必须能构建为无 Node runtime 依赖的单文件脚本。
+- JS Core 必须能构建为无 Node runtime 依赖的单文件脚本；
+- Stash Settings 页面由 bundle 内资源经 HTTP Script synthetic response 提供；Settings 路径在普通业务流前 short-circuit；不存在远程 UI/backend。
+- Stash Interception Scope 计划允许 `*.swufe.edu.cn`，Routing Scope 只包含 Settings 中启用的精确域；wildcard/HTTP/QUIC 相关 host 能力尚未实机确认。
 
 ## Edge Cases
 
@@ -87,6 +89,11 @@
 | Q-003 | 最小 WebVPN Cookie 集与过期信号 | 数据最小化 | Open / P0 | 部分 |
 | Q-004 | Loon 目标域 QUIC 最佳策略 | 稳定性 | Open / M3 | No |
 | Q-005 | Body Script 上限 | 性能/可靠性 | Open / M4 | No |
+| Q-006 | Stash secure random token source、Origin/Referer 信息及 synthetic response 能力 | Settings API CSRF/合成路由 | Open / Gate D | 是；失败时拒绝开放写 API并采用静态 scope |
+| Q-007 | wildcard MitM、SWUFE 子域 script match、HTTP 子域 force-http-engine | 动态自定义 Domain | Open / Gate D | 是；失败时改用静态 interception 列表 |
+| Q-008 | `DOMAIN-SUFFIX,swufe.edu.cn` QUIC 规则在目标 iOS Override 真机命中与 TCP 回落 | 子域 HTTPS script | Open / Gate D | M2 发布前 |
+| Q-009 | Tile `$done({url})` 动态切换到 Settings 是否可靠 | Tile Journey | Open / M2 | 否；固定 Settings + 独立登录按钮为退化 |
+| Q-010 | 16 KiB 以上 Settings POST 能否本地 413 且保证不被 Stash `max-size` 跳过后发往 upstream | Settings API 安全 | Open / Gate D | 是；失败则不能交付 POST API |
 
 ## Acceptance Criteria
 

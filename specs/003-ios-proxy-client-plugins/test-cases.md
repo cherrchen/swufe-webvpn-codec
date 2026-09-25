@@ -21,7 +21,9 @@
 | IOS-TC-A08 | bad token | 明确错误、不崩溃 |
 | IOS-TC-A09 | 共享 vectors | 100% 一致 |
 
-## B. Routing
+## B. Routing Core compatibility
+
+本组 B06/B07 覆盖现有通用 RoutingPolicy 的 wildcard 分支；不表示 Stash Settings V2 暴露 wildcard routing。Stash Settings exact-only 覆盖见 K/M 组。
 
 | ID | 场景 | 预期 |
 | --- | --- | --- |
@@ -88,7 +90,7 @@
 | F02 | debug on | 无 Cookie/body/token |
 | F03 | notification | 无 Cookie/账号 |
 | F04 | storage audit | 无 username/password/MFA |
-| F05 | wildcard default | false |
+| F05 | Settings V2 routing wildcard | no wildcard route; only selected exact hosts |
 | F06 | remote asset | HTTPS |
 | F07 | reset | Session 清除 |
 | F08 | exception | stack 不带敏感 input |
@@ -155,3 +157,58 @@
 | J05 | license | 清单完整 |
 | J06 | rollback | 上一版可安装 |
 | J07 | clean install | 不依赖旧数据 |
+
+## K. Settings WebUI / pseudo API（Stash）
+
+| ID | 场景 | 预期 |
+| --- | --- | --- |
+| K01 | 从 Tile 打开 Settings URL | Stash synthetic HTML 页面成功渲染；不依赖学校服务返回此路径 |
+| K02 | bundle 离线打开 | 已缓存脚本无需远端 UI/CDN 即可提供 HTML/CSS/JS；首次未缓存情形单独记录 |
+| K03 | Dark Mode / safe-area | 可读、无横向溢出，状态/错误不只靠颜色 |
+| K04 | Toggle builtin | 打开/关闭 jwxt 后保存得到对应 enabled state |
+| K05 | 添加合法 hostname | `foo.swufe.edu.cn` 保存为 normalized custom host |
+| K06 | 删除 custom host | 保存后路由列表不含它；builtin 无删除操作 |
+| K07 | 成功/失败反馈 | Saved；存储失败保留编辑数据并提示重试 |
+| K08 | 未登录进入 Settings | 设置/保存可用；独立登录按钮打开官方 WebVPN |
+| K09 | Tile 状态 URL | logged out → login；ready → Settings；动态更新能力需设备确认；静态 Settings fallback 可用 |
+| K10 | unknown Settings path/method | 本地合成 404/405；未触达真实 upstream |
+| K11 | GET HTML | `200 text/html; charset=utf-8`、bundle 内资源、no-store |
+| K12 | GET settings | JSON 无 Session、CAS Cookie、Authorization、MFA、WRD secret |
+| K13 | valid POST | token 与 schema 校验后写 v2，返回 `{ok:true}` |
+| K14 | invalid JSON/schema | `INVALID_JSON` / `INVALID_SETTINGS`；不写入，不回显 body |
+| K15 | malformed/illegal host | URL、path、userinfo、IP、localhost、wildcard、外部域均拒绝 |
+| K16 | reserved hosts | gateway/authserver 大小写或末尾点变体规范化后拒绝 |
+| K17 | duplicate hosts | builtin/custom 等价项拒绝 `DUPLICATE_HOST` |
+| K18 | oversized body | 超出 byte cap 返回 `BODY_TOO_LARGE`；不解析/写入，日志无 body |
+| K19 | invalid/expired/reused token | 返回 `UNAUTHORIZED`，不写入；成功 token 只能消费一次 |
+| K20 | Origin/Referer/Content-Type | 跨源、不匹配 Origin、错误 Content-Type 请求拒绝 |
+| K21 | Settings namespace priority | 不触发 Session Capture、WRD 编码、业务 body rewrite |
+| K22 | Settings handler/storage exception | 本地 synthetic 500；不得走 request-entry 的 catch-and-pass 到真实 gateway |
+| K23 | secure nonce generation unavailable | 本地 synthetic `503 SETTINGS_UNAVAILABLE`；不签发弱 token、不开放 POST、不请求 upstream |
+
+## L. Settings normalization / migration
+
+| ID | 场景 | 预期 |
+| --- | --- | --- |
+| L01 | uppercase + whitespace + trailing dot | ` JWXT.SWUFE.EDU.CN. ` → `jwxt.swufe.edu.cn` |
+| L02 | URL input `https://jwxt.swufe.edu.cn/foo?a=1` | 拒绝；UI 明确只收 hostname |
+| L03 | path / port / userinfo / wildcard | 拒绝 |
+| L04 | V1 defaults | 迁移为 jwxt builtin enabled 与 V2 defaults |
+| L05 | V1 in-scope exact custom host | 映射为 normalized `customHosts` |
+| L06 | V1 external/reserved/invalid/wildcard | 丢弃并显示无 hostname 明文的 warning；Routing 不扩张 |
+| L07 | v2 write failure | 保留 v1，fail closed，无 wildcard fallback |
+| L08 | migration with existing session | `swufe.session.v1` 值不变 |
+
+## M. Dynamic Routing / Interception Security
+
+| ID | 场景 | 预期 |
+| --- | --- | --- |
+| M01 | selected hostname | WebVPN WRD rewrite；Session 仅发往 gateway upstream |
+| M02 | unselected intercepted SWUFE hostname | 完整 PASS，URL/header/body 不变，Cookie 不注入 |
+| M03 | builtin disabled | jwxt PASS，无 Cookie 注入 |
+| M04 | custom removed | 下一请求立即 PASS，无需重导入 Override |
+| M05 | Settings namespace | 永不发送到 gateway upstream |
+| M06 | wildcard MitM config import | 真机确认 wildcard 子域捕获及 allowlist 内外行为 |
+| M07 | wildcard QUIC rule | `DOMAIN-SUFFIX,swufe.edu.cn` + `PROTOCOL,QUIC` 只拒绝必要范围，TCP 回落脚本可观察；无全局 UDP/443 拒绝 |
+| M08 | gateway/authserver | 官方登录流正常；不进入普通 target rewrite |
+| M09 | external ordinary domain | 不新增 MitM/rewrite；无 WebVPN Cookie |

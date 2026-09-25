@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADR)
 
-> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-20
+> Status: Draft ｜ Owner: cherrchen ｜ Last Reviewed: 2026-09-25
 >
 > Chinese source of truth: [README.md](README.md)
 
@@ -58,6 +58,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0011](ADR-0011-refuse-start-on-fake-ip-dns.en.md) | A fake-ip (TUN / virtual-interface) environment is refused at start with `PROXY_CONFLICT` too | Accepted | 2026-09-21 | Does not supersede ADR-0004: it only extends its pre-start conflict criterion (the system-proxy criterion and clearing semantics are unchanged) |
 | [ADR-0012](ADR-0012-react-antd-multiwindow-renderer.en.md) | Migrate the renderer to React + Ant Design 6 and turn the desktop UI into a four-window layout | Proposed | 2026-09-23 | Supersedes no existing ADR: it only constrains the renderer framework, the build and the window structure (ADR-0003's Electron decision still stands) |
 | [ADR-0013](ADR-0013-js-core-aes-cfb128.en.md) | Shared JS core for iOS plugins, with aes-js as the AES block primitive | Accepted | 2026-09-24 | Does not supersede ADR-0005: desktop keeps the Python codec; this decision only constrains the mobile JS backend |
+| [ADR-0014](ADR-0014-stash-local-settings-and-routing-scope.en.md) | Stash uses a local pseudo WebUI to manage exact WebVPN sites | Accepted | 2026-09-25 | Does not supersede existing ADRs; defines Spec 003 Stash Settings and Interception/Routing Scope boundaries |
 
 ## Rules
 

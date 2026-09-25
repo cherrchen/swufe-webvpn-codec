@@ -13,7 +13,7 @@
 
 ### L0 Pure Unit
 
-Node 环境执行：codec、allowlist、session parser、request decision、response rewrite、schema validation、redact。
+Node 环境执行：codec、allowlist、session parser、request decision、response rewrite、schema validation、redact。追加 Settings hostname normalize/validate、Builtin/custom compile、V1→V2 migration、Settings namespace route priority、pseudo response machine code 与 body size/token checks。纯 Core suite 不引用 Stash globals。
 
 ### L1 Cross-language Contract
 
@@ -30,6 +30,8 @@ release bundle：单文件可解析、无 Node built-in、无 unresolved imports
 ### L4 Host Import Smoke
 
 真机：Loon plugin / Stash override 可导入、enable/disable、script provider、MitM、debug log。
+
+Stash Settings E2E 另验证 synthetic HTML、同源 API GET/POST、pseudo endpoint 未上游、Tile 动态/固定退化 URL、离线已缓存运行、Dark Mode/safe-area 与保存后路由即时变化。
 
 ### L5 P0 Login PoC
 
@@ -66,7 +68,13 @@ Loon M3 执行时，按 [G13–G18](test-cases.md) 顺序记录：先确认 HTTP
 - corrupt storage 不 dump；
 - remote URL 为 HTTPS；
 - clear 后不再注入；
-- wildcard 默认关闭。
+- Settings V2 没有 wildcard route 开关；默认 Routing Scope 由明确启用站点组成。
+- Routing wildcard 不存在于 Settings V2；即使 Interception Scope wildcard enabled，未选中子域仍 PASS。
+- Settings Namespace 不触发 Session capture/业务 rewrite，Settings API 绝不向 upstream。
+- POST 的 Host/path/method/Origin/Referer/Content-Type/token/schema/body byte cap 均拒绝越界输入；token 过期/重放无写入。
+- API、日志和错误中没有 Session/CAS Cookie、Authorization、MFA、WRD secret 或 POST 原文。
+- V1→V2 migration 不改变 Session key；invalid hostname 不能扩大 Routing Scope。
+- MitM interception wildcard 语义在用户说明中可见；证明只有选中项经 WebVPN。
 
 ## 7. P0 Login 记录模板
 
@@ -105,7 +113,7 @@ Result:
 
 ## 10. Entry Criteria
 
-进入真机 E2E 前：Core 单测全绿、cross vectors 全绿、bundle 可解析、Session 日志红线通过、至少一个宿主配置可导入。
+进入 Settings 真机 E2E 前：确认 Stash 安全 nonce 能力及 wildcard MitM/QUIC/force-http-engine 真正导入配置；否则采用并文档化静态 hostname 退化方案。Schema/API contract checks、bundle smoke、至少一个宿主配置导入完成。
 
 ## 11. Exit Criteria
 
@@ -114,5 +122,7 @@ Result:
 - 至少一个宿主完整 E2E；
 - 另一宿主若无法 E2E，明确记录限制而不是标 Passed；
 - P0 登录结论冻结；
+- Settings API / synthetic route security cases pass；
+- wildcard Interception Scope 与 exact Routing Scope 真机边界清楚，或采用静态 Interception 退化方案；
 - 无 Session 泄露；
 - 文档同步完成。

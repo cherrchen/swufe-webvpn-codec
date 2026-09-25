@@ -56,8 +56,9 @@ plugins/stash/
   src/adapter.ts
   src/request-entry.ts
   src/response-entry.ts
-  src/tile-entry.ts
-  swufe-webvpn.stoverride
+    src/tile-entry.ts
+    src/settings/                 # 小型 bundled HTML/CSS/JS（实现可按仓库风格合并）
+    swufe-webvpn.stoverride
   dist/
 ```
 
@@ -98,6 +99,8 @@ Loon 官方 Script API 已公开 request/response、persistent store、notificat
 ### Stash Adapter
 
 负责 `$request/$response`、`$persistentStore`、`$notification`、`$environment`、Tile `$done({title,content,url,...})`、`.stoverride` 的 `http.mitm/http.script/script-providers`、版本检查。
+
+Settings namespace dispatcher、synthetic response、token/store IO 属于 Stash Adapter。Settings UI bundle 可独立源码维护，但 build 阶段必须内联进请求脚本，不从运行时 CDN 拉取。Core 不调用 `$request`、`$done` 或 `$persistentStore`。
 
 ## 6. AES-CFB128 方案
 
@@ -186,13 +189,76 @@ desktop 当前将 `/wengine-vpn/`、`/authserver/` 视为 gateway root namespace
 
 Stash 真机日志显示，响应脚本把透明改写后的请求和浏览器直接访问的 WebVPN 原生 `/http/<token>/` 请求都呈现为同一 gateway URL。对原生 bootstrap 再执行 `302` promotion 会跳回自身，形成无限重定向。Stash Adapter 因此在教务文档导航的 request 阶段直接向浏览器返回指向 WebVPN URL 的 `302`；浏览器对该原生 URL 的响应不再反向改写。其它宿主的 Core promotion 语义不变。
 
-## 12. MitM Scope
+## 12. Interception Scope / Routing Scope
 
-最小范围建议：gateway、默认 allowlist host、用户显式加入的其它目标 host。
+两个范围必须分别配置和授权：
 
-`authserver.swufe.edu.cn` 原则上不为了 Session Capture 做内容脚本处理；若宿主必须列入 MitM 才能保证登录导航，则需独立安全评审，且脚本不得读取认证 body。
+| Scope | Stash 首发设计 | 行为 |
+| --- | --- | --- |
+| Interception Scope | `webvpn.swufe.edu.cn`、`authserver.swufe.edu.cn`、`*.swufe.edu.cn` HTTPS；`*.swufe.edu.cn:80` 的 force-http-engine 范围待按 Stash 语法/实机评估 | 进入 HTTP Engine；TLS 在设备本地由 Stash MitM 解密 |
+| Routing Scope | Settings V2 中 enabled builtin + 合法 customHosts 编译出的精确 host 集 | 唯一可进行 WebVPN WRD、Session 注入与 reverse rewrite 的普通 target |
 
-## 13. HTTP/3 / QUIC
+`Intercepted != Routed through WebVPN`。旧表述“MitM 只含当前明确 allowlist”对动态 Domain 功能不成立，是有意改变的安全语义：用户允许 Stash 对 SWUFE 子域范围解密，便于无需重装即启用新域；插件仍只对选中 hostname 代理。未选域需完整 PASS，不读 Cookie、不改 header/body、不请求 gateway。
+
+MitM `*.swufe.edu.cn:443` 是 Stash 官方配置支持的 wildcard 格式，但该仓库现有 Override 和设备 Demo 尚未验证这个通配值与 request script regex 的组合。动态 HTTP 子域是否需要/允许 `force-http-engine` 同样待实机确认。若任一关键范围无法可靠命中，产品退化为静态 Interception Scope，新增域名需更新 Override；不得谎称脚本可运行时扩展 MitM。
+
+为入口正常使用，`webvpn` 与 `authserver` 保持在 HTTP Engine 处理范围；认证 body 永不被保存，Cookie 捕获只在 gateway context。
+
+## 13. Settings Virtual WebUI 与 pseudo HTTP API
+
+```mermaid
+sequenceDiagram
+    participant S as Safari
+    participant H as Stash HTTP Engine
+    participant R as Settings Route Handler
+    participant KV as $persistentStore
+    S->>H: GET https://webvpn.../__swufe_bridge__/
+    H->>R: request script
+    R-->>S: synthetic bundled HTML (never upstream)
+    S->>H: GET /__swufe_bridge__/api/settings
+    H->>R: short-circuit before session/routing
+    R->>KV: read swufe.settings.v2
+    R-->>S: JSON DTO + local token
+    S->>H: POST /__swufe_bridge__/api/settings
+    H->>R: validate origin/token/schema/size
+    R->>KV: write settings only
+    R-->>S: synthetic JSON response
+```
+
+WebUI source、执行、传输、存储的固定决策：
+
+| 项目 | 决策 |
+| --- | --- |
+| WebUI source | HTML/CSS/JS 在 Stash 插件/script bundle 内 |
+| WebUI execution | Safari |
+| WebUI transport | Stash HTTP Script synthetic response |
+| Settings persistence | Stash `$persistentStore` |
+| Remote application server | none |
+| GitHub | 仅发布 `.stoverride` 与 `dist/request.js`、`dist/response.js`、`dist/tile.js` 等制品，不托管运行时页面/API |
+
+保留 URL 前缀为 `https://webvpn.swufe.edu.cn/__swufe_bridge__/`。任何以该前缀开头的 path 在 Core 业务分支之前优先 short-circuit；未知 path/method 也由本地返回 404/405，不向 upstream fall through。Settings 请求不得触发 Session Capture、Routing、WRD、业务 Header/body rewrite。`file://` 无法访问 Stash persistent store；`127.0.0.1` 会要求真实 socket server，均不采用。
+
+Settings route 一经识别，即使 JSON parse/storage/render 出错，也必须由本地生成 4xx/5xx synthetic response；不得复用普通业务 request entry 中的 catch-and-pass 行为。未知路径、方法、nonce 错误及 body 超限均不可 fall through。
+
+第一版 endpoint 仅为 `GET /`、`GET /api/settings`、`POST /api/settings`。响应使用 `Cache-Control: no-store`。错误 JSON 只给机器码。API 代码在 Adapter 层，但 hostname validation/migration/compiler 使用平台无关 DTO 函数。
+
+安全检查至少包含 Host、精确 path、method、Origin/Referer（宿主请求能提供时）、`application/json` Content-Type、自定义 Settings token、UTF-8 body byte cap、schema/version、host allow rule。当前 Stash 随机 token API 可用性尚未验证：实现前确认安全随机能力；无安全随机时 fail closed，不能回退为固定 token 或 `Math.random()`。POST body、Cookie/Authorization 等敏感 header 不进入日志或 API 响应。
+
+## 14. Stash Settings Flow 与业务 Flow 的优先级
+
+```text
+request-entry
+  1. parse URL safely; host + path in Settings namespace?
+       yes → settings handler → synthetic response → stop
+  2. gateway/authserver Session behavior
+  3. compile latest Settings DTO → exact RoutingPolicy
+  4. selected target? no → PASS unchanged
+  5. selected target → Session / codec / rewrite
+```
+
+Settings route 确认必须发生在 `captureSession()` 与 Core `rewriteRequest()` 之前。HTTP script request/response 两阶段都须识别 namespace；禁止 Settings HTML/JSON 被业务 response rewrite 处理。写入 v2 settings 后，下一次业务请求直接 parse 新 key；不缓存旧路由策略跨请求。
+
+## 15. HTTP/3 / QUIC
 
 Stash 官方文档明确 HTTP/3 当前不会进入 HTTP Engine，而作为 UDP 转发；Stash 版必须保证目标域名回落到 TCP HTTP/1.1/2。教务实际入口为 HTTP 端口 80；来自 Tunnel 的该连接必须以 `jwxt.swufe.edu.cn:80` 进入 `force-http-engine` 才能触发脚本。不要把这些主机的 443 放进 `force-http-engine`：2026-09-24 真机里，该项让 HTTPS 进不了 HTTP 脚本，Safari 显示无法建立安全连接。HTTPS 只走 MitM。
 
@@ -207,21 +273,25 @@ Loon 有 UDP 端口/规则能力，但全局 `disable-udp-ports = 443` 不应成
 3. **原生 WebVPN 命名空间**：分别观察 Loon request/response 脚本中的 `$request.url`，不能从 URL 外观推定请求是透明改写还是浏览器直接发出的 `/http/<token>/`。对浏览器已处于原生 WebVPN URL 的响应应保持网关原有语义；任何 promotion 302 的目标都不能与当前浏览器 URL 相同。Stash 在 request 阶段返回 302 的适配方案仍待其真机复验，Loon 须按自身脚本能力确定实现。
 4. **响应体与诊断**：仅改写响应 Header 时，若宿主未提供 body，不得写出空 body；同时验证 Location、Set-Cookie 与业务 HTML 不被截断。分别确认插件加载、脚本执行、脚本日志位置和远程 bundle 更新，避免用“没有普通日志”推断脚本未运行。诊断只记录脱敏主机、状态、动作和错误码，不记录 Cookie、WRD token 或页面内容。
 
-## 14. 安全架构
+对于动态子域，Stash 官方 rule grammar 包含 `DOMAIN-SUFFIX`、`PROTOCOL,QUIC` 和 `AND` 逻辑规则，因此候选规则为 `AND,((DOMAIN-SUFFIX,swufe.edu.cn),(PROTOCOL,QUIC)),REJECT`。它比旧的 3 条精确域规则覆盖更多 SWUFE 子域，只阻止该后缀 QUIC；现有 Demo 没有该规则，需导入并在真机验证匹配、回落与未选 host PASS。绝不全局拒绝 UDP/443。
+
+## 16. 安全架构
 
 ```text
 Browser/App
-   ↓ user-enabled host MitM
+   ↓ Stash-declared Interception Scope (gateway + SWUFE wildcard, pending device proof)
 Loon/Stash runtime
    ↓
 Plugin JS
-   ↓ HTTPS
-Official WebVPN
+   ├─ unselected intercepted SWUFE host → unchanged PASS
+   ├─ selected exact host → WRD + Session only to gateway
+   └─ Settings namespace → synthetic local response, no upstream
+Selected WebVPN request → HTTPS → Official WebVPN
 ```
 
-约束：Session 只存在本机宿主持久化；无项目云后端；无账号密码；日志 redact URL token/Cookie/body；只有 allowlist 进入 WRD rewrite；远程安装与脚本更新仅来自本仓库 **GitHub** HTTPS（Release 与/或 `raw.githubusercontent.com`，见 [prd.md §7 IOS-REQ-001/012](prd.md)）。
+约束：Session 只存在本机宿主持久化；无项目云后端；无账号密码；日志 redact URL token/Cookie/body；只有 Routing Scope allowlist 进入 WRD rewrite；远程安装与脚本更新仅来自本仓库 **GitHub** HTTPS（Release 与/或 `raw.githubusercontent.com`，见 [prd.md §7 IOS-REQ-001/012](prd.md)）。用户须知 Stash Interception Scope 内的 HTTPS 都可能在设备本地解密，即使该 host 未选 WebVPN。
 
-## 15. 兼容性
+## 17. 兼容性
 
 | 维度 | 策略 |
 | --- | --- |
@@ -231,7 +301,7 @@ Official WebVPN
 | iPadOS | 同 iOS 路线，至少做冒烟 |
 | tvOS/macOS host | 不属于首期产品验收 |
 
-## 16. 备选方案
+## 18. 备选方案
 
 | 方案 | 优点 | 缺点 | 结论 |
 | --- | --- | --- | --- |
@@ -240,10 +310,12 @@ Official WebVPN
 | 两宿主各写一套 JS | 起步快 | 漂移、测试翻倍 | 不采用 |
 | 远端代理服务器 | 统一 | 流量/Session 上云 | 不采用 |
 | 共享 JS Core + Adapter | 复用与测试性最好 | 需 adapter contract | **采用** |
+| Stash bundled virtual WebUI + pseudo API | 自包含、Settings 本地存储、即时生效 | Host script short-circuit/token/wildcard 需验证 | **采用，Stash 首发** |
+| BoxJS | 有现成管理页模式 | 外加 runtime/config dependency、范围远超需求 | 不采用 |
+| GitHub Pages / remote UI / local socket server | 可独立部署页面 | 增加外部服务或真实 server；不满足自包含目标 | 不采用 |
 
-## 17. 建议 ADR
+## 19. ADR 记录
 
-- ADR-0013：iOS 使用第三方代理客户端插件而非独立 App；
-- ADR-0014：移动端共享 JS Core + Host Adapter；
-- ADR-0015：移动端 WRD AES-CFB128 backend 与依赖策略；
-- 若 P0 登录容器行为改变方案，再建立专门 ADR。
+- [ADR-0013](../../docs/architecture/adr/ADR-0013-js-core-aes-cfb128.md)：移动端共享 JS Core 与 AES-CFB128 backend；
+- [ADR-0014](../../docs/architecture/adr/ADR-0014-stash-local-settings-and-routing-scope.md)：Stash 本地 pseudo WebUI、精确 Routing Scope 与宽 Interception Scope。
+- P0 Safari 呈现方式已在本 Spec 与 [verification.md](verification.md) 记录，不改变 Host Runtime 架构，无需新增 ADR。

@@ -25,7 +25,7 @@ P0 Host capability PoC → M1 Shared Core → M2 Stash → M3 Loon → M4 E2E/Se
 
 ## 4. M2 — Stash Adapter（首发宿主）
 
-`.stoverride`、request/response、Tile、HTTP Engine/MitM、HTTP/3 处理、E2E jwxt；制品与脚本经本仓库 **GitHub**（Release 或 `raw.githubusercontent.com`）分发。退出：Stash 主路径通过或宿主限制明确记录。
+`.stoverride`、request/response、Tile、HTTP Engine/MitM、HTTP/3 处理、Settings UI/pseudo API、Settings V2 与 migration、动态精确路由及 E2E jwxt；制品与脚本经本仓库 **GitHub** 分发。退出：Stash 主路径和 Settings 安全边界通过；wildcard interception 真机验证通过，或静态域退化方案明确写入产品范围。
 
 ## 5. M3 — Loon Adapter
 
@@ -58,6 +58,11 @@ body 压测、Session 过期、安全审计、文档、安装链接、rollback�
 | R-IOS-009 | 宿主 API 变化 | 中 | 中 | version guard + Adapter isolation |
 | R-IOS-010 | 用户其它 Rewrite 冲突 | 中 | 中 | 排障指引，不改他人配置 |
 | R-IOS-011 | Session 泄露日志 | 低 | 极高 | structured safe log + negative tests |
+| R-IOS-012 | Wildcard MitM 扩大本机可解密 SWUFE 子域 | 中 | 高 | Settings 安装说明明示范围；Routing exact allowlist；未选流量 PASS 与 Cookie negative tests；无法可靠支持则退回静态域声明 |
+| R-IOS-013 | Settings pseudo endpoint 被其他网页滥用写配置 | 中 | 高 | secure one-use nonce、Origin/Referer、JSON-only、schema、body limit；安全随机能力为实现前 Gate |
+| R-IOS-014 | Stash 不支持任意子域 force-http-engine/脚本命中或 QUIC suffix rule | 中 | 高 | 用当前官方语法导入真机验证；只拒绝 SWUFE suffix QUIC；必要时采用静态范围并要求更新 Override |
+| R-IOS-015 | Settings 路由错误 fall through 到真实 gateway | 低 | 高 | 保留命名空间全路径 short-circuit；未知路径合成本地 404/405；upstream capture 用例 |
+| R-IOS-016 | oversized POST 因宿主 `max-size` 行为绕过脚本而到达真实 gateway | 中 | 极高 | 禁用未经验证的 `max-size` shortcut；证明超限请求本地 413 且不上游，否则 POST API 不可发布 |
 
 ## 10. 决策 Gate
 
@@ -75,6 +80,10 @@ Python/JS vectors 未全绿，不进入真实账号 E2E。
 
 发现任意非 gateway 请求带 WebVPN Cookie，立即阻断发布。
 
+### Gate D — Dynamic Scope / Settings Host Capabilities
+
+在编码 Settings POST 前确认 Stash runtime 可用的安全随机 token source、请求 Origin/Referer 透传字段、body 字节长度/大小上限、合成 response 语法；确认 wildcard MitM + HTTP script regex + suffix QUIC 规则在目标 Stash 版本可导入并命中。任一核心能力不成立时，先收敛为预声明静态 host 设置，不伪称动态拦截成立。
+
 ## 11. Definition of Done
 
 - [ ] PRD Must 实现或显式降级并接受
@@ -84,6 +93,9 @@ Python/JS vectors 未全绿，不进入真实账号 E2E。
 - [ ] Session security tests
 - [ ] 过期/重登
 - [ ] QUIC 路径验证
+- [ ] Settings pseudo UI/API、自包含与 V1→V2 migration
+- [ ] Settings CSRF/schema/body-size/upstream/cookie security checks
+- [ ] Interception Scope 与 Routing Scope 分开验证并对用户披露
 - [ ] desktop regression
 - [ ] README 安装说明
 - [ ] 长期 docs/ADR 同步
@@ -95,4 +107,4 @@ Python/JS vectors 未全绿，不进入真实账号 E2E。
 
 ## 13. 不做的顺手优化
 
-不重写 desktop Python、不重构 Electron UI、不建后端/账号系统、不支持更多代理 App、不做云同步、不做复杂 allowlist GUI、不自动化 CAS/MFA。
+不重写 desktop Python、不重构 Electron UI、不建后端/账号系统、不支持更多代理 App、不做云同步、不做复杂管理后台、不自动化 CAS/MFA。轻量 Stash Settings 网站列表管理属于本 Feature scope。
