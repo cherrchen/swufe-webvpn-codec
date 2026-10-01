@@ -1,4 +1,4 @@
-/* swufe-webvpn loon 7afa05c */
+/* swufe-webvpn loon f5afb4c */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -3002,7 +3002,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       globals.done(value);
     };
     try {
-      traceEntered(`swufe-webvpn-loon-${kind} 0.1.0-m3`, globals.request?.url);
+      traceEntered(`swufe-webvpn-loon-${kind} 0.1.1-m3`, globals.request?.url);
       const runtime = bindLoonRuntime({ ...globals, done });
       if (kind === "request") handleLoonRequest(runtime, globals.argument);
       else handleLoonResponse(runtime, globals.argument);
@@ -3013,7 +3013,14 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
   }
   function requestOutput(result) {
     if (result.decision === "respond" && result.response) return { response: result.response };
-    if (result.decision === "rewrite" && result.url) return { url: result.url, headers: result.headers ?? {} };
+    if (result.decision === "rewrite" && result.url) {
+      const headers = {};
+      for (const [key, value] of Object.entries(result.headers ?? {})) {
+        if (key.toLowerCase() !== "host") headers[key] = value;
+      }
+      headers.Host = new URL(result.url).host;
+      return { url: result.url, headers };
+    }
     if (result.decision === "rewrite_headers" && result.headers) return { headers: result.headers };
     return {};
   }

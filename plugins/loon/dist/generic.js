@@ -1,4 +1,4 @@
-/* swufe-webvpn loon 7afa05c */
+/* swufe-webvpn loon f5afb4c */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -944,7 +944,14 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
   }
   function requestOutput(result) {
     if (result.decision === "respond" && result.response) return { response: result.response };
-    if (result.decision === "rewrite" && result.url) return { url: result.url, headers: result.headers ?? {} };
+    if (result.decision === "rewrite" && result.url) {
+      const headers = {};
+      for (const [key, value] of Object.entries(result.headers ?? {})) {
+        if (key.toLowerCase() !== "host") headers[key] = value;
+      }
+      headers.Host = new URL(result.url).host;
+      return { url: result.url, headers };
+    }
     if (result.decision === "rewrite_headers" && result.headers) return { headers: result.headers };
     return {};
   }
@@ -958,7 +965,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
 
   // src/generic-entry.ts
   try {
-    traceEntered("swufe-webvpn-loon-generic 0.1.0-m3", void 0);
+    traceEntered("swufe-webvpn-loon-generic 0.1.1-m3", void 0);
     const runtime = bindLoonRuntime({
       loon: typeof $loon === "undefined" ? "" : $loon,
       store: $persistentStore,

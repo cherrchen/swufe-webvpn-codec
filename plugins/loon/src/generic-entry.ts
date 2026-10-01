@@ -9,7 +9,7 @@ declare const $notification: LoonGlobals["notification"];
 declare const $done: LoonGlobals["done"];
 
 try {
-  traceEntered("swufe-webvpn-loon-generic 0.1.0-m3", undefined);
+  traceEntered("swufe-webvpn-loon-generic 0.1.1-m3", undefined);
   const runtime = bindLoonRuntime({
     loon: typeof $loon === "undefined" ? "" : $loon,
     store: $persistentStore, notification: $notification, done: () => undefined,

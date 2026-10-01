@@ -18,6 +18,8 @@ MitM includes `*.swufe.edu.cn` and decrypts SWUFE HTTPS locally. WRD forwarding 
 
 ## Artifacts and development
 
+Current local artifacts are `0.1.1-m3`: Loon URL rewrites explicitly set the gateway `Host`, including a non-default port, instead of retaining the academic site's Host. See [verification](../../specs/003-ios-proxy-client-plugins/verification.md) for the original-URL device failure and the pending post-fix device check. Device recovery has not yet been verified.
+
 `dist/request.js`, `dist/response.js` and `dist/generic.js` are standalone bundles without Node runtime dependencies. The plugin references GitHub raw files on this repository's main branch. **Remote links cannot serve this change before it is pushed.** For local testing, import all three bundles into Loon and change Script paths to the corresponding local files. Distribute and roll back the plugin and all three bundles together at one version.
 
 ```bash

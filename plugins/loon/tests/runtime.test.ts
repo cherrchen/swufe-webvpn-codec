@@ -83,6 +83,33 @@ describe("Loon native runtime and request mapping", () => {
     expect(JSON.stringify(post.headers)).toContain("stored-ticket");
     expect(rt.logs.join("")).not.toContain("do-not-log");
   });
+  it.each(["Host", "host", "HOST"])("replaces %s with the rewritten gateway authority", hostKey => {
+    const rt = fixture({ [STORAGE_KEYS.session]: session() });
+    for (const path of ["/", "/wengine-vpn/js/main.js"]) {
+      const out = rt.run("request", {
+        url: `http://jwxt.swufe.edu.cn${path}`, method: "POST",
+        headers: { [hostKey]: "jwxt.swufe.edu.cn:80", accept: "text/html", "X-Keep": "yes" },
+        body: "keep-body",
+      });
+      const headers = out.headers as Record<string, string>;
+      const authorities = Object.entries(headers).filter(([key]) => key.toLowerCase() === "host");
+      expect(authorities).toEqual([["Host", new URL(out.url as string).host]]);
+      expect(headers["X-Keep"]).toBe("yes");
+      expect(headers.cookie).toContain("stored-ticket");
+      expect(out).not.toHaveProperty("body");
+    }
+  });
+  it("sets the gateway Host when absent and preserves its non-default port", () => {
+    const rt = fixture({
+      [STORAGE_KEYS.session]: session(),
+      [STORAGE_KEYS.settingsV2]: JSON.stringify({ schemaVersion: 2, enabled: true,
+        gatewayBase: gateway + ":8443", builtinSiteStates: { jwxt: true },
+        customHosts: [], hostSchemes: {}, debug: false, bodyRewriteMaxBytes: 1048576 }),
+    });
+    const out = rt.run("request", { url: "http://jwxt.swufe.edu.cn/", headers: {} });
+    expect(out.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn:8443\//);
+    expect(out.headers).toMatchObject({ Host: "webvpn.swufe.edu.cn:8443" });
+  });
   it("captures Safari gateway ticket and uses headers-only edits for direct WRD requests", () => {
     const rt = fixture();
     expect(rt.run("request", { url: gateway + "/", headers: { cookie: `${TICKET_COOKIE_NAME}=A` } })).toEqual({});

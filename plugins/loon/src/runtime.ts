@@ -33,7 +33,7 @@ export function executeLoonHttp(kind: "request" | "response", globals: LoonGloba
     globals.done(value);
   };
   try {
-    traceEntered(`swufe-webvpn-loon-${kind} 0.1.0-m3`, globals.request?.url);
+    traceEntered(`swufe-webvpn-loon-${kind} 0.1.1-m3`, globals.request?.url);
     const runtime = bindLoonRuntime({ ...globals, done });
     if (kind === "request") handleLoonRequest(runtime, globals.argument);
     else handleLoonResponse(runtime, globals.argument);
@@ -46,7 +46,17 @@ export function executeLoonHttp(kind: "request" | "response", globals: LoonGloba
 
 function requestOutput(result: HostRequestResult): Record<string, unknown> {
   if (result.decision === "respond" && result.response) return { response: result.response };
-  if (result.decision === "rewrite" && result.url) return { url: result.url, headers: result.headers ?? {} };
+  if (result.decision === "rewrite" && result.url) {
+    // Loon retains an explicitly supplied Host when applying a URL rewrite.
+    // Keep the upstream authority consistent with the gateway URL, including
+    // a non-default port, without duplicating differently cased Host fields.
+    const headers: Record<string, string> = {};
+    for (const [key, value] of Object.entries(result.headers ?? {})) {
+      if (key.toLowerCase() !== "host") headers[key] = value;
+    }
+    headers.Host = new URL(result.url).host;
+    return { url: result.url, headers };
+  }
   if (result.decision === "rewrite_headers" && result.headers) return { headers: result.headers };
   return {};
 }

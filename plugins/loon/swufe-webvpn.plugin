@@ -17,16 +17,16 @@ AND,((DOMAIN-SUFFIX,swufe.edu.cn),(PROTOCOL,QUIC)),REJECT
 
 [Script]
 # New syntax (Build 983+). First matching request rule wins: settings stays first.
-request if ${url} ~= /^https?:\/\/webvpn\.swufe\.edu\.cn(?::\d+)?\/__swufe_bridge__/i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/request.js?v=0.1.0-m3", {${enabled}, ${debug}}) with tag="SWUFE 本地设置", timeout=10, requires_body=true
+request if ${url} ~= /^https?:\/\/webvpn\.swufe\.edu\.cn(?::\d+)?\/__swufe_bridge__/i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/request.js?v=0.1.1-m3", {${enabled}, ${debug}}) with tag="SWUFE 本地设置", timeout=10, requires_body=true
 # Ordinary requests are header-only; POST bodies are preserved by omission.
-request if ${url} ~= /^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn(?::\d+)?\//i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/request.js?v=0.1.0-m3", {${enabled}, ${debug}}) with tag="SWUFE 请求", timeout=10, requires_body=false
+request if ${url} ~= /^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn(?::\d+)?\//i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/request.js?v=0.1.1-m3", {${enabled}, ${debug}}) with tag="SWUFE 请求", timeout=10, requires_body=false
 # Auth bodies never need to be read. Gateway ticket rotation is observed in headers.
-response if ${url} ~= /^https?:\/\/authserver\.swufe\.edu\.cn(?::\d+)?\//i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/response.js?v=0.1.0-m3", {${enabled}, ${debug}}) with tag="SWUFE CAS 状态", timeout=10, requires_body=false
+response if ${url} ~= /^https?:\/\/authserver\.swufe\.edu\.cn(?::\d+)?\//i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/response.js?v=0.1.1-m3", {${enabled}, ${debug}}) with tag="SWUFE CAS 状态", timeout=10, requires_body=false
 # Only supported textual bodies enter the body script; other responses use headers.
-response if ${url} ~= /^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn(?::\d+)?\//i && ${response.header['Content-Type']} ~= /^(text\/html|application\/javascript|text\/javascript|application\/json)(?:;|$)/i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/response.js?v=0.1.0-m3", {${enabled}, ${debug}}) with tag="SWUFE 文本响应", timeout=15, requires_body=true
-response if ${url} ~= /^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn(?::\d+)?\//i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/response.js?v=0.1.0-m3", {${enabled}, ${debug}}) with tag="SWUFE 响应头", timeout=10, requires_body=false
-generic then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/generic.js?v=0.1.0-m3", "settings") with tag="SWUFE 网站设置", img_url="gearshape.system", timeout=10
-generic then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/generic.js?v=0.1.0-m3", "login") with tag="SWUFE 打开网页登录", img_url="network.system", timeout=10
+response if ${url} ~= /^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn(?::\d+)?\//i && ${response.header['Content-Type']} ~= /^(text\/html|application\/javascript|text\/javascript|application\/json)(?:;|$)/i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/response.js?v=0.1.1-m3", {${enabled}, ${debug}}) with tag="SWUFE 文本响应", timeout=15, requires_body=true
+response if ${url} ~= /^https?:\/\/([a-z0-9-]+\.)*swufe\.edu\.cn(?::\d+)?\//i then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/response.js?v=0.1.1-m3", {${enabled}, ${debug}}) with tag="SWUFE 响应头", timeout=10, requires_body=false
+generic then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/generic.js?v=0.1.1-m3", "settings") with tag="SWUFE 网站设置", img_url="gearshape.system", timeout=10
+generic then script("https://raw.githubusercontent.com/cherrchen/swufe-webvpn-codec/main/plugins/loon/dist/generic.js?v=0.1.1-m3", "login") with tag="SWUFE 打开网页登录", img_url="network.system", timeout=10
 
 [Mitm]
 hostname = *.swufe.edu.cn, webvpn.swufe.edu.cn, authserver.swufe.edu.cn

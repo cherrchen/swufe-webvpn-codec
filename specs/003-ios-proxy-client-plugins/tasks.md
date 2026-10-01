@@ -85,6 +85,11 @@
 
 ## 注意事项
 
+### Loon 教务访问 Bug follow-up（2026-10-01）
+
+- [x] T062 修复 Loon URL rewrite 的 Host authority 映射，覆盖 Host 大小写、缺失、非默认网关端口、Gateway-owned 路径及 POST body 保留；构建 0.1.1-m3 — 关联：G13/G17；证据见 verification。
+- [ ] T063 在设备加载 0.1.1-m3 后复验原始 `http://jwxt.swufe.edu.cn/`，确认上游连接目标与教务操作；若仍失败，继续取证 HTTP→HTTPS 宿主连接切换 — 依赖：T062；关联：G13/G17/T021。
+
 - T026/T027 仍待 Stash 真机：HTTP/3 回落（H09）与教务 E2E；N02–N10 是新增 M2 follow-up。自动测试不能代替设备证据。
 - P0 失败时先更新需求与架构，不用猜测继续实现；
 - 真实 Cookie 不得写入 commit、Issue、PR、CI artifact；

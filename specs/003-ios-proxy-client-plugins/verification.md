@@ -280,7 +280,7 @@ request/response 脚本新增安全摘要：每个被处理请求生成短 trace
 | T019 通知节流 | 30 分钟登录/过期、10 分钟错误；独立事件时间戳；openUrl 与 Generic | Passed | G05/O06 Pending |
 | T056 Safe Trace | raw/WRD authserver 分类与敏感值负向测试 | Passed | N07–N09 Pending |
 | T060 Settings 页面/API | O02–O05 VM：无 host crypto 的 browser bootstrap、来源、nonce/replay/TTL、schema/reserved host/16 KiB、storage false/exception、Settings short-circuit、下一请求路由/V1迁移不改 Session | Passed | O02–O04/K/M 等价设备项 Pending |
-| T017/T018/T061 制品 | 新语法文本检查、Build guard、脚本执行与各一次 done；request/response/generic IIFE；bundle scan；workspace/CI 配置 | Passed | Loon parser/import、真实两阶段 URL、QUIC/HTTP 与脚本 load/update Pending |
+| T017/T018/T061 制品 | 新语法文本检查、Build guard、脚本执行与各一次 done；request/response/generic IIFE；bundle scan；workspace/CI 配置 | Passed | parser/import 与设置页 GET 已真机确认；原始教务 HTTP 改写失败，见下方 Bug 记录；其它门槛 Pending |
 
 ### 执行命令与结果
 
@@ -310,3 +310,28 @@ Python L2 已有不可达网关测试失败：客户端收到预期 502 并满�
 - 已同步 Spec 003 的 scope/design/interfaces/UI/plan/tasks/test/verification、AGENTS/README 中英状态、architecture/components/interfaces、local API 索引、security、testing strategy、roadmap 和 ADR-0016 中英决策。
 - 未执行 Loon 真机：缺少本轮可控制的设备/宿主会话。T020/T021/T057、O 系列设备验收与 M4 性能/发布仍 Pending；真实 upstream Cookie、两阶段 URL、wildcard MitM、QUIC 回落、Settings 来源/超限 body 必须由设备取证。
 - `.plugin` 中 raw URL 指向 main；本轮文件未推送，远程 URL 不能视作已发布。可按 Loon README 导入本地 bundles 先验收；正式 release/rollback 不属于本轮交付状态。
+
+
+## Loon 原始教务 URL 失败与 Host 修复（2026-10-01）
+
+任务分类：Spec 003 M3 Bug，T062/T063，G13/G17。
+
+### 真机证据与状态
+
+- 使用 iPhone 镜像实际观察：改用 GitHub raw 导入后，插件已解析 Settings/business request、response 与 Generic；开启 Loon，Safari 设置入口显示本地 SWUFE WebVPN 页。仅确认设置页读取，保存/CSRF/超限等设备项仍 Pending。此前误导入 GitHub blob 页不作为有效插件的失败证据。
+- `http://jwxt.swufe.edu.cn/` 命中「SWUFE 请求」，23:15:01 的请求约 34 ms 失败，收发均 0 B。请求详情显示 URL 已改为 WebVPN `/http/<wrd>/` 且有 Gateway ticket Cookie；Host 仍是 `jwxt.swufe.edu.cn`，概述的修改后地址也仍为教务主机。记录不含真实 Cookie、账号或完整请求头。
+- 用户真人对照确认：直接访问同一原生 WRD URL 可进入，教务已登录成功。这证明原生 WebVPN 路径可用；不替代原始教务域名经 Loon 透明改写的验收。
+
+| 验证项 | 状态 | 证据 / 边界 |
+| --- | --- | --- |
+| raw 插件解析与 Settings 页面 GET | Passed | 镜像显示已解析脚本及本地设置页；其它 Settings 设备项未验证 |
+| 原生 WRD URL 进入教务并登录 | Passed（用户真人验收） | 同一转写资源可进入；不证明透明改写 |
+| G13 原始 HTTP/80 教务 URL（0.1.0-m3） | Failed | 命中 Script，URL 已改、Host 未同步，0 B 快速失败 |
+| T062 Host authority 修复（0.1.1-m3） | Passed（本地） | 修复前新增 4 个回归测试失败；修复后 Loon 44 tests、typecheck、bundle scan 通过 |
+| T063 G13/G17 修复后设备恢复 | Pending | 本地制品尚未分发到设备；不能把 Host 修复视作已证明故障恢复 |
+
+### 修复范围与 Open Questions
+
+Loon Adapter 在 URL rewrite 的 `$done({url,headers})` 映射中移除大小写不同的旧 Host，设置唯一 `Host = new URL(url).host`；支持非默认网关端口、WRD 与 Gateway-owned 路径，其余头及 Cookie 保留，POST body 仍按宿主契约通过省略保留。PASS、headers-only Gateway 注入与 Settings synthetic response 不变。共享 Core/Stash、存储与安全模型未修改；属于既有上游 URL 契约的 Adapter 修复，无需新 ADR。三 bundle 与 `.plugin` cache version 同步为 `0.1.1-m3`。
+
+Open：旧 Host 保留是已复现的输出缺陷，但它是否是唯一导致 0 B 失败的原因仍待 T063；尤其须复核 Loon 的 HTTP→HTTPS 连接切换、实际目的地址/端口与响应 URL 语义。复验时先加载同版本本地 bundle 或分发后的 raw 制品，确认日志版本后访问原始 `http://jwxt.swufe.edu.cn/` 并操作教务；若仍失败，保留本条 Failed 证据并继续取证，不宣称修复完成。
