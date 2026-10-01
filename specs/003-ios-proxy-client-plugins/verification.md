@@ -372,3 +372,12 @@ T065/G13/G17：用户复检 0.1.1-m3，HTTP 教务根请求完成 URL/Host 改�
 | 修复后教务页面内操作 / POST 提交 | Pending | 本次仅确认进入页面，未确认具体操作 |
 
 上述结论更新 T065 的设备页面进入结果，不追溯标记 0.1.1/0.1.2 通过；其余 M3/M4 设备验收与 Spec 状态不变。
+
+
+## Loon / Stash Gateway Session 复用对照（2026-10-02）
+
+任务分类：Spec 003 会话实现审查与回归验证。两宿主均调用 packages/webvpn-plugin-runtime 的 handlePluginRequest/handlePluginResponse，底层 rewriteRequest 与 SessionRecordV1 相同。Loon 已实现网关请求 Cookie 捕获、Set-Cookie ticket 观察、宿主持久化、普通业务及允许的 direct WRD 请求注入、冲突 App ticket 以 stored ticket 为准、绑定 ticket 轮换/删除、根页 200 后确认新登录、CAS-only 不清会话和 logout/时钟到期清理。Loon 使用本机独立 persistent store；不是读取 Stash store 或复制各 App 的 Cookie Jar。
+
+未发现需补齐的 Loon Session 运行时分支。本轮仅新增 Loon VM 回归：从 Safari 网关请求捕获并由根页 200 确认，复制持久化状态到独立客户端模拟无网关 Cookie 的导航及原生 WRD 注入；冲突 ticket 替换且保留 App Cookie；认证站 Cookie 不污染 store；新登录 ticket 仅在根页 200 且无未绑定 ticket 下发后切换。Loon 52 tests、构建/bundle scan/typecheck 与 Stash 36 tests、构建/bundle scan Passed。运行时代码和制品版本仍为 0.1.3-m3；测试重建仅产生的 Git banner 差异已还原，不分发无行为变化的新版本。
+
+限制：VM 独立客户端是模拟证据，不证明真实 App/WKWebView 流量进入 Loon 或网关接受注入的会话。用户此前确认教务入口可进入，不能替代跨 App Session 复用设备验收。N02–N10 与 CAS Cookie Jar 隔离等设备项仍按既有矩阵；重现某个 App 重新登录时应取证 request 是否命中、Gateway Request Kind、ticketRelation、注入结果和响应分类，不能仅凭 CAS 页面认定 Gateway Session 未复用。

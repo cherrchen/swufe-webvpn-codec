@@ -149,6 +149,40 @@ describe("Loon native runtime and request mapping", () => {
     expect(Object.values(rt.store).join("")).not.toContain("CAS=secret");
     expect(rt.logs.join("")).not.toContain("secret");
   });
+  it("reuses a persisted Safari session in a separate client with no gateway cookie", () => {
+    const safari = fixture();
+    const loginRequest = { url: gateway + "/", headers: { cookie: `${TICKET_COOKIE_NAME}=A; route=route-A` } };
+    safari.run("request", loginRequest);
+    safari.run("response", loginRequest, { status: 200, headers: {} });
+    expect(JSON.parse(safari.store[STORAGE_KEYS.session]!)).toMatchObject({ status: "valid" });
+    const saved = safari.store[STORAGE_KEYS.session];
+    safari.run("request", { url: "https://authserver.swufe.edu.cn/authserver/login", headers: { cookie: "CASTGC=not-stored" } });
+    expect(safari.store[STORAGE_KEYS.session]).toBe(saved);
+    expect(safari.store[STORAGE_KEYS.session]).not.toContain("not-stored");
+    const client = fixture({ ...safari.store });
+    const navigation = client.run("request", { url: "http://jwxt.swufe.edu.cn/", headers: { accept: "text/html" } });
+    const response = navigation.response as { headers: { location: string } };
+    expect(response.headers.location).toBe(codec.encodeUrl("http://jwxt.swufe.edu.cn/", gateway));
+    const forwarded = client.run("request", { url: response.headers.location, headers: { Cookie: "app=client-cookie" } });
+    expect(forwarded).toEqual({ headers: { cookie: `app=client-cookie; ${TICKET_COOKIE_NAME}=A; route=route-A` } });
+    const conflict = client.run("request", { url: wrapped, headers: { cookie: `${TICKET_COOKIE_NAME}=B; app=client-cookie` } });
+    expect(conflict).toEqual({ headers: { cookie: `app=client-cookie; ${TICKET_COOKIE_NAME}=A; route=route-A` } });
+    expect(client.store[STORAGE_KEYS.session]).toBe(safari.store[STORAGE_KEYS.session]);
+  });
+  it("switches to a new login ticket only after a gateway root 200 confirms it", () => {
+    const rt = fixture({ [STORAGE_KEYS.session]: session("A", "valid") });
+    const newLogin = { url: gateway + "/", headers: { cookie: `${TICKET_COOKIE_NAME}=B; route=route-B` } };
+    expect(rt.run("request", newLogin)).toEqual({});
+    expect(rt.store[STORAGE_KEYS.session]).toContain(`${TICKET_COOKIE_NAME}=A`);
+    rt.run("response", newLogin, { status: 302, headers: { location: "/login" } });
+    expect(rt.store[STORAGE_KEYS.session]).toContain(`${TICKET_COOKIE_NAME}=A`);
+    rt.run("response", newLogin, { status: 200, headers: { "set-cookie": `${TICKET_COOKIE_NAME}=unbound; Max-Age=3600` } });
+    expect(rt.store[STORAGE_KEYS.session]).toContain(`${TICKET_COOKIE_NAME}=A`);
+    rt.run("response", newLogin, { status: 200, headers: {} });
+    expect(JSON.parse(rt.store[STORAGE_KEYS.session]!)).toMatchObject({ status: "valid", cookieHeader: `${TICKET_COOKIE_NAME}=B; route=route-B` });
+    const out = rt.run("request", { url: wrapped, headers: {} });
+    expect(out).toEqual({ headers: { cookie: `${TICKET_COOKIE_NAME}=B; route=route-B` } });
+  });
   it("supports the native enable switch while keeping settings accessible", () => {
     const rt = fixture({ [STORAGE_KEYS.session]: session() });
     expect(rt.run("request", { url: "http://jwxt.swufe.edu.cn/" }, undefined, { enabled: false })).toEqual({});
