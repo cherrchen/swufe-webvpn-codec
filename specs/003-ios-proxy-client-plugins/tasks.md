@@ -119,3 +119,10 @@
 | T049 | 未完成 | 同步 README、UI/security/update/rollback guide 与发布制品清单 | T048 | links/review；安全披露清楚 | 002,016–017 |
 
 - [x] T065 Loon 页面 GET 复用 Stash 原生 Gateway 导航：request 合成 302、透明非导航请求保留与防环回归；0.1.3-m3 — 关联：G13/G17；2026-10-02 用户真机确认教务入口可进入；完整响应链与教务内操作仍 Pending。
+
+## 2026-10-02 审查缺陷修复
+
+- [x] T066 Safe Auth Trace 仅记录固定路径分类，移除持久化 Trace 并清理旧键；覆盖 debug 开/关 — IOS-REQ-018。
+- [x] T067 nonce 消费写入失败时返回 STORAGE_FAILED 且禁止配置保存/重放 — AC-SETTINGS 安全契约。
+- [x] T068 响应仅改头时省略 body，Stash 不再将二进制转换为 UTF-8；覆盖 PDF 字节与正文改写 — IOS-REQ-007。
+- [x] T069 Settings 保存前刷新 nonce，失败后保留编辑内容并恢复重试；覆盖过期、校验/存储失败与网络错误 — AC-SETTINGS。

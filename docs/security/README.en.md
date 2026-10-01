@@ -94,7 +94,7 @@ This project adds one hard constraint: **never build a proxy core, TLS stack or 
 
 | Data category | Sensitivity | Storage | Retention | Access control |
 | ------------- | ----------- | ------- | --------- | -------------- |
-| WebVPN session cookies | High | `userData/session.bin` (optionally `safeStorage`-encrypted) or an Electron persistent session partition | Cleared on logout/session expiry (automatic cleanup interval `TBD` - not defined for phase 1) | Read/written only by the Main process and the sidecar; never in logs or the debug panel |
+| WebVPN session cookies | High | `userData/session.bin` (optionally `safeStorage`-encrypted) or an Electron persistent session partition | Cleared on logout/session expiry (automatic cleanup interval `TBD` - not defined for phase 1); retention of the plaintext sidecar config copy is defined in the [control protocol](../api/bridge-control-protocol.en.md) | Read/written only by the Main process and the sidecar; never in logs or the debug panel |
 | Allowlist and AppSettings | Low | `userData/config.json` | Kept for the lifetime of the app | The local user (a file in the user data directory) |
 | Debug logs | Low (off by default; bodies and cookies forbidden) | In-memory ring buffer; on-disk location `TBD` (not defined for phase 1) | `TBD` - retention policy not defined for phase 1 | Local viewing only |
 

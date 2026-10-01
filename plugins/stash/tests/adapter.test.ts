@@ -153,7 +153,7 @@ describe("Stash adapter", () => {
     expect(rewritten.decision).toBe("rewrite");
     const requestLines = logs.join("\n");
     expect(requestLines).toContain("method=POST");
-    expect(requestLines).toContain("originalPath=/campusapp/api/lanapi/login/signin");
+    expect(requestLines).toContain("originalPathClass=resource");
     expect(requestLines).toContain("contentLengthHeader=430");
     expect(requestLines).toContain("bodyLength=");
     expect(requestLines).toContain("userAgentClass=SciyardApp");
@@ -719,4 +719,17 @@ describe("Stash adapter", () => {
     handleStashResponse(rt);
     expect(rt.responses[0]).toEqual({});
   });
+});
+
+
+it.each([false, true])("never logs raw paths or persists trace data (debug=%s)", (debug) => {
+  const logs: unknown[] = [];
+  const rt = runtime({ request: { url: "http://jwxt.swufe.edu.cn/student/SIMULATED-ID-12345/report?ticket=private" }, debug: (record) => logs.push(record) });
+  rt.store[STORAGE_KEYS.settingsV2] = JSON.stringify({ schemaVersion: 2, enabled: true, debug, gatewayBase: "https://webvpn.swufe.edu.cn", wrdKey: DEFAULT_KEY, wrdIv: DEFAULT_KEY, builtinSiteStates: { jwxt: true }, customHosts: [], bodyRewriteMaxBytes: 1048576 });
+  rt.store[STORAGE_KEYS.session] = JSON.stringify({ schemaVersion: 1, gatewayHost: "webvpn.swufe.edu.cn", cookieHeader: "route=STUB", capturedAt: NOW, lastConfirmedAt: null, expiresAt: null, status: "captured" });
+  rt.store["swufe.trace.pending.v1"] = JSON.stringify({ path: "/student/OLD-ID" });
+  handleStashRequest(rt);
+  expect(JSON.stringify(logs)).not.toMatch(/SIMULATED-ID|student|report|private|OLD-ID/);
+  expect(JSON.stringify(logs)).toContain("originalPathClass=resource");
+  expect(rt.store["swufe.trace.pending.v1"]).toBeUndefined();
 });

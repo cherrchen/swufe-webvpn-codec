@@ -84,6 +84,7 @@ flowchart TD
 - 不负责：不做 URL 改写；不持有学号/密码；不做 allowlist 判定。
 - 输入：登录 WebView 的 session partition（票据 cookie 及其过期时间）；sidecar 在真实流量上报告的 `swufe-session expired`。
 - 输出：`SessionState`（Cookie 集合）、登录/过期状态；供 Proxy Orchestrator 推送 sidecar。
+- 会话更新：每次成功采集独立发送 `onUpdate`，即使登录布尔值未变化；IPC 据此刷新运行配置。监控启用时重新安排新票据的到期计时，失败采集不取消既有计时。`onChange` 仍只表示登录状态变化。
 - 依赖：Login WebView 的 session。
 - 被谁依赖：App Shell、Proxy Orchestrator。
 - 关键不变式：Cookie 的唯一读取点；Cookie 不得进入日志（见 INV-001）；没有票据不算已登录；`expiresAt` 只取票据，到点本地失效，不再定时请求门户。
@@ -93,6 +94,7 @@ flowchart TD
 ### Proxy Orchestrator
 
 - 职责：启停 mitm sidecar、设置/清除系统代理、管理进程捕获（local capture）与捕获方式（`captureMode`）、代理冲突检测。
+- 生命周期：启动、停止、失效、异常退出、登出与捕获配置修改共用串行队列。停止/失效/异常退出/登出立即取消在途启动；启动在每个异步阶段结束后检查取消，代理启用命令完成后才可清理和清除归属标记。运行配置保留期见 [bridge-control-protocol.md](../api/bridge-control-protocol.md)。
 - 不负责：不做流量改写；不管理 CA（Cert Manager）；不直接读取 Cookie（经 Session Broker）。
 - 输入：`startBridge` / `stopBridge` / `setCaptureMode` / `setCaptureProcesses` IPC；OS 当前代理设置；`captureMode` 与 `captureProcesses`。
 - 输出：`BridgeStatus`（含 `localCaptureEnabled` 与 `captureError`）；系统代理指向；推送给 sidecar 的 `{allowlist, cookies, debug, capture}` 配置。

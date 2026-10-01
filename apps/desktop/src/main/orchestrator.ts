@@ -6,7 +6,7 @@
  * only ever clear a proxy this app installed (INV-002 / NFR-004).
  */
 
-import { chmodSync, closeSync, mkdirSync, openSync, writeSync } from 'node:fs'
+import { chmodSync, closeSync, mkdirSync, openSync, rmSync, writeSync } from 'node:fs'
 import { lookup } from 'node:dns/promises'
 import { createServer } from 'node:net'
 import { dirname, join } from 'node:path'
@@ -67,6 +67,8 @@ export class ProxyOrchestrator {
   private activePort: number | null = null
   private proxyCache: { at: number; enabled: boolean } | null = null
   private captureReport: CaptureReport | null = null
+  private lifecycle: Promise<void> = Promise.resolve()
+  private cancellationRevision = 0
   private inflightStart: Promise<BridgeStatus> | null = null
   private inflightExpiry: Promise<void> | null = null
   private readonly statusListeners: Array<(status: BridgeStatus) => void> = []
@@ -88,9 +90,9 @@ export class ProxyOrchestrator {
   }
 
   async start(): Promise<BridgeStatus> {
-    if (this.machine.state === 'running') return this.status()
     if (this.inflightStart) return this.inflightStart
-    this.inflightStart = this.runStart()
+    const revision = this.cancellationRevision
+    this.inflightStart = this.serialize(() => this.runStart(revision))
     try {
       return await this.inflightStart
     } finally {
@@ -99,15 +101,21 @@ export class ProxyOrchestrator {
   }
 
   async stop(): Promise<BridgeStatus> {
+    this.cancellationRevision++
     if (this.inflightExpiry) {
       await this.inflightExpiry
       return this.status()
     }
-    // A quit can arrive while `starting`; finishing that attempt first keeps the
-    // state machine's documented transitions intact.
-    if (this.inflightStart) await this.inflightStart.catch(() => undefined)
+    return this.serialize(() => this.runStop())
+  }
+
+  private async runStop(): Promise<BridgeStatus> {
     const from = this.machine.state
-    if (from === 'idle') return this.status()
+    if (from === 'idle') {
+      this.removeRuntimeConfig()
+      return this.status()
+    }
+    if (from === 'starting') this.machine.fail('BRIDGE_CRASH', '桥接启动已取消。')
     this.deps.session.stopMonitor()
     // `running → stopping` is the documented path; `error` (the previous cleanup
     // failed) and `stopping` (a second call) go straight to the cleanup itself.
@@ -129,6 +137,11 @@ export class ProxyOrchestrator {
     this.sidecar = null
     this.captureReport = null
     this.activePort = null
+    try {
+      this.removeRuntimeConfig()
+    } catch (error) {
+      cleanupFailure ??= describe(error)
+    }
     this.deps.session.stopMonitor()
     if (this.machine.state === 'stopping') this.machine.transition('idle')
     else this.machine.reset()
@@ -143,6 +156,16 @@ export class ProxyOrchestrator {
   /** Sidecar died on its own: clear our proxy and park in `error` (no auto restart). */
   async handleSidecarExit(code: number | null, signal: string | null): Promise<void> {
     if (this.machine.state !== 'running' && this.machine.state !== 'starting') return
+    this.cancellationRevision++
+    const sidecar = this.sidecar
+    return this.serialize(async () => {
+      if (sidecar !== this.sidecar) return
+      await this.runSidecarExit(code, signal)
+    })
+  }
+
+  private async runSidecarExit(code: number | null, signal: string | null): Promise<void> {
+    if (this.machine.state !== 'running' && this.machine.state !== 'starting') return
     console.warn(`swufe-sidecar 桥接进程退出：code=${code ?? 'null'} signal=${signal ?? 'null'}`)
     this.sidecar = null
     this.captureReport = null
@@ -153,14 +176,23 @@ export class ProxyOrchestrator {
       console.warn(`swufe-proxy 桥接异常退出后清除代理失败：${describe(error)}`)
     }
     this.activePort = null
-    this.machine.fail(mapSidecarError(null), ERROR_MESSAGES.BRIDGE_CRASH)
+    let cleanupFailure: string | null = null
+    try {
+      this.removeRuntimeConfig()
+    } catch (error) {
+      cleanupFailure = describe(error)
+    }
+    this.machine.fail(mapSidecarError(null), cleanupFailure
+      ? `${ERROR_MESSAGES.BRIDGE_CRASH} 运行配置清理失败：${cleanupFailure}`
+      : ERROR_MESSAGES.BRIDGE_CRASH)
     this.emitStatus()
   }
 
   /** Session expiry cascade: stop proxy → stop sidecar → drop session → notify (EC-007). */
   async handleSessionExpired(): Promise<void> {
     if (this.inflightExpiry) return this.inflightExpiry
-    this.inflightExpiry = this.runSessionExpiry()
+    this.cancellationRevision++
+    this.inflightExpiry = this.serialize(() => this.runSessionExpiry())
     try {
       await this.inflightExpiry
     } finally {
@@ -176,6 +208,7 @@ export class ProxyOrchestrator {
     if (this.machine.state === 'running') this.machine.transition('stopping')
 
     let proxyFailure: string | null = null
+    let cleanupFailure: string | null = null
     try {
       await this.disableSystemProxy(this.activePort ?? this.settings().bridgePort)
     } catch (error) {
@@ -185,19 +218,31 @@ export class ProxyOrchestrator {
     try {
       await this.sidecar?.stop()
     } catch (error) {
+      cleanupFailure = describe(error)
       console.warn(`swufe-sidecar 会话过期后停止失败：${describe(error)}`)
     }
     this.sidecar = null
     this.captureReport = null
     this.activePort = null
+    try {
+      this.removeRuntimeConfig()
+    } catch (error) {
+      cleanupFailure ??= describe(error)
+    }
     this.deps.session.stopMonitor()
-    await this.deps.session.clear()
+    try {
+      await this.deps.session.clear()
+    } catch (error) {
+      cleanupFailure ??= describe(error)
+    }
     if (this.machine.state === 'stopping') this.machine.transition('idle')
     this.machine.fail(
       'SESSION_EXPIRED',
       proxyFailure
         ? `WebVPN 会话已失效，桥接已停止，但系统代理清理失败：${proxyFailure}`
-        : ERROR_MESSAGES.SESSION_EXPIRED,
+        : cleanupFailure
+          ? `WebVPN 会话已失效，桥接已停止，但本地清理失败：${cleanupFailure}`
+          : ERROR_MESSAGES.SESSION_EXPIRED,
     )
     this.emitStatus()
     for (const listener of this.sessionExpiredListeners) listener()
@@ -205,6 +250,15 @@ export class ProxyOrchestrator {
 
   /** Crash self-healing: a leftover "managed by app" flag is cleared on launch. */
   async recoverOnLaunch(): Promise<void> {
+    return this.serialize(() => this.runRecovery())
+  }
+
+  private async runRecovery(): Promise<void> {
+    try {
+      this.removeRuntimeConfig()
+    } catch (error) {
+      console.warn(`swufe-config 启动时清除运行配置失败：${describe(error)}`)
+    }
     if (!this.settings().systemProxyManagedByApp) return
     console.warn('swufe-proxy 检测到上次运行残留的代理标记：清除本桥代理设置')
     try {
@@ -224,9 +278,16 @@ export class ProxyOrchestrator {
   }
 
   async logout(): Promise<void> {
-    if (this.machine.state !== 'idle') await this.stop()
-    await this.deps.session.clear()
-    this.emitStatus()
+    this.cancellationRevision++
+    return this.serialize(async () => {
+      if (this.machine.state !== 'idle') await this.runStop()
+      try {
+        this.removeRuntimeConfig()
+      } finally {
+        await this.deps.session.clear()
+        this.emitStatus()
+      }
+    })
   }
 
   /** Re-push the runtime config while the bridge runs (config file hot reload). */
@@ -245,6 +306,10 @@ export class ProxyOrchestrator {
    * the sidecar config, which the addon hot-reloads.
    */
   async setCaptureMode(mode: CaptureMode): Promise<void> {
+    return this.serialize(() => this.runCaptureMode(mode))
+  }
+
+  private async runCaptureMode(mode: CaptureMode): Promise<void> {
     if (mode === 'selected-apps') await this.assertNoForeignProxy()
     if (mode === this.settings().captureMode) {
       // The UI's retry action re-sends the same mode after a capture failure.
@@ -262,7 +327,7 @@ export class ProxyOrchestrator {
         } catch (error) {
           // If rollback also failed, stop local capture before a residual system
           // proxy can route the same process through both capture mechanisms.
-          if (this.settings().systemProxyManagedByApp) await this.stop()
+          if (this.settings().systemProxyManagedByApp) await this.runStop()
           throw error
         }
       }
@@ -274,10 +339,12 @@ export class ProxyOrchestrator {
   }
 
   async setCaptureProcesses(patterns: string[]): Promise<void> {
-    this.deps.store.updateSettings({ captureProcesses: patterns })
-    this.captureReport = null
-    this.refreshRuntimeConfig()
-    this.emitStatus()
+    return this.serialize(async () => {
+      this.deps.store.updateSettings({ captureProcesses: patterns })
+      this.captureReport = null
+      this.refreshRuntimeConfig()
+      this.emitStatus()
+    })
   }
 
   async status(): Promise<BridgeStatus> {
@@ -298,10 +365,13 @@ export class ProxyOrchestrator {
     return status
   }
 
-  private async runStart(): Promise<BridgeStatus> {
+  private async runStart(revision: number): Promise<BridgeStatus> {
+    const cancelled = (): boolean => revision !== this.cancellationRevision
+    if (cancelled() || this.machine.state === 'running') return this.status()
     if (this.machine.state === 'error') this.machine.reset()
     if (this.settings().systemProxyManagedByApp) {
-      await this.recoverOnLaunch()
+      await this.runRecovery()
+      if (cancelled()) return this.status()
       if (this.settings().systemProxyManagedByApp) {
         return this.fail('BRIDGE_CRASH', '上次运行残留的系统代理未能清理，请检查系统代理设置。')
       }
@@ -318,6 +388,7 @@ export class ProxyOrchestrator {
 
     try {
       const ca = await this.deps.certManager.getStatus()
+      if (cancelled()) return this.status()
       if (!ca.installed || !ca.trusted) return this.fail('CA_MISSING', ERROR_MESSAGES.CA_MISSING)
     } catch (error) {
       return this.fail('BRIDGE_CRASH', describe(error))
@@ -325,6 +396,7 @@ export class ProxyOrchestrator {
 
     try {
       const entries = await this.deps.systemProxy.read()
+      if (cancelled()) return this.status()
       if (entries.length === 0) {
         return this.fail('BRIDGE_CRASH', '未找到可用的系统网络服务：无法设置系统代理。')
       }
@@ -343,7 +415,9 @@ export class ProxyOrchestrator {
     if (upstreamHost) {
       const resolveUpstream = this.deps.resolveUpstream ?? defaultResolveUpstream
       try {
-        if ((await resolveUpstream(upstreamHost)).some(isFakeIpAddress)) {
+        const addresses = await resolveUpstream(upstreamHost)
+        if (cancelled()) return this.status()
+        if (addresses.some(isFakeIpAddress)) {
           console.warn(`swufe-proxy ${upstreamHost} 解析到 fake-ip 地址（198.18.0.0/15）：拒绝开桥`)
           return this.fail('PROXY_CONFLICT', ERROR_MESSAGES.PROXY_CONFLICT)
         }
@@ -353,8 +427,11 @@ export class ProxyOrchestrator {
       }
     }
 
+    if (cancelled()) return this.status()
     const portProbe = this.deps.portProbe ?? defaultPortProbe
-    if (!(await portProbe(port))) {
+    const portFree = await portProbe(port)
+    if (cancelled()) return this.status()
+    if (!portFree) {
       return this.fail(
         'BRIDGE_CRASH',
         `本机桥端口 ${port} 已被占用：请关闭占用该端口的程序，或修改 bridgePort 后重试。`,
@@ -368,6 +445,7 @@ export class ProxyOrchestrator {
     if (captureSelected) {
       try {
         await this.disableSystemProxyIfManaged(port)
+        if (cancelled()) return this.status()
       } catch (error) {
         return this.fail('BRIDGE_CRASH', describe(error))
       }
@@ -376,6 +454,7 @@ export class ProxyOrchestrator {
     try {
       this.writeRuntimeConfig()
     } catch (error) {
+      this.removeRuntimeConfig()
       return this.fail('BRIDGE_CRASH', `运行时配置写入失败：${describe(error)}`)
     }
 
@@ -386,20 +465,24 @@ export class ProxyOrchestrator {
     this.sidecar = sidecar
     this.activePort = port
     sidecar.onExit((code, signal) => {
-      void this.handleSidecarExit(code, signal)
+      if (this.sidecar === sidecar) void this.handleSidecarExit(code, signal)
     })
     sidecar.onDebug((event) => this.emitDebug(event))
-    sidecar.onCapture((report) => this.handleCaptureReport(report))
+    sidecar.onCapture((report) => {
+      if (this.sidecar === sidecar) this.handleCaptureReport(report)
+    })
     sidecar.onSessionExpired(() => {
-      void this.handleSessionExpired()
+      if (this.sidecar === sidecar) void this.handleSessionExpired()
     })
 
     try {
       await sidecar.start()
+      if (cancelled()) return this.status()
     } catch (error) {
       await sidecar.stop().catch(() => undefined)
       this.sidecar = null
       this.activePort = null
+      this.removeRuntimeConfig()
       this.machine.fail('BRIDGE_CRASH', describe(error))
       this.emitStatus()
       return this.status()
@@ -408,10 +491,12 @@ export class ProxyOrchestrator {
     if (!captureSelected) {
       try {
         await this.enableSystemProxy(port)
+        if (cancelled()) return this.status()
       } catch (error) {
         await sidecar.stop().catch(() => undefined)
         this.sidecar = null
         this.activePort = null
+        this.removeRuntimeConfig()
         this.machine.fail('BRIDGE_CRASH', describe(error))
         this.emitStatus()
         return this.status()
@@ -520,6 +605,17 @@ export class ProxyOrchestrator {
 
   private now(): number {
     return this.deps.now ? this.deps.now() : Date.now()
+  }
+
+  /** All lifecycle mutations share one queue; a failure never poisons later cleanup. */
+  private serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.lifecycle.then(operation)
+    this.lifecycle = result.then(() => undefined, () => undefined)
+    return result
+  }
+
+  private removeRuntimeConfig(): void {
+    rmSync(join(this.deps.userDataDir, RUNTIME_CONFIG_FILENAME), { force: true })
   }
 
   private writeRuntimeConfig(): void {

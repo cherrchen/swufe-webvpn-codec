@@ -102,20 +102,22 @@ function render() {
     custom.append(item);
   });
 }
-async function load() {
+async function load(preserveEdits = false) {
   const response = await fetch(api, { cache: "no-store" });
   const body = await response.json();
   if (!response.ok || !body.ok) {
-    show("feedback", "设置暂不可用", "bad");
-    return;
+    throw new Error("settings unavailable");
   }
   state.token = body.token || "";
-  state.builtin = body.data.settings.builtinSiteStates;
-  state.custom = body.data.settings.customHosts.slice();
-  state.schemes = body.data.settings.hostSchemes || {};
+  if (!state.token) throw new Error("settings token unavailable");
+  if (!preserveEdits) {
+    state.builtin = body.data.settings.builtinSiteStates;
+    state.custom = body.data.settings.customHosts.slice();
+    state.schemes = body.data.settings.hostSchemes || {};
+  }
   state.status = body.data.status;
   show("warning", body.data.migrationWarnings && body.data.migrationWarnings.length ? "部分旧网站设置不再受支持，请检查当前列表" : "");
-  render();
+  if (!preserveEdits) render();
 }
 document.getElementById("add").addEventListener("click", () => {
   const value = document.getElementById("host").value.trim().toLowerCase().replace(/\\.+$/, "");
@@ -130,20 +132,29 @@ document.getElementById("add").addEventListener("click", () => {
   render();
 });
 document.getElementById("save").addEventListener("click", async () => {
+  const save = document.getElementById("save");
+  if (save.disabled) return;
+  save.disabled = true;
   show("feedback", "正在保存", "");
-  const response = await fetch(api, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-swufe-settings-token": state.token },
-    body: JSON.stringify({ schemaVersion: 2, builtinSiteStates: state.builtin, customHosts: state.custom, hostSchemes: state.schemes })
-  });
-  const body = await response.json().catch(() => ({}));
-  if (response.ok && body.ok) {
+  const draft = JSON.stringify({ schemaVersion: 2, builtinSiteStates: state.builtin, customHosts: state.custom, hostSchemes: state.schemes });
+  try {
+    // Every attempt gets a new one-use token without replacing unsaved edits.
+    await load(true);
+    const response = await fetch(api, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-swufe-settings-token": state.token },
+      body: draft
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || !body.ok) throw new Error("save failed");
     show("feedback", "已保存", "ok");
     show("warning", "");
-    await load();
-    return;
+  } catch {
+    show("feedback", "保存失败，请重试", "bad");
+  } finally {
+    state.token = "";
+    save.disabled = false;
   }
-  show("feedback", "保存失败，请重试", "bad");
 });
 document.getElementById("login").addEventListener("click", () => { location.href = origin + "/"; });
 load().catch(() => show("feedback", "设置暂不可用", "bad"));

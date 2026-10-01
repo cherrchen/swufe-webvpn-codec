@@ -42,6 +42,7 @@ Phase 1 adopts option A (finalised 2026-09-21): Main only launches/terminates th
 
 - Path: defaults to `~/.swufe-webvpn-bridge/bridge-config.json`, overridden by `--config` (M2 passes `<userData>/bridge-config.json` under Electron `userData`).
 - Permissions: `0600` (it contains the WebVPN session cookie, see NFR-003).
+- Retention: the desktop App keeps this file only while starting/running, deleting it after sidecar shutdown on stop/quit, logout, session expiry, startup failure and unexpected exit. Launch recovery also removes a stale copy; the next start recreates it from the current session. Deletion failure must be reported as a cleanup error rather than successful removal.
 - Content (field names match `AllowlistConfig` / `SessionState` / `AppSettings` in [data-model.md](../architecture/data-model.md)):
 
   ```json

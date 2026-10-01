@@ -39,7 +39,7 @@ import {
 import { SETTINGS_PAGE_HTML } from "./settings-page.ts";
 
 const NOTIFY_GAP_MS = 60_000;
-const DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
+const LEGACY_DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
 
 export interface PluginRuntime {
   nowIso: string;
@@ -70,6 +70,7 @@ export function createPluginAdapter(runtime: PluginRuntime): HostAdapter {
 }
 
 export function handlePluginRequest(runtime: PluginRuntime): void {
+  clearLegacyTrace(runtime);
   if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
     try {
       const response = handleSettingsRequest(settingsDto(runtime), {
@@ -163,7 +164,6 @@ export function handlePluginRequest(runtime: PluginRuntime): void {
     const decoded = deriveRewriteContext(decision.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv);
     const bodyPreserved = "unknown"; // The host's $done({url, headers}) does not expose the post-rewrite request body.
     const gwCookies = gatewayCookieNames(decision.headers);
-    savePendingTrace(runtime, { traceId, method: request.method ?? "GET", host: decoded?.originalHost ?? host, path: safePath(request.url), at: runtime.nowIso });
     emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail: `trace=${traceId} targetHost=${safeHost(decision.url) ?? "-"} targetScheme=${schemeOf(decision.url)} rewrittenPathShape=/${wrappedSchemeOf(decision.url)}/<wrd>/... decodedOriginalHost=${decoded?.originalHost ?? "-"} gatewayKind=wrapped-resource gatewayCookiePresent=${gwCookies.length ? "yes" : "no"} gatewayCookieNames=[${gwCookies.join(",")}] gatewayTicketCookiePresent=${gwCookies.some((n) => n.startsWith("wengine_vpn_ticket")) ? "yes" : "no"} routeCookiePresent=${gwCookies.includes("route") ? "yes" : "no"} requestBodyPreserved=${bodyPreserved} ${detail}` });
     runtime.finishRequest({ decision: "rewrite", url: decision.url, headers: decision.headers });
     return;
@@ -178,6 +178,7 @@ export function handlePluginRequest(runtime: PluginRuntime): void {
 }
 
 export function handlePluginResponse(runtime: PluginRuntime): void {
+  clearLegacyTrace(runtime);
   if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
     runtime.finishResponse({});
     return;
@@ -203,7 +204,7 @@ export function handlePluginResponse(runtime: PluginRuntime): void {
   const rewriteSettings = toRewriteSettingsFromV2(settings);
   const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv)
     ?? deriveOriginalRequestContext(runtime, rewriteSettings);
-  const traceId = takePendingTrace(runtime, context?.originalHost ?? safeHost(runtime.request.url), safePath(context?.originalUrl ?? runtime.request.url), runtime.request.method ?? "GET") ?? diagnosticTrace(runtime);
+  const traceId = diagnosticTrace(runtime);
   // After a browser navigation has reached the WebVPN URL, its bootstrap
   // document must be served as-is. Promoting it to the same URL loops forever.
   if (context && !context.gatewayOwned && isNativeGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
@@ -259,7 +260,7 @@ export function handlePluginResponse(runtime: PluginRuntime): void {
   runtime.finishResponse({
     status: result.response.status,
     headers: result.response.headers,
-    body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : undefined,
+    ...(result.changes.includes("body") || result.changes.includes("promotion") ? { body: result.response.body } : {}),
   });
 }
 
@@ -667,7 +668,7 @@ function requestMetadata(request: NonNullable<PluginRuntime["request"]>): string
   const length = byteLength(request.body);
   const ua = header(request.headers, "user-agent") ?? "";
   const uaClass = /sciyardapp/i.test(ua) ? "SciyardApp" : /safari/i.test(ua) ? "Safari" : /webview|wv\)/i.test(ua) ? "WebView" : ua ? "other" : "unknown";
-  return `method=${method} originalHost=${safeHost(request.url) ?? "-"} originalPath=${safePath(request.url)} originalScheme=${schemeOf(request.url)} contentType=${header(request.headers, "content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown"} contentLengthHeader=${header(request.headers, "content-length") ?? "unknown"} bodyPresent=${length === null ? "unknown" : length > 0 ? "yes" : "no"} bodyLength=${length ?? "unknown"} bodyHash=unavailable userAgentClass=${uaClass} requestCookieNames=[${cookieNames(request.headers).join(",")}]`;
+  return `method=${method} originalHost=${safeHost(request.url) ?? "-"} originalPathClass=${safePathClass(request.url)} originalScheme=${schemeOf(request.url)} contentType=${header(request.headers, "content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown"} contentLengthHeader=${header(request.headers, "content-length") ?? "unknown"} bodyPresent=${length === null ? "unknown" : length > 0 ? "yes" : "no"} bodyLength=${length ?? "unknown"} bodyHash=unavailable userAgentClass=${uaClass} requestCookieNames=[${cookieNames(request.headers).join(",")}]`;
 }
 
 function classifyBody(contentType: string, body: string | Uint8Array | undefined): string {
@@ -713,30 +714,24 @@ function byteLength(body: string | Uint8Array | undefined): number | null {
   return new TextEncoder().encode(body).byteLength;
 }
 
-function safePath(url: string): string {
-  try { return new URL(url).pathname; } catch { return "-"; }
+function safePathClass(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === GATEWAY_HOST) return classifyGatewayRequest(url);
+    return parsed.pathname === "/" ? "root" : "resource";
+  } catch { return "invalid"; }
+}
+
+function clearLegacyTrace(runtime: PluginRuntime): void {
+  try {
+    if (runtime.read(LEGACY_DIAGNOSTIC_TRACE_KEY)) runtime.write(LEGACY_DIAGNOSTIC_TRACE_KEY, null);
+  } catch { /* Cleanup must not bypass local Settings error handling. */ }
 }
 
 function diagnosticTrace(runtime: PluginRuntime): string {
   const cryptoObj = globalThis.crypto as { randomUUID?: () => string } | undefined;
   try { if (cryptoObj?.randomUUID) return cryptoObj.randomUUID().replace(/-/g, "").slice(0, 12); } catch { /* runtime may not expose crypto */ }
   return `${Date.parse(runtime.nowIso).toString(36)}${Math.random().toString(36).slice(2, 7)}`.slice(-12);
-}
-
-function savePendingTrace(runtime: PluginRuntime, pending: { traceId: string; method: string; host: string | null; path: string; at: string }): void {
-  runtime.write(DIAGNOSTIC_TRACE_KEY, JSON.stringify(pending));
-}
-
-function takePendingTrace(runtime: PluginRuntime, host: string | null, path: string, method: string): string | null {
-  const raw = runtime.read(DIAGNOSTIC_TRACE_KEY);
-  runtime.write(DIAGNOSTIC_TRACE_KEY, null);
-  if (!raw) return null;
-  try {
-    const pending = JSON.parse(raw) as { traceId?: string; method?: string; host?: string | null; path?: string; at?: string };
-    if (pending.host === host && pending.path === path && pending.method === method
-      && Date.parse(runtime.nowIso) - Date.parse(pending.at ?? "") < 120_000) return pending.traceId ?? null;
-  } catch { /* ignore corrupt transient trace */ }
-  return null;
 }
 
 function gatewayOwnedSignal(url: string): "failed" | "other" {

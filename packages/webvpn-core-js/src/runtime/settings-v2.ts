@@ -359,7 +359,9 @@ function settingsPost(
   if (size > SETTINGS_BODY_MAX_BYTES) return json(413, "BODY_TOO_LARGE");
   if (!originAllowed(input.origin, input.referer)) return json(401, "UNAUTHORIZED");
   if (!jsonContentType(input.contentType)) return json(400, "INVALID_SETTINGS");
-  if (!consumeNonce(dependencies.kv, input.token, input.nowIso)) return json(401, "UNAUTHORIZED");
+  const nonce = consumeNonce(dependencies.kv, input.token, input.nowIso);
+  if (nonce === "storage-failed") return json(500, "STORAGE_FAILED");
+  if (!nonce) return json(401, "UNAUTHORIZED");
   if (loaded.kind === "incompatible") return json(400, "INVALID_SETTINGS");
   const text = bodyText(input.body);
   if (text === null) return json(400, "INVALID_JSON");
@@ -515,9 +517,9 @@ function jsonContentType(value: string | undefined): boolean {
   return value.split(";")[0]?.trim().toLowerCase() === "application/json";
 }
 
-function consumeNonce(kv: KeyValueStore, token: string | undefined, nowIso: string): boolean {
+function consumeNonce(kv: KeyValueStore, token: string | undefined, nowIso: string): boolean | "storage-failed" {
   const raw = kv.read(STORAGE_KEYS.settingsCsrf);
-  clearNonce(kv);
+  if (!kv.write(STORAGE_KEYS.settingsCsrf, null)) return "storage-failed";
   if (!raw || !token || !NONCE_RE.test(token)) return false;
   try {
     const data = JSON.parse(raw) as { token?: unknown; issuedAt?: unknown };

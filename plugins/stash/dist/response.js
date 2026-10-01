@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 7d40a66 */
+/* swufe-webvpn stash 0c1d786 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1923,8 +1923,9 @@
 
   // ../../packages/webvpn-plugin-runtime/src/runtime.ts
   var NOTIFY_GAP_MS = 6e4;
-  var DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
+  var LEGACY_DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
   function handlePluginResponse(runtime) {
+    clearLegacyTrace(runtime);
     if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
       runtime.finishResponse({});
       return;
@@ -1949,7 +1950,7 @@
     confirmGatewayRootSession(runtime, settings.gatewayBase, ticketEvent);
     const rewriteSettings = toRewriteSettingsFromV2(settings);
     const context = deriveRewriteContext(runtime.request.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv) ?? deriveOriginalRequestContext(runtime, rewriteSettings);
-    const traceId = takePendingTrace(runtime, context?.originalHost ?? safeHost(runtime.request.url), safePath(context?.originalUrl ?? runtime.request.url), runtime.request.method ?? "GET") ?? diagnosticTrace(runtime);
+    const traceId = diagnosticTrace(runtime);
     if (context && !context.gatewayOwned && isNativeGatewayUrl(runtime.request.url, rewriteSettings.gatewayBase)) {
       emit(runtime, settings.debug, {
         ts: runtime.nowIso,
@@ -1999,7 +2000,7 @@
     runtime.finishResponse({
       status: result.response.status,
       headers: result.response.headers,
-      body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : void 0
+      ...result.changes.includes("body") || result.changes.includes("promotion") ? { body: result.response.body } : {}
     });
   }
   function absoluteGatewayRedirect(runtime, settings) {
@@ -2276,11 +2277,10 @@
     if (body instanceof Uint8Array) return body.byteLength;
     return new TextEncoder().encode(body).byteLength;
   }
-  function safePath(url) {
+  function clearLegacyTrace(runtime) {
     try {
-      return new URL(url).pathname;
+      if (runtime.read(LEGACY_DIAGNOSTIC_TRACE_KEY)) runtime.write(LEGACY_DIAGNOSTIC_TRACE_KEY, null);
     } catch {
-      return "-";
     }
   }
   function diagnosticTrace(runtime) {
@@ -2290,17 +2290,6 @@
     } catch {
     }
     return `${Date.parse(runtime.nowIso).toString(36)}${Math.random().toString(36).slice(2, 7)}`.slice(-12);
-  }
-  function takePendingTrace(runtime, host, path, method) {
-    const raw = runtime.read(DIAGNOSTIC_TRACE_KEY);
-    runtime.write(DIAGNOSTIC_TRACE_KEY, null);
-    if (!raw) return null;
-    try {
-      const pending = JSON.parse(raw);
-      if (pending.host === host && pending.path === path && pending.method === method && Date.parse(runtime.nowIso) - Date.parse(pending.at ?? "") < 12e4) return pending.traceId ?? null;
-    } catch {
-    }
-    return null;
   }
   function gatewayOwnedSignal(url) {
     try {
@@ -2366,8 +2355,7 @@
       response: typeof $response === "undefined" ? void 0 : $response,
       read: (key) => $persistentStore.read(key) || null,
       write: (key, value) => {
-        $persistentStore.write(value ?? "", key);
-        return true;
+        return $persistentStore.write(value ?? "", key) !== false;
       },
       notify: (input) => {
         $notification.post(input.title, "", input.body, input.openUrl ? { url: input.openUrl } : void 0);
@@ -2386,7 +2374,7 @@
           headers: result.headers
         };
         if (result.body !== void 0) {
-          output.body = typeof result.body === "string" ? result.body : bytesToString(result.body);
+          output.body = result.body;
         }
         $done(output);
       },
@@ -2396,8 +2384,5 @@
         platform: $environment?.system === "macOS" ? "macos" : "ios"
       })
     };
-  }
-  function bytesToString(body) {
-    return new TextDecoder().decode(body);
   }
 })();

@@ -44,3 +44,32 @@ it("returns a synthetic redirect for a jwxt document navigation", async () => {
   const response = done[0]?.response as { headers: { location: string } };
   expect(response.headers.location).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn\/http\//);
 });
+
+it("returns a local storage error when the host refuses nonce deletion", async () => {
+  const bundle = await build({
+    entryPoints: [fileURLToPath(new URL("../src/request-entry.ts", import.meta.url))],
+    bundle: true, format: "iife", platform: "browser", write: false,
+  });
+  const token = 'ab'.repeat(16);
+  const store: Record<string, string> = {
+    [STORAGE_KEYS.settingsCsrf]: JSON.stringify({ token, issuedAt: new Date().toISOString() }),
+  };
+  const done: Array<Record<string, unknown>> = [];
+  runInNewContext(bundle.outputFiles[0]?.text ?? '', {
+    $request: { url: 'https://webvpn.swufe.edu.cn/__swufe_bridge__/api/settings', method: 'POST',
+      headers: { origin: 'https://webvpn.swufe.edu.cn', 'content-type': 'application/json', 'x-swufe-settings-token': token },
+      body: JSON.stringify({ schemaVersion: 2, builtinSiteStates: { jwxt: false }, customHosts: [] }) },
+    $persistentStore: { read: (key: string) => store[key] ?? null,
+      write: (value: string, key: string) => {
+        if (key === STORAGE_KEYS.settingsCsrf && value === '') return false;
+        store[key] = value;
+        return true;
+      } },
+    $notification: { post: () => undefined }, $environment: { system: 'iOS', version: 'test' },
+    $done: (value: Record<string, unknown>) => done.push(value), console: { log: () => undefined },
+    URL, TextEncoder, TextDecoder, Uint8Array,
+  });
+  expect(done).toHaveLength(1);
+  expect(done[0]).toMatchObject({ response: { status: 500, body: JSON.stringify({ ok: false, code: 'STORAGE_FAILED' }) } });
+  expect(JSON.parse(store[STORAGE_KEYS.settingsV2] ?? '{}').builtinSiteStates.jwxt).toBe(true);
+});

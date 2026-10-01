@@ -88,7 +88,7 @@ flowchart LR
 
 | 数据类别 | 敏感性 | 存储 | 保留 | 访问控制 |
 | -------- | ------ | ---- | ---- | -------- |
-| WebVPN 会话 Cookie | 高 | `userData/session.bin`（可选 `safeStorage` 加密）或 Electron Session 持久分区 | 登出/会话失效时清除（自动清理周期 `TBD`——第一期未定义） | 仅 Main 进程与 sidecar 读写；禁止进入日志与调试面板 |
+| WebVPN 会话 Cookie | 高 | `userData/session.bin`（可选 `safeStorage` 加密）或 Electron Session 持久分区 | 登出/会话失效时清除（自动清理周期 `TBD`——第一期未定义）；sidecar 运行配置的明文副本保留期见 [控制协议](../api/bridge-control-protocol.md) | 仅 Main 进程与 sidecar 读写；禁止进入日志与调试面板 |
 | allowlist 与 AppSettings | 低 | `userData/config.json` | 随 App 生命周期长期保留 | 本机用户（用户目录文件） |
 | 调试日志 | 低（默认关闭，且禁止正文与 Cookie） | 内存环缓；落盘位置 `TBD`（第一期未定义） | `TBD`——第一期未定义保留策略 | 仅本机查看 |
 

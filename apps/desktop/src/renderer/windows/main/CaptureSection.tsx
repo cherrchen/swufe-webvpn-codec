@@ -51,6 +51,7 @@ export function CaptureSection({
         捕获方式
       </h2>
       <Radio.Group
+        disabled={status?.state === 'starting' || status?.state === 'stopping'}
         value={mode}
         onChange={(event) => void applyMode(event.target.value as CaptureMode)}
       >
@@ -72,7 +73,7 @@ export function CaptureSection({
       {failure ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <p style={{ margin: 0 }}>{CAPTURE_GUIDANCE}</p>
-          <Button onClick={() => void applyMode(mode)}>重试</Button>
+          <Button disabled={status?.state === 'starting' || status?.state === 'stopping'} onClick={() => void applyMode(mode)}>重试</Button>
         </div>
       ) : null}
     </section>

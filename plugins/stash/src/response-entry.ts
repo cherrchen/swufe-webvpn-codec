@@ -3,7 +3,7 @@ import { traceEntered, traceThrew } from "./script-trace.ts";
 
 declare const $request: StashRuntime["request"];
 declare const $response: StashRuntime["response"];
-declare const $persistentStore: { read(key: string): string | null; write(value: string, key: string): void };
+declare const $persistentStore: { read(key: string): string | null; write(value: string, key: string): boolean | void };
 declare const $notification: { post(title: string, subtitle?: string, body?: string, options?: { url?: string }): void };
 declare const $environment: { system?: string; version?: string } | undefined;
 declare function $done(value: Record<string, unknown>): void;
@@ -24,8 +24,7 @@ function bindResponseRuntime(): StashRuntime {
     response: typeof $response === "undefined" ? undefined : $response,
     read: (key) => $persistentStore.read(key) || null,
     write: (key, value) => {
-      $persistentStore.write(value ?? "", key);
-      return true;
+      return $persistentStore.write(value ?? "", key) !== false;
     },
     notify: (input) => {
       $notification.post(input.title, "", input.body, input.openUrl ? { url: input.openUrl } : undefined);
@@ -44,7 +43,7 @@ function bindResponseRuntime(): StashRuntime {
         headers: result.headers,
       };
       if (result.body !== undefined) {
-        output.body = typeof result.body === "string" ? result.body : bytesToString(result.body);
+        output.body = result.body;
       }
       $done(output);
     },
@@ -54,8 +53,4 @@ function bindResponseRuntime(): StashRuntime {
       platform: $environment?.system === "macOS" ? "macos" : "ios",
     }),
   };
-}
-
-function bytesToString(body: Uint8Array): string {
-  return new TextDecoder().decode(body);
 }

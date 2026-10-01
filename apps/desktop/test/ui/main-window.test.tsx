@@ -184,3 +184,14 @@ test('a session-expiry push opens the re-login modal owned by the main window', 
   within(dialog).getByRole('button', { name: '去登录' }).click()
   await waitFor(() => expect(fake.calls).toContain('login'))
 })
+
+test.each(['starting', 'stopping'] as const)('capture modes are disabled while %s', async (state) => {
+  const fake = installBridgeFake()
+  renderInShell(<MainWindow />)
+  await screen.findByRole('radio', { name: '指定应用' })
+  fake.emitStatus(status({ state, loggedIn: true }))
+  await waitFor(() => {
+    expect((screen.getByRole('radio', { name: '指定应用' }) as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByRole('radio', { name: '系统代理（全部流量）' }) as HTMLInputElement).disabled).toBe(true)
+  })
+})

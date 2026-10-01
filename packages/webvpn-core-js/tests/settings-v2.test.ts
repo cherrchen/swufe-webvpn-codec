@@ -192,3 +192,22 @@ describe("settings route", () => {
     expect(handleSettingsRequest({ method: "PUT", path: "/__swufe_bridge__/api/settings", nowIso: NOW }, deps).status).toBe(405);
   });
 });
+
+
+it("refuses saves and replay when nonce deletion fails", () => {
+  const memory = memoryKv();
+  const kv = { read: memory.read, write: (key: string, value: string | null) =>
+    key === STORAGE_KEYS.settingsCsrf && value === null ? false : memory.write(key, value) };
+  const deps = { kv, statusProvider: { getStatus: () => "logged-out" as const }, pageHtml: "" };
+  handleSettingsRequest({ method: "GET", path: "/__swufe_bridge__/api/settings", nowIso: NOW, freshNonce: TOKEN }, deps);
+  const before = memory.read(STORAGE_KEYS.settingsV2);
+  const input = { method: "POST", path: "/__swufe_bridge__/api/settings", nowIso: NOW,
+    origin: "https://webvpn.swufe.edu.cn", contentType: "application/json", token: TOKEN,
+    body: JSON.stringify({ schemaVersion: 2, builtinSiteStates: { jwxt: false }, customHosts: ["library.swufe.edu.cn"] }) };
+  for (let i = 0; i < 2; i++) {
+    const response = handleSettingsRequest(input, deps);
+    expect(response.status).toBe(500);
+    expect(response.body).toContain("STORAGE_FAILED");
+    expect(memory.read(STORAGE_KEYS.settingsV2)).toBe(before);
+  }
+});

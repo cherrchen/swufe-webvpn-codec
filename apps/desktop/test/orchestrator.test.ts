@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
@@ -643,4 +643,128 @@ test('a capture failure is cleared by the next stop', async () => {
   await h.orchestrator.stop()
 
   assert.equal((await h.orchestrator.status()).captureError, undefined)
+})
+
+
+async function tick(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve))
+}
+
+test('expiry during proxy enable waits for the OS write before clearing ownership', async () => {
+  const h = harness()
+  const entered = Promise.withResolvers<void>()
+  const gate = Promise.withResolvers<void>()
+  const enable = h.systemProxy.enable.bind(h.systemProxy)
+  h.systemProxy.enable = async (port) => {
+    entered.resolve()
+    await gate.promise
+    await enable(port)
+  }
+  const start = h.orchestrator.start()
+  await entered.promise
+  const expired = h.orchestrator.handleSessionExpired()
+  await tick()
+  assert.equal(h.calls.includes('sidecar.stop'), false)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+  gate.resolve()
+  await Promise.all([start, expired])
+  assert.equal((await h.orchestrator.status()).error?.code, 'SESSION_EXPIRED')
+  assert.equal(h.systemProxy.enabledPort, null)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+  assert.equal(h.session.monitoring, false)
+})
+
+test('expiry during sidecar readiness cancels proxy installation', async () => {
+  const gate = Promise.withResolvers<void>()
+  const h = harness({}, (sidecar) => { sidecar.startGate = gate.promise })
+  const start = h.orchestrator.start()
+  while (!h.sidecars.length) await tick()
+  const expired = h.orchestrator.handleSessionExpired()
+  gate.resolve()
+  await Promise.all([start, expired])
+  assert.equal(h.calls.includes('proxy.enable'), false)
+  assert.equal((await h.orchestrator.status()).error?.code, 'SESSION_EXPIRED')
+})
+
+test('capture mode changes wait for startup and preserve mutual exclusion', async () => {
+  const gate = Promise.withResolvers<void>()
+  const h = harness({}, (sidecar) => { sidecar.startGate = gate.promise })
+  h.store.updateSettings({ captureProcesses: ['/Applications/Safari.app'] })
+  const start = h.orchestrator.start()
+  while (!h.sidecars.length) await tick()
+  const switchMode = h.orchestrator.setCaptureMode('selected-apps')
+  await tick()
+  assert.equal(h.store.getSettings().captureMode, 'system-proxy')
+  assert.deepEqual(runtimeCapture(h.userDataDir), { processes: [] })
+  gate.resolve()
+  await Promise.all([start, switchMode])
+  assert.equal(h.systemProxy.enabledPort, null)
+  assert.deepEqual(runtimeCapture(h.userDataDir), { processes: ['/Applications/Safari.app'] })
+})
+
+test('logout and expiry remove the cookie-bearing runtime config even if proxy cleanup fails', async () => {
+  for (const action of ['logout', 'handleSessionExpired'] as const) {
+    const h = harness()
+    await h.orchestrator.start()
+    h.systemProxy.disableFailure = new Error('cleanup denied')
+    await h.orchestrator[action]()
+    assert.equal(existsSync(join(h.userDataDir, 'bridge-config.json')), false)
+    assert.equal(h.session.cookies.length, 0)
+    assert.equal(h.store.getSettings().systemProxyManagedByApp, true)
+  }
+})
+
+test('failed startup and unexpected exit remove the runtime cookie copy', async () => {
+  const failed = harness({}, (sidecar) => { sidecar.startFailure = new Error('not ready') })
+  await failed.orchestrator.start()
+  assert.equal(existsSync(join(failed.userDataDir, 'bridge-config.json')), false)
+  const crashed = harness()
+  await crashed.orchestrator.start()
+  crashed.sidecars[0]?.crash()
+  await tick()
+  assert.equal(existsSync(join(crashed.userDataDir, 'bridge-config.json')), false)
+})
+
+test('a sidecar exit during proxy enable cancels running and cleans up after the write', async () => {
+  const h = harness()
+  const gate = Promise.withResolvers<void>()
+  const entered = Promise.withResolvers<void>()
+  const enable = h.systemProxy.enable.bind(h.systemProxy)
+  h.systemProxy.enable = async (port) => { entered.resolve(); await gate.promise; await enable(port) }
+  const start = h.orchestrator.start()
+  await entered.promise
+  const crash = h.orchestrator.handleSidecarExit(9, null)
+  gate.resolve()
+  await Promise.all([start, crash])
+  assert.equal((await h.orchestrator.status()).error?.code, 'BRIDGE_CRASH')
+  assert.equal(h.systemProxy.enabledPort, null)
+  assert.equal(h.store.getSettings().systemProxyManagedByApp, false)
+  assert.equal(existsSync(join(h.userDataDir, 'bridge-config.json')), false)
+})
+
+test('logout during startup cancels OS installation and removes runtime cookies', async () => {
+  const gate = Promise.withResolvers<void>()
+  const h = harness({}, (sidecar) => { sidecar.startGate = gate.promise })
+  const start = h.orchestrator.start()
+  while (!h.sidecars.length) await tick()
+  const logout = h.orchestrator.logout()
+  gate.resolve()
+  await Promise.all([start, logout])
+  assert.equal(h.calls.includes('proxy.enable'), false)
+  assert.equal(existsSync(join(h.userDataDir, 'bridge-config.json')), false)
+  assert.equal(h.session.cookies.length, 0)
+  assert.equal((await h.orchestrator.status()).state, 'idle')
+})
+
+test('launch recovery removes a stale runtime cookie copy even without a proxy marker', async () => {
+  const h = harness()
+  await h.orchestrator.start()
+  h.store.updateSettings({ systemProxyManagedByApp: false })
+  // A fresh orchestrator models restarting after an unclean exit.
+  const { ProxyOrchestrator } = await import('../src/main/orchestrator')
+  const recovered = new ProxyOrchestrator({ store: h.store, session: h.session,
+    systemProxy: h.systemProxy, certManager: h.certManager,
+    sidecarFactory: () => { throw new Error('no launch') }, userDataDir: h.userDataDir })
+  await recovered.recoverOnLaunch()
+  assert.equal(existsSync(join(h.userDataDir, 'bridge-config.json')), false)
 })

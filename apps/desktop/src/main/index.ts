@@ -1,6 +1,6 @@
 /** Electron Main entry: wires the store, session broker, orchestrator, IPC and windows. */
 
-import { app } from 'electron'
+import { app, BrowserWindow, session as electronSession } from 'electron'
 import { join } from 'node:path'
 
 import { CONFDIR_NAME } from './constants'
@@ -45,7 +45,10 @@ async function start(): Promise<void> {
 
   const store = new AppStore(userDataDir)
   store.load()
-  const session = new SessionBroker(store.getSettings().webvpnBase)
+  const session = new SessionBroker(store.getSettings().webvpnBase, {
+    fromPartition: (partition) => electronSession.fromPartition(partition),
+    createWindow: (options) => new BrowserWindow(options),
+  })
   await session.prepare()
   const certManager = createCertManager(join(userDataDir, CONFDIR_NAME), bridgeRoot)
 

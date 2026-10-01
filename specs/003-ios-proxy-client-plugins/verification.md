@@ -214,11 +214,11 @@ P0 结论写在本 Feature 文档包内。Spec 003 现为 `In Progress`。AES ba
 
 ### Stash 请求诊断（2026-09-25）
 
-request/response 脚本新增安全摘要：每个被处理请求生成短 trace id；rewrite 请求把该 id 暂存供 response 脚本关联。request 规则启用 `require-body: true` 后，POST body 仅记录存在性与 UTF-8 字节长度，正文不输出且不计算 body hash。Stash `$done({url, headers})` 接口看不到改写后的 body，因此 `requestBodyPreserved=unknown`。启用 body 暴露会增加 Stash 缓冲内存占用。此暂存关联只保留最近一条待响应记录；并发同路径请求可能无法可靠配对，日志不得据此认定关联成功，需结合时间、method、host/path核对。
+2026-09-25 的跨脚本 Trace 暂存实现已被 2026-10-02 隐私修复取代。当前 request/response 各自生成短 trace id，只在同一次脚本调用内关联；不得把不同调用的 id 当作请求响应配对。原始路径仅转为固定分类值，Trace 不写入持久存储，旧 `swufe.trace.pending.v1` 在后续处理时尝试删除。真机取证按时间、method、host 与分类结合判断，不记录原始 path/query。
 
-响应摘要记录 body 类型与长度、Content-Type、Set-Cookie 名称及启发式来源分类。`bodyOriginGuess=upstream-api` 只表示 wrapped-resource JSON 的启发式判断，不证明响应一定由 bctest 生成；`applicationSessionCandidate` 也只表示响应出现疑似应用 Cookie 名，不代表 session 有效。Cookie、Set-Cookie、Authorization、UA 原文及请求/响应正文不得进入日志。
+POST body 仅记录存在性与 UTF-8 字节长度；正文不输出且不计算 body hash。Stash `$done({url, headers})` 看不到改写后的 body，故 `requestBodyPreserved=unknown`。响应摘要的类型、长度、Cookie 名与来源猜测仍只是启发式证据，不能证明 Session 有效。Cookie 值、Authorization、UA 原文与请求/响应正文不得进入日志。启用 body 暴露的宿主缓冲内存成本仍需真机验证。
 
-本地自动化覆盖：`plugins/stash/tests/adapter.test.ts` 的安全 POST/响应摘要用例；Stash 真机验证仍未执行。真机步骤：打开 Stash 独立脚本日志，保持 WebVPN 已登录，在 Sciyard App 执行一次登录，回传同一 trace 的 `request-enter`、`rewrite` 与 `response` 行，以及随后一条 bctest 请求行。不要回传请求或响应正文、Cookie 值或 Authorization。
+本地覆盖见 `plugins/stash/tests/adapter.test.ts` 的安全摘要及 debug 开/关隐私用例。Stash 真机仍未执行；现场只收集脱敏后的 request/response 摘要，不回传正文或认证值。
 
 | 项 | 原因 | 已尝试 | 需要的动作 |
 | --- | --- | --- | --- |
@@ -381,3 +381,24 @@ T065/G13/G17：用户复检 0.1.1-m3，HTTP 教务根请求完成 URL/Host 改�
 未发现需补齐的 Loon Session 运行时分支。本轮仅新增 Loon VM 回归：从 Safari 网关请求捕获并由根页 200 确认，复制持久化状态到独立客户端模拟无网关 Cookie 的导航及原生 WRD 注入；冲突 ticket 替换且保留 App Cookie；认证站 Cookie 不污染 store；新登录 ticket 仅在根页 200 且无未绑定 ticket 下发后切换。Loon 52 tests、构建/bundle scan/typecheck 与 Stash 36 tests、构建/bundle scan Passed。运行时代码和制品版本仍为 0.1.3-m3；测试重建仅产生的 Git banner 差异已还原，不分发无行为变化的新版本。
 
 限制：VM 独立客户端是模拟证据，不证明真实 App/WKWebView 流量进入 Loon 或网关接受注入的会话。用户此前确认教务入口可进入，不能替代跨 App Session 复用设备验收。N02–N10 与 CAS Cookie Jar 隔离等设备项仍按既有矩阵；重现某个 App 重新登录时应取证 request 是否命中、Gateway Request Kind、ticketRelation、注入结果和响应分类，不能仅凭 CAS 页面认定 Gateway Session 未复用。
+
+
+## 审查安全与数据完整性修复回归（2026-10-02）
+
+Bug 任务 T066–T069。恢复现有 Safe Auth Trace、一次性 nonce、正文保持与 Settings 错误重试契约；不新增依赖或 Session/Settings schema，不扩展注入范围，无需新 ADR。两宿主 bundle 已从更新后的共享 runtime 重建。
+
+| 审查项 | 关联矩阵 | 回归证据 | 状态 |
+| --- | --- | --- | --- |
+| #3 原始路径进入日志/持久存储 | N07–N09、IOS-REQ-018 | [Stash Adapter](../../plugins/stash/tests/adapter.test.ts) debug 开/关隐私断言：模拟账号路径不进入日志，路径仅输出固定分类，旧 Trace 键删除；移除跨脚本持久化关联 | Passed（本地） |
+| #6 nonce 删除失败可保存/重放 | K14/K19–K21、AC-SETTINGS | [Core](../../packages/webvpn-core-js/tests/settings-v2.test.ts) 注入删除失败、其它写入成功，连续请求返回 500 且站点设置不变；[Stash entry](../../plugins/stash/tests/request-entry.test.ts) 验证宿主 false 返回值映射与本地 STORAGE_FAILED | Passed（本地） |
+| #7 改响应头损坏二进制正文 | IOS-REQ-007 | [Stash response VM](../../plugins/stash/tests/response-entry.test.ts)：PDF 模拟字节 + Cookie Domain 改写，`$done` 无 body 字段，原字节不变；确需正文的现有改写/提升用例仍通过 | Passed（本地） |
+| #8 Settings 错误后无法重试 | K01–K07/K19 | [Settings page VM](../../plugins/stash/tests/settings-page.test.ts) 执行 Stash/Loon 实际 bundled HTML：编辑三分钟后获取新 nonce；配置写入失败、网络错误、校验失败后保留草稿并可重新保存，协议与关闭的 builtin 保留 | Passed（本地） |
+
+执行命令与结果：
+
+- `pnpm --filter webvpn-core-js test`：76 passed。
+- `pnpm --filter swufe-webvpn-stash test`：42 passed，build / bundle scan Passed。
+- `pnpm --filter swufe-webvpn-loon test`：52 passed，build / bundle scan Passed。
+- `pnpm -r run typecheck`、根 `pnpm run typecheck` 与 `pnpm run docs:check`：Passed。
+
+全仓库本轮自动化合计 550 passed（Python 221 + desktop unit 121 + UI 38 + Core 76 + Stash 42 + Loon 52）。这些是本地/VM 证据：iOS parser、超限 Settings 本地终结、QUIC 回落、真实会话与跨 App/WKWebView E2E 仍按既有 Pending/Failed 矩阵执行，不以自动化通过替代真机。Spec 003 保持 `In Progress`。

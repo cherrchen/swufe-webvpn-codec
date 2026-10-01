@@ -6,7 +6,7 @@
  * flow (INV-004 / EC-005).
  */
 
-import { BrowserWindow, session, type Session } from 'electron'
+import type { BrowserWindow, BrowserWindowConstructorOptions, Session } from 'electron'
 
 import type { SessionInfo } from '../shared/types'
 import { LOGIN_PARTITION, TICKET_COOKIE_NAME } from './constants'
@@ -30,9 +30,15 @@ export class SessionBroker {
   private closedAfterLogin = false
   private monitor: NodeJS.Timeout | null = null
   private readonly probeGuard = new SessionProbeGuard()
+  private captureRevision = 0
+  private expiryCallback: (() => void) | null = null
+  private readonly updateListeners: Array<() => void> = []
   private readonly changeListeners: Array<() => void> = []
 
-  constructor(private readonly webvpnBase: string) {
+  constructor(private readonly webvpnBase: string, private readonly electron: {
+    fromPartition: (partition: string) => Session
+    createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindow
+  }) {
     this.webvpnHost = new URL(webvpnBase).hostname
   }
 
@@ -58,9 +64,14 @@ export class SessionBroker {
     this.changeListeners.push(cb)
   }
 
+  /** Successful Cookie captures, including re-login while already logged in. */
+  onUpdate(cb: () => void): void {
+    this.updateListeners.push(cb)
+  }
+
   /** Must run before any window opens: the login partition never uses our bridge. */
   async prepare(): Promise<void> {
-    const partition = session.fromPartition(LOGIN_PARTITION)
+    const partition = this.electron.fromPartition(LOGIN_PARTITION)
     await partition.setProxy({ mode: 'direct' })
     this.partition = partition
   }
@@ -78,7 +89,7 @@ export class SessionBroker {
     }
     const resolved = await partition.resolveProxy(this.webvpnBase)
     console.log(`swufe-session 登录窗口 resolveProxy(${this.webvpnBase}) = ${resolved}`)
-    const win = new BrowserWindow({
+    const win = this.electron.createWindow({
       width: 1024,
       height: 768,
       title: '登录 WebVPN',
@@ -112,7 +123,7 @@ export class SessionBroker {
   }
 
   async capture(): Promise<boolean> {
-    const revision = this.probeGuard.changeSession()
+    const revision = ++this.captureRevision
     const cookies = await this.requirePartition().cookies.get({ url: this.webvpnBase })
     const captured: SessionCookie[] = []
     let ticketExpires: number | null = null
@@ -129,20 +140,24 @@ export class SessionBroker {
       hasTicket = true
       ticketExpires = typeof cookie.expirationDate === 'number' ? cookie.expirationDate : null
     }
-    if (!this.probeGuard.isCurrentSession(revision)) return false
+    if (revision !== this.captureRevision) return false
     if (!hasTicket) return false
     if (ticketExpires !== null && ticketExpires * 1000 <= Date.now()) return false
+    this.probeGuard.changeSession()
     this.capturedCookies = captured
     this.capturedAt = new Date().toISOString()
     this.expiresAtIso = ticketExpires === null ? null : new Date(ticketExpires * 1000).toISOString()
     this.lastValidatedAt = this.capturedAt
     this.setLoggedIn(true)
+    if (this.expiryCallback) this.startMonitor(this.expiryCallback)
+    for (const listener of this.updateListeners) listener()
     return true
   }
 
   /** Local timer until the ticket `expiresAt`. A missing expiry does not probe. */
   startMonitor(onExpired: () => void): void {
     this.stopMonitor()
+    this.expiryCallback = onExpired
     this.probeGuard.startMonitor()
     if (!this.capturedLoggedIn || !this.expiresAtIso) return
     const delay = Date.parse(this.expiresAtIso) - Date.now()
@@ -161,6 +176,8 @@ export class SessionBroker {
   }
 
   stopMonitor(): void {
+    this.expiryCallback = null
+    this.probeGuard.changeSession()
     this.probeGuard.stopMonitor()
     if (!this.monitor) return
     clearTimeout(this.monitor)
@@ -168,14 +185,15 @@ export class SessionBroker {
   }
 
   async clear(): Promise<void> {
+    this.captureRevision++
     this.probeGuard.changeSession()
     this.stopMonitor()
     this.capturedCookies = []
     this.capturedAt = null
     this.lastValidatedAt = null
     this.expiresAtIso = null
-    await this.requirePartition().clearStorageData({ storages: ['cookies'] })
     this.setLoggedIn(false)
+    await this.requirePartition().clearStorageData({ storages: ['cookies'] })
   }
 
   private async handleNavigation(url: string): Promise<void> {

@@ -2,7 +2,7 @@ import { handleStashRequest, nativeGatewayRedirect, type StashRuntime } from "./
 import { traceEntered, traceThrew } from "./script-trace.ts";
 
 declare const $request: StashRuntime["request"];
-declare const $persistentStore: { read(key: string): string | null; write(value: string, key: string): void };
+declare const $persistentStore: { read(key: string): string | null; write(value: string, key: string): boolean | void };
 declare const $notification: { post(title: string, subtitle?: string, body?: string, options?: { url?: string }): void };
 declare const $environment: { system?: string; version?: string } | undefined;
 declare function $done(value: Record<string, unknown>): void;
@@ -22,8 +22,7 @@ function bindRuntime(): StashRuntime {
     request: typeof $request === "undefined" ? undefined : $request,
     read: (key) => $persistentStore.read(key) || null,
     write: (key, value) => {
-      $persistentStore.write(value ?? "", key);
-      return true;
+      return $persistentStore.write(value ?? "", key) !== false;
     },
     notify: (input) => {
       $notification.post(input.title, "", input.body, input.openUrl ? { url: input.openUrl } : undefined);

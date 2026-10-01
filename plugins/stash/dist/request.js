@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 7d40a66 */
+/* swufe-webvpn stash 0c1d786 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1495,7 +1495,9 @@
     if (size > SETTINGS_BODY_MAX_BYTES) return json(413, "BODY_TOO_LARGE");
     if (!originAllowed(input.origin, input.referer)) return json(401, "UNAUTHORIZED");
     if (!jsonContentType(input.contentType)) return json(400, "INVALID_SETTINGS");
-    if (!consumeNonce(dependencies.kv, input.token, input.nowIso)) return json(401, "UNAUTHORIZED");
+    const nonce = consumeNonce(dependencies.kv, input.token, input.nowIso);
+    if (nonce === "storage-failed") return json(500, "STORAGE_FAILED");
+    if (!nonce) return json(401, "UNAUTHORIZED");
     if (loaded.kind === "incompatible") return json(400, "INVALID_SETTINGS");
     const text = bodyText(input.body);
     if (text === null) return json(400, "INVALID_JSON");
@@ -1642,7 +1644,7 @@
   }
   function consumeNonce(kv2, token, nowIso) {
     const raw = kv2.read(STORAGE_KEYS.settingsCsrf);
-    clearNonce(kv2);
+    if (!kv2.write(STORAGE_KEYS.settingsCsrf, null)) return "storage-failed";
     if (!raw || !token || !NONCE_RE.test(token)) return false;
     try {
       const data = JSON.parse(raw);
@@ -1851,20 +1853,22 @@ function render() {
     custom.append(item);
   });
 }
-async function load() {
+async function load(preserveEdits = false) {
   const response = await fetch(api, { cache: "no-store" });
   const body = await response.json();
   if (!response.ok || !body.ok) {
-    show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad");
-    return;
+    throw new Error("settings unavailable");
   }
   state.token = body.token || "";
-  state.builtin = body.data.settings.builtinSiteStates;
-  state.custom = body.data.settings.customHosts.slice();
-  state.schemes = body.data.settings.hostSchemes || {};
+  if (!state.token) throw new Error("settings token unavailable");
+  if (!preserveEdits) {
+    state.builtin = body.data.settings.builtinSiteStates;
+    state.custom = body.data.settings.customHosts.slice();
+    state.schemes = body.data.settings.hostSchemes || {};
+  }
   state.status = body.data.status;
   show("warning", body.data.migrationWarnings && body.data.migrationWarnings.length ? "\u90E8\u5206\u65E7\u7F51\u7AD9\u8BBE\u7F6E\u4E0D\u518D\u53D7\u652F\u6301\uFF0C\u8BF7\u68C0\u67E5\u5F53\u524D\u5217\u8868" : "");
-  render();
+  if (!preserveEdits) render();
 }
 document.getElementById("add").addEventListener("click", () => {
   const value = document.getElementById("host").value.trim().toLowerCase().replace(/\\.+$/, "");
@@ -1879,20 +1883,29 @@ document.getElementById("add").addEventListener("click", () => {
   render();
 });
 document.getElementById("save").addEventListener("click", async () => {
+  const save = document.getElementById("save");
+  if (save.disabled) return;
+  save.disabled = true;
   show("feedback", "\u6B63\u5728\u4FDD\u5B58", "");
-  const response = await fetch(api, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-swufe-settings-token": state.token },
-    body: JSON.stringify({ schemaVersion: 2, builtinSiteStates: state.builtin, customHosts: state.custom, hostSchemes: state.schemes })
-  });
-  const body = await response.json().catch(() => ({}));
-  if (response.ok && body.ok) {
+  const draft = JSON.stringify({ schemaVersion: 2, builtinSiteStates: state.builtin, customHosts: state.custom, hostSchemes: state.schemes });
+  try {
+    // Every attempt gets a new one-use token without replacing unsaved edits.
+    await load(true);
+    const response = await fetch(api, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-swufe-settings-token": state.token },
+      body: draft
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || !body.ok) throw new Error("save failed");
     show("feedback", "\u5DF2\u4FDD\u5B58", "ok");
     show("warning", "");
-    await load();
-    return;
+  } catch {
+    show("feedback", "\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", "bad");
+  } finally {
+    state.token = "";
+    save.disabled = false;
   }
-  show("feedback", "\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", "bad");
 });
 document.getElementById("login").addEventListener("click", () => { location.href = origin + "/"; });
 load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad"));
@@ -1902,8 +1915,9 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
 
   // ../../packages/webvpn-plugin-runtime/src/runtime.ts
   var NOTIFY_GAP_MS = 6e4;
-  var DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
+  var LEGACY_DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
   function handlePluginRequest(runtime) {
+    clearLegacyTrace(runtime);
     if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
       try {
         const response = handleSettingsRequest(settingsDto(runtime), {
@@ -1997,7 +2011,6 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       const decoded = deriveRewriteContext(decision.url, rewriteSettings.gatewayBase, rewriteSettings.wrdKey, rewriteSettings.wrdIv);
       const bodyPreserved = "unknown";
       const gwCookies = gatewayCookieNames(decision.headers);
-      savePendingTrace(runtime, { traceId, method: request.method ?? "GET", host: decoded?.originalHost ?? host, path: safePath(request.url), at: runtime.nowIso });
       emit(runtime, settings.debug, { ts: runtime.nowIso, host, direction: "request", action: "rewrite", detail: `trace=${traceId} targetHost=${safeHost(decision.url) ?? "-"} targetScheme=${schemeOf(decision.url)} rewrittenPathShape=/${wrappedSchemeOf(decision.url)}/<wrd>/... decodedOriginalHost=${decoded?.originalHost ?? "-"} gatewayKind=wrapped-resource gatewayCookiePresent=${gwCookies.length ? "yes" : "no"} gatewayCookieNames=[${gwCookies.join(",")}] gatewayTicketCookiePresent=${gwCookies.some((n) => n.startsWith("wengine_vpn_ticket")) ? "yes" : "no"} routeCookiePresent=${gwCookies.includes("route") ? "yes" : "no"} requestBodyPreserved=${bodyPreserved} ${detail}` });
       runtime.finishRequest({ decision: "rewrite", url: decision.url, headers: decision.headers });
       return;
@@ -2214,7 +2227,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     const length = byteLength(request.body);
     const ua = header(request.headers, "user-agent") ?? "";
     const uaClass = /sciyardapp/i.test(ua) ? "SciyardApp" : /safari/i.test(ua) ? "Safari" : /webview|wv\)/i.test(ua) ? "WebView" : ua ? "other" : "unknown";
-    return `method=${method} originalHost=${safeHost(request.url) ?? "-"} originalPath=${safePath(request.url)} originalScheme=${schemeOf(request.url)} contentType=${header(request.headers, "content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown"} contentLengthHeader=${header(request.headers, "content-length") ?? "unknown"} bodyPresent=${length === null ? "unknown" : length > 0 ? "yes" : "no"} bodyLength=${length ?? "unknown"} bodyHash=unavailable userAgentClass=${uaClass} requestCookieNames=[${cookieNames(request.headers).join(",")}]`;
+    return `method=${method} originalHost=${safeHost(request.url) ?? "-"} originalPathClass=${safePathClass(request.url)} originalScheme=${schemeOf(request.url)} contentType=${header(request.headers, "content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown"} contentLengthHeader=${header(request.headers, "content-length") ?? "unknown"} bodyPresent=${length === null ? "unknown" : length > 0 ? "yes" : "no"} bodyLength=${length ?? "unknown"} bodyHash=unavailable userAgentClass=${uaClass} requestCookieNames=[${cookieNames(request.headers).join(",")}]`;
   }
   function cookieNames(headers) {
     const raw = header(headers, "cookie") ?? "";
@@ -2228,11 +2241,19 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     if (body instanceof Uint8Array) return body.byteLength;
     return new TextEncoder().encode(body).byteLength;
   }
-  function safePath(url) {
+  function safePathClass(url) {
     try {
-      return new URL(url).pathname;
+      const parsed = new URL(url);
+      if (parsed.hostname === GATEWAY_HOST) return classifyGatewayRequest(url);
+      return parsed.pathname === "/" ? "root" : "resource";
     } catch {
-      return "-";
+      return "invalid";
+    }
+  }
+  function clearLegacyTrace(runtime) {
+    try {
+      if (runtime.read(LEGACY_DIAGNOSTIC_TRACE_KEY)) runtime.write(LEGACY_DIAGNOSTIC_TRACE_KEY, null);
+    } catch {
     }
   }
   function diagnosticTrace(runtime) {
@@ -2242,9 +2263,6 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     } catch {
     }
     return `${Date.parse(runtime.nowIso).toString(36)}${Math.random().toString(36).slice(2, 7)}`.slice(-12);
-  }
-  function savePendingTrace(runtime, pending) {
-    runtime.write(DIAGNOSTIC_TRACE_KEY, JSON.stringify(pending));
   }
   function safeHost(url) {
     try {
@@ -2302,8 +2320,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       request: typeof $request === "undefined" ? void 0 : $request,
       read: (key) => $persistentStore.read(key) || null,
       write: (key, value) => {
-        $persistentStore.write(value ?? "", key);
-        return true;
+        return $persistentStore.write(value ?? "", key) !== false;
       },
       notify: (input) => {
         $notification.post(input.title, "", input.body, input.openUrl ? { url: input.openUrl } : void 0);

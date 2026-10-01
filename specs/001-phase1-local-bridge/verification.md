@@ -665,3 +665,25 @@ pnpm 命令使用临时环境变量 `pnpm_config_verify_deps_before_run=false`�
 > 因此 Spec 001 保持 `Implemented`；本次 `KI-019` 风险接受不等同于根因已定位或 Spec 可推进到 `Verified`。
 > **2026-09-23（`KI-019` 有界化 + 现场复测）**：挂起已不再表现为「无限等待」——桥对网关主机的上游建连限制为 4s × 2 次尝试，两次都超时后客户端得到 `502 Bad Gateway`，并新增 `swufe-upstream` 阶段记录、`<userData>/bridge-upstream.log` 与现场判因工具 `pnpm run diagnose:upstream`（同轮直连对照）。本机实测（不经校园网）：有界失败 8.1s 内返回 502、慢响应与「已连但不响应」三类路径均可在日志中区分（见「`KI-019` 有界化与阶段证据（2026-09-23）」）。**同日现场复测已执行**（真实会话，cherrchen 完成登录；默认路由直连、无 TUN）：40 轮中 `bridge-side` **19**、`no-stall` 21、`network-or-resolver` 0；异常轮阶段记录恒为「网关建连成功（54–68ms）→ TLS 握手成功（57–72ms）→ 上游不回任何字节 → 客户端断开」，而同轮 DNS/TCP/TLS 探针全绿、同路径 + 同会话 Cookie 直连 18/18 快速、网关自有路径 10/10 快速（见「KI-019 现场复测（2026-09-23）」）。据此**排除本机网络/解析原因**，把问题定位到「桥的上游请求/响应阶段」；`--set http2=false` 候选经代码与实测证明对本路径不生效（改动已回滚）。因尚未取得报文级证据以区分 mitmproxy 请求与网关侧处理，`KI-019` 保持 `Open`、Spec 001 仍为 `Implemented`；解除条件见 [known-issues.md](known-issues.md) 的 `KI-019`。另：复测前置的 CA 安装暴露 `KI-021`（Windows 的 CA 安装/卸载系统对话框阻塞 `certutil`），本轮已修复并真机复验（安装与卸载均按「等 15s 再点『是(Y)』」成功），条目置 `Fixed`。
 > **2026-09-23（`KI-019` 四臂配对复测）**：以同轮交替的四臂（`A` 应用桥 / `A-v` 同桥中性头 / `B` stock mitmdump（无本仓库 addon）/ `C` 直连网关）做本轮复测，两轮各 40 轮**全部 0 挂起**，爆发窗口未出现，机械判定 `insufficient` → **不下归因结论**，`KI-019` 保持 `Open`、Spec 001 仍为 `Implemented`（见「KI-019 四臂配对复测（2026-09-23）」）。
+
+
+## 生命周期与会话审查修复回归（2026-10-02）
+
+任务类型为 Bug，覆盖 T051–T053；恢复既有 REQ-002/003 与 NFR-003/004，不改变公共 IPC/sidecar 配置结构、不新增依赖，无需新 ADR。以下为注入式自动化证据，未进行本轮 Windows/macOS 真实系统代理与账号验收。
+
+| 审查项 | 需求 | 回归证据 | 状态 |
+| --- | --- | --- | --- |
+| #1 启动与失效/清理并发 | REQ-002、NFR-004 | [orchestrator.test.ts](../../apps/desktop/test/orchestrator.test.ts)：sidecar 就绪等待、代理 enable 等待期间失效/登出/异常退出；等待写入后清理，无非法迁移或残留归属丢失 | Passed |
+| #2 启动期间切换捕获方式 | REQ-003 | 同一测试文件：切换等待启动队列；最终系统代理关闭且进程列表匹配；界面禁用见 [002 verification](../002-desktop-ui-multiwindow/verification.md) | Passed |
+| #4 运行中重新登录 | REQ-002 | [session-broker.test.ts](../../apps/desktop/test/session-broker.test.ts)：新 Cookie 进入运行配置，旧计时器不触发，新票据到期触发清理；失败采集保留旧计时，停监控后不自动重启 | Passed |
+| #5 运行配置残留 Cookie | NFR-003 | orchestrator 用例：登出/失效（含代理清理失败）、启动失败、异常退出、启动恢复后文件不存在；清理失败仍保留代理恢复标记 | Passed |
+
+执行命令与结果：
+
+- `pnpm --filter swufe-webvpn-bridge test:unit`：121 passed。
+- `pnpm --filter swufe-webvpn-bridge test:ui`：38 passed。
+- `UV_CACHE_DIR=/private/tmp/swufe-uv-cache uv run --directory bridges/python pytest -q`：221 passed（L0/L1/L2）。
+- `pnpm --filter swufe-webvpn-bridge build`：Passed；`pnpm -r run typecheck` 与根 `pnpm run typecheck`：Passed。
+- `pnpm run docs:check`：Passed，无错误/警告。组件生命周期、会话更新事件、运行配置保留期、安全与 UI 文档已同步中英版本。
+
+Spec 001 保持 `Implemented`；本轮不改变 KI-014/KI-019 风险状态或历史真机结果。

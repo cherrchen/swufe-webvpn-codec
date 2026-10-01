@@ -164,3 +164,8 @@ Status 取值：`Pending` / `Passed` / `Failed` / `N/A`（`N/A` 必须写明理�
 - [ ] Spec 状态可推进到 `Verified`
 
 当前状态：`Implemented`。实现、组件测试、全量回归与 macOS 上的可机器执行验收全部通过。2026-09-23 随 001 的 Windows 验收在同一台真机上补齐了三项未验证项中的两项（真实会话下的教务页面操作、进程捕获真实范围），并在 Windows 上实际使用了四窗口结构；本 Spec 自身的 Windows 判据（零滚动 zoom 四档、AntD 对话框习惯）与 macOS 上真实扩展授权下的 TC-G04 仍需按原口径复跑；与 001 的既有遗留（`KI-014`/`KI-019` 等）一致。
+
+
+## 捕获方式过渡禁用回归（2026-10-02）
+
+REQ-003 / TC-J04：主窗口 `starting` 与 `stopping` 状态禁用捕获方式单选和捕获重试。`test/ui/main-window.test.tsx` 新增两种过渡态的可观察禁用断言，`pnpm --filter swufe-webvpn-bridge test:ui` 38 passed；Main 侧仍用生命周期队列保障 IPC 并发互斥，见 [Spec 001 回归记录](../001-phase1-local-bridge/verification.md)。中英 UI 规范已同步。本次未复验窗口几何、Windows 或真实进程捕获，Spec 状态保持 `Implemented`。

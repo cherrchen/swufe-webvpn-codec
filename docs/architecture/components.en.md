@@ -85,6 +85,7 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 - Not responsible for: URL rewriting; holding student IDs/passwords; allowlist decisions.
 - Input: the Login WebView session partition (the ticket cookie and its expiry); a `swufe-session expired` line from the sidecar on real traffic.
 - Output: `SessionState` (Cookie set), login/expiry state; consumed by Proxy Orchestrator when pushing to the sidecar.
+- Session updates: every successful capture emits `onUpdate`, even when the login boolean is unchanged; IPC refreshes the runtime config from this event. An active monitor rearms the expiry timer for the new ticket; failed captures leave the existing timer intact. `onChange` still reports login-state changes only.
 - Dependencies: the Login WebView session.
 - Depended on by: App Shell, Proxy Orchestrator.
 - Key invariants: the only Cookie reader; Cookies must never enter logs (see INV-001); a login without the ticket is not accepted; `expiresAt` comes only from the ticket and expires locally, with no timed portal request.
@@ -94,6 +95,7 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 ### Proxy Orchestrator
 
 - Responsibility: start/stop the mitm sidecar, set/clear the system proxy, manage process capture (local capture) and the capture mode (`captureMode`), detect proxy conflicts.
+- Lifecycle: start, stop, expiry, unexpected exit, logout and capture configuration changes share a serial queue. Stop/expiry/exit/logout immediately cancel an in-flight start; startup checks cancellation after each async stage, and proxy cleanup waits for an enable command to finish before clearing ownership. Runtime config retention is defined in [bridge-control-protocol.md](../api/bridge-control-protocol.en.md).
 - Not responsible for: traffic rewriting; CA management (Cert Manager); reading Cookies directly (goes through Session Broker).
 - Input: `startBridge` / `stopBridge` / `setCaptureMode` / `setCaptureProcesses` IPC; the current OS proxy settings; `captureMode` and `captureProcesses`.
 - Output: `BridgeStatus` (including `localCaptureEnabled` and `captureError`); the system proxy target; the `{allowlist, cookies, debug, capture}` config pushed to the sidecar.

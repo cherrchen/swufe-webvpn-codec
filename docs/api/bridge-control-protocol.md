@@ -40,6 +40,7 @@
 
 - 路径：默认 `~/.swufe-webvpn-bridge/bridge-config.json`，`--config` 覆盖（M2 传入 Electron `userData` 下的 `<userData>/bridge-config.json`）。
 - 权限：`0600`（含 WebVPN 会话 Cookie，见 NFR-003）。
+- 保留期：桌面 App 仅在启动/运行期间保留；sidecar 停止后删除，覆盖正常关桥/退出、登出、会话失效、启动失败与异常退出。App 启动恢复也删除上次遗留文件；后续启动从当前会话重新生成。删除失败须报告清理错误，不当作已清除。
 - 内容（字段名与 [data-model.md](../architecture/data-model.md) 的 `AllowlistConfig` / `SessionState` / `AppSettings` 一致）：
 
   ```json
