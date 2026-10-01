@@ -1,4 +1,4 @@
-/* swufe-webvpn loon f5afb4c */
+/* swufe-webvpn loon 7d40a66 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -2398,7 +2398,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
         action: "pass",
         detail: `trace=${traceId} ${responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession)}`
       });
-      runtime.finishResponse({});
+      runtime.finishResponse(runtime.env().host === "loon" ? absoluteGatewayRedirect(runtime, rewriteSettings) : {});
       return;
     }
     const result = rewriteResponse(
@@ -2441,6 +2441,23 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       headers: result.response.headers,
       body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : void 0
     });
+  }
+  function absoluteGatewayRedirect(runtime, settings) {
+    const response = runtime.response;
+    if (!response || !runtime.request || (response.status ?? 200) < 300 || (response.status ?? 200) >= 400) return {};
+    const headers = response.headers ?? {};
+    const entry = Object.entries(headers).find(([key2]) => key2.toLowerCase() === "location");
+    if (!entry) return {};
+    const [key, value] = entry;
+    try {
+      const target = new URL(value, runtime.request.url);
+      if (target.origin !== new URL(settings.gatewayBase).origin || target.href === value || target.href === new URL(runtime.request.url).href) return {};
+      const context = deriveRewriteContext(target.href, settings.gatewayBase, settings.wrdKey, settings.wrdIv);
+      if (!context || context.gatewayOwned) return {};
+      return { headers: { ...headers, [key]: target.href } };
+    } catch {
+      return {};
+    }
   }
   function isGatewayLogoutUrl(url) {
     if (!url) return false;
@@ -3002,7 +3019,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       globals.done(value);
     };
     try {
-      traceEntered(`swufe-webvpn-loon-${kind} 0.1.1-m3`, globals.request?.url);
+      traceEntered(`swufe-webvpn-loon-${kind} 0.1.2-m3`, globals.request?.url);
       const runtime = bindLoonRuntime({ ...globals, done });
       if (kind === "request") handleLoonRequest(runtime, globals.argument);
       else handleLoonResponse(runtime, globals.argument);

@@ -89,6 +89,7 @@
 
 - [x] T062 修复 Loon URL rewrite 的 Host authority 映射，覆盖 Host 大小写、缺失、非默认网关端口、Gateway-owned 路径及 POST body 保留；构建 0.1.1-m3 — 关联：G13/G17；证据见 verification。
 - [ ] T063 在设备加载 0.1.1-m3 后复验原始 `http://jwxt.swufe.edu.cn/`，确认上游连接目标与教务操作；若仍失败，继续取证 HTTP→HTTPS 宿主连接切换 — 依赖：T062；关联：G13/G17/T021。
+- [x] T064 修复 Loon Gateway URL 响应上下文中的相对 WRD Location：同源绝对 URL 回退、非 WRD/外部/自跳转排除与原始 URL 解码回归；0.1.2-m3 — 关联：G17；设备重定向链复验 Pending。
 
 - T026/T027 仍待 Stash 真机：HTTP/3 回落（H09）与教务 E2E；N02–N10 是新增 M2 follow-up。自动测试不能代替设备证据。
 - P0 失败时先更新需求与架构，不用猜测继续实现；

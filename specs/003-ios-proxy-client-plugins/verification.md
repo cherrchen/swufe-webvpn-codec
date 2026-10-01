@@ -335,3 +335,16 @@ Python L2 已有不可达网关测试失败：客户端收到预期 502 并满�
 Loon Adapter 在 URL rewrite 的 `$done({url,headers})` 映射中移除大小写不同的旧 Host，设置唯一 `Host = new URL(url).host`；支持非默认网关端口、WRD 与 Gateway-owned 路径，其余头及 Cookie 保留，POST body 仍按宿主契约通过省略保留。PASS、headers-only Gateway 注入与 Settings synthetic response 不变。共享 Core/Stash、存储与安全模型未修改；属于既有上游 URL 契约的 Adapter 修复，无需新 ADR。三 bundle 与 `.plugin` cache version 同步为 `0.1.1-m3`。
 
 Open：旧 Host 保留是已复现的输出缺陷，但它是否是唯一导致 0 B 失败的原因仍待 T063；尤其须复核 Loon 的 HTTP→HTTPS 连接切换、实际目的地址/端口与响应 URL 语义。复验时先加载同版本本地 bundle 或分发后的 raw 制品，确认日志版本后访问原始 `http://jwxt.swufe.edu.cn/` 并操作教务；若仍失败，保留本条 Failed 证据并继续取证，不宣称修复完成。
+
+
+## Loon 302 相对 WRD 路径与重复包装修复（2026-10-01）
+
+任务分类：Spec 003 M3 Bug，T064/G17。用户提供的脱敏结构表明：浏览器出现 `https://jwxt.swufe.edu.cn/https/<wrd>/xtgl/dl_loginForward.html`，下一次发往网关的路径成为 `/http/<wrd>/https/<wrd>/xtgl/dl_loginForward.html`，`/wengine-vpn/cookie` 的目标 path 也含 WRD 包装前缀。镜像已观察到这类教务域名 + WRD path 的请求，以及“您访问的页面不存在”的页面。未保存用户提供的真实 Cookie/账号/完整 header。
+
+代码与本地复现：Core 已支持相对 WRD Location 解码，但共享 runtime 对 Gateway WRD 响应整体 PASS。在 Loon response 暴露改写后上游 URL、Safari 仍保留原站点 URL 的场景，相对 WRD Location 因 PASS 留给浏览器按原站点域解析，后续 request 会再次包装。新增回归在旧实现返回 `{}` 而失败。尚未取得现场原始 302 头及 response `$request.url` 的直接证据，因此该上下文是已复现的故障机制，现场的唯一触发原因仍待 G17 确认。
+
+0.1.2-m3：仅在 Loon、启用转发、有效 Gateway WRD response 上，把 3xx 的同源、可解码且非自跳转的相对 WRD Location 补成绝对网关 URL。保留 header 大小写及其它 header，不重写原生 bootstrap/body，不改外部/未知/非 3xx 目标。原始 browser URL 的响应仍使用既有 Core 解码，普通请求的 Host 修复保留。此处理不依赖跨请求推测原始浏览器 URL，在上下文不足时导航到官方 Gateway；不新增 session/key/权限，属于宿主响应映射修复，无需新 ADR。Stash 行为不变，其 bundle 随共享源重建。
+
+本地验证：Loon 47 tests、Loon 与共享 runtime typecheck、bundle scan 通过；Stash 36 tests 与 bundle scan 通过；docs/spec/diff 检查通过。覆盖原始 URL / 上游 URL 两种 Location 语义、浏览器下一请求无双重包装、query 保留、绝对/外部/非法/自跳转/非 3xx/禁用转发负向用例与 bootstrap 防环。
+
+设备状态：Pending。需加载 0.1.2-m3，重新从 `http://jwxt.swufe.edu.cn/` 发起；确认 302 Location 要么为解码后的原始教务 URL，要么为完整官方 Gateway URL，下一请求仅含单层 WRD 路径，页面与 Cookie 查询 path 无混拼。已有错误 URL 需从入口重新开始，不能只刷新旧的嵌套路径。

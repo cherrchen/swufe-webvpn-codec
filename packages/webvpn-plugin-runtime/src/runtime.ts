@@ -214,7 +214,8 @@ export function handlePluginResponse(runtime: PluginRuntime): void {
       action: "pass",
       detail: `trace=${traceId} ${responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession)}`,
     });
-    runtime.finishResponse({});
+    runtime.finishResponse(runtime.env().host === "loon"
+      ? absoluteGatewayRedirect(runtime, rewriteSettings) : {});
     return;
   }
   const result = rewriteResponse(
@@ -260,6 +261,27 @@ export function handlePluginResponse(runtime: PluginRuntime): void {
     headers: result.response.headers,
     body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : undefined,
   });
+}
+
+// Loon may expose the rewritten upstream URL even though Safari still has
+// the original site URL. A root-relative WRD Location must name its gateway
+// explicitly; otherwise Safari resolves it on the original site and the next
+// request wraps the already encoded path again. Keep native bootstrap bodies.
+function absoluteGatewayRedirect(runtime: PluginRuntime, settings: ReturnType<typeof toRewriteSettingsFromV2>): HostResponseResult {
+  const response = runtime.response;
+  if (!response || !runtime.request || (response.status ?? 200) < 300 || (response.status ?? 200) >= 400) return {};
+  const headers = response.headers ?? {};
+  const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === "location");
+  if (!entry) return {};
+  const [key, value] = entry;
+  try {
+    const target = new URL(value, runtime.request.url);
+    if (target.origin !== new URL(settings.gatewayBase).origin || target.href === value
+      || target.href === new URL(runtime.request.url).href) return {};
+    const context = deriveRewriteContext(target.href, settings.gatewayBase, settings.wrdKey, settings.wrdIv);
+    if (!context || context.gatewayOwned) return {};
+    return { headers: { ...headers, [key]: target.href } };
+  } catch { return {}; }
 }
 
 function isGatewayLogoutUrl(url: string | undefined): boolean {

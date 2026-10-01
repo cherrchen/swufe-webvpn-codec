@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 7afa05c */
+/* swufe-webvpn stash 7d40a66 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1958,7 +1958,7 @@
         action: "pass",
         detail: `trace=${traceId} ${responseDetail(runtime.response, runtime.request.url, runtime.request.headers, rewriteSettings, ticketEvent, priorSession)}`
       });
-      runtime.finishResponse({});
+      runtime.finishResponse(runtime.env().host === "loon" ? absoluteGatewayRedirect(runtime, rewriteSettings) : {});
       return;
     }
     const result = rewriteResponse(
@@ -2001,6 +2001,23 @@
       headers: result.response.headers,
       body: typeof result.response.body === "string" || result.response.body instanceof Uint8Array ? result.response.body : void 0
     });
+  }
+  function absoluteGatewayRedirect(runtime, settings) {
+    const response = runtime.response;
+    if (!response || !runtime.request || (response.status ?? 200) < 300 || (response.status ?? 200) >= 400) return {};
+    const headers = response.headers ?? {};
+    const entry = Object.entries(headers).find(([key2]) => key2.toLowerCase() === "location");
+    if (!entry) return {};
+    const [key, value] = entry;
+    try {
+      const target = new URL(value, runtime.request.url);
+      if (target.origin !== new URL(settings.gatewayBase).origin || target.href === value || target.href === new URL(runtime.request.url).href) return {};
+      const context = deriveRewriteContext(target.href, settings.gatewayBase, settings.wrdKey, settings.wrdIv);
+      if (!context || context.gatewayOwned) return {};
+      return { headers: { ...headers, [key]: target.href } };
+    } catch {
+      return {};
+    }
   }
   function isGatewayLogoutUrl(url) {
     if (!url) return false;

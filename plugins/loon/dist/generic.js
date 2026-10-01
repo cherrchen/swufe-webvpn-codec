@@ -1,4 +1,4 @@
-/* swufe-webvpn loon f5afb4c */
+/* swufe-webvpn loon 7d40a66 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -965,7 +965,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
 
   // src/generic-entry.ts
   try {
-    traceEntered("swufe-webvpn-loon-generic 0.1.1-m3", void 0);
+    traceEntered("swufe-webvpn-loon-generic 0.1.2-m3", void 0);
     const runtime = bindLoonRuntime({
       loon: typeof $loon === "undefined" ? "" : $loon,
       store: $persistentStore,

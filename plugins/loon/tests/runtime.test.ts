@@ -251,11 +251,38 @@ describe("Loon response, session and diagnostic boundaries", () => {
     const rt = fixture({ [STORAGE_KEYS.session]: session() });
     expect(rt.run("response", { url: wrapped }, { status: 200, headers: { "content-type": "text/html" }, body: '<html><script src="/wengine-vpn/js/main.js"></script></html>' })).toEqual({});
   });
+  it("absolutizes a relative WRD redirect when Loon exposes the upstream URL", () => {
+    const rt = fixture({ [STORAGE_KEYS.session]: session() });
+    const target = codec.encodeUrl("https://jwxt.swufe.edu.cn/xtgl/dl_loginForward.html?language=&_t=123", gateway);
+    const relative = new URL(target).pathname + new URL(target).search;
+    const out = rt.run("response", { url: codec.encodeUrl("http://jwxt.swufe.edu.cn/", gateway) },
+      { status: 302, headers: { Location: relative, "X-Keep": "yes" } });
+    expect(out).toEqual({ headers: { Location: target, "X-Keep": "yes" } });
+    const browserNext = new URL((out.headers as Record<string, string>).Location!, "http://jwxt.swufe.edu.cn/").href;
+    expect(browserNext).toBe(target);
+    expect(rt.run("request", { url: browserNext, headers: { cookie: `${TICKET_COOKIE_NAME}=stored-ticket` } })).toEqual({});
+  });
+  it("does not change native absolute, external, malformed or non-redirect Locations", () => {
+    const rt = fixture({ [STORAGE_KEYS.session]: session() });
+    const target = codec.encodeUrl("https://jwxt.swufe.edu.cn/b", gateway);
+    for (const location of [target, "https://evil.example" + new URL(target).pathname, "/https/not-a-token/b", "/login", wrapped]) {
+      expect(rt.run("response", { url: wrapped }, { status: 302, headers: { location } })).toEqual({});
+    }
+    expect(rt.run("response", { url: wrapped }, { status: 200, headers: { location: new URL(target).pathname } })).toEqual({});
+    expect(rt.run("response", { url: wrapped }, { status: 302, headers: { location: new URL(target).pathname } }, { enabled: false })).toEqual({});
+  });
   it("rewrites header-only Location when the original URL is exposed without clearing the body", () => {
     const rt = fixture({ [STORAGE_KEYS.session]: session() });
     const out = rt.run("response", { url: "http://jwxt.swufe.edu.cn/a" }, { status: 302, headers: { location: codec.encodeUrl("http://jwxt.swufe.edu.cn/b", gateway) } });
     expect(out).toMatchObject({ headers: { location: "http://jwxt.swufe.edu.cn/b" } });
     expect(out).not.toHaveProperty("body");
+  });
+  it("decodes relative WRD Location when Loon exposes the original browser URL", () => {
+    const rt = fixture({ [STORAGE_KEYS.session]: session() });
+    const target = codec.encodeUrl("https://jwxt.swufe.edu.cn/xtgl/dl_loginForward.html?language=&_t=123", gateway);
+    const out = rt.run("response", { url: "http://jwxt.swufe.edu.cn/" },
+      { status: 302, headers: { location: new URL(target).pathname + new URL(target).search } });
+    expect(out).toEqual({ status: 302, headers: { location: "https://jwxt.swufe.edu.cn/xtgl/dl_loginForward.html?language=&_t=123" } });
   });
   it("promotes captured to valid only after a successful protected response", () => {
     const rt = fixture({ [STORAGE_KEYS.session]: session() });

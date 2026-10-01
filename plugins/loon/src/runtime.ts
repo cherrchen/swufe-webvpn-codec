@@ -33,7 +33,7 @@ export function executeLoonHttp(kind: "request" | "response", globals: LoonGloba
     globals.done(value);
   };
   try {
-    traceEntered(`swufe-webvpn-loon-${kind} 0.1.1-m3`, globals.request?.url);
+    traceEntered(`swufe-webvpn-loon-${kind} 0.1.2-m3`, globals.request?.url);
     const runtime = bindLoonRuntime({ ...globals, done });
     if (kind === "request") handleLoonRequest(runtime, globals.argument);
     else handleLoonResponse(runtime, globals.argument);
