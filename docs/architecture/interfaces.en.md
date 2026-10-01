@@ -139,3 +139,7 @@ Description: the in-process boundary IF-001 is a stable contract (Internal); IF-
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-C01–C04) | conflict refusal, proxy set and clear |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-E01–E03) | install, uninstall and missing-CA prompt |
 | IF-006 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md) (TC-F01–F03, TC-G01–G03, TC-D01) + L1 `bridges/python/tests/l1/test_addon_request.py` / `test_addon_response.py` (gateway-owned path passthrough, bootstrap promotion and non-promotion) + L2 `bridges/python/tests/l2/test_proxy_end_to_end.py` | upstream rewrite, response reverse-rewrite, gateway-owned namespace passthrough and promotion, browser acceptance |
+
+## iOS plugin interfaces
+
+Core/HostAdapter and local Settings contracts are defined in [Spec 003 interfaces](../../specs/003-ios-proxy-client-plugins/interfaces.md). Loon M3 adds browser nonce bootstrap; §17 defines native mapping, Argument overrides, notifications and artifacts. See [ADR-0016](adr/ADR-0016-loon-local-settings-runtime.en.md). No public network API or desktop IPC changes.

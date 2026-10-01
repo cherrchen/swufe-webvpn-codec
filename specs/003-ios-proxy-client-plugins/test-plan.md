@@ -140,3 +140,11 @@ Result:
 - wildcard Interception Scope 与 exact Routing Scope 真机边界清楚，或采用静态 Interception 退化方案；
 - 无 Session 泄露；
 - 文档同步完成。
+
+## Loon M3 本地与设备验证（2026-10-01）
+
+本地：`pnpm --filter swufe-webvpn-loon run typecheck/test`（两条独立命令）覆盖 O01–O06、G/N 安全契约及三个 bundle；共享 runtime 抽取同时运行 Stash 回归、Core 向量和 desktop/Python 基线。
+
+真机顺序：先导入新语法制品并检查 O01/G03/G18；Safari Settings 验证 O02–O04（特别是 Referer、nonce replay/TTL、超过 16 KiB 的本地 413/no-upstream）；再从官方页面登录并观察 Gateway Session，测试 HTTP/80、原生/透明 response URL 与 body、CAS-only redirect、绑定 ticket deletion、QUIC TCP 回落、跨 App Gateway 注入，最后 disable/update。记录设备、iOS、Loon build、插件/bundle 版本和脱敏结果。
+
+Stash 暂停后续开发，不将其既有 Pending/Failed 改写为通过。Loon O/G/N 与 M4 性能/发布均须独立证据；本地 parser 文本检查不是 Loon parser 执行。

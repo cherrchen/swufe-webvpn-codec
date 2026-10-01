@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 0bc1702 */
+/* swufe-webvpn stash 7afa05c */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -694,8 +694,8 @@
     return text;
   }
 
-  // src/adapter.ts
-  function handleStashTile(runtime) {
+  // ../../packages/webvpn-plugin-runtime/src/runtime.ts
+  function handleStatusTile(runtime) {
     const raw = runtime.read(STORAGE_KEYS.session);
     const parsed = raw ? parseSession(raw) : null;
     const last = readLastError(runtime);
@@ -718,7 +718,7 @@
     }
   }
 
-  // src/script-trace.ts
+  // ../../packages/webvpn-plugin-runtime/src/script-trace.ts
   function traceEntered(script, requestUrl) {
     writeTrace({
       ts: (/* @__PURE__ */ new Date()).toISOString(),
@@ -754,7 +754,7 @@
   // src/tile-entry.ts
   try {
     traceEntered("swufe-webvpn-tile", void 0);
-    const tile = handleStashTile(bindTileRuntime());
+    const tile = handleStatusTile(bindTileRuntime());
     console.log(JSON.stringify({ direction: "system", action: "entered", detail: `swufe-webvpn-tile trace=1 content=${tile.content} session=${tile.sessionState}` }));
     $done({ title: tile.title, content: tile.content, url: tile.url, icon: tile.icon });
   } catch (error) {

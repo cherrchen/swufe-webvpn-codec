@@ -83,3 +83,7 @@ Desktop 无数据迁移。Settings V1 → V2 migration 按 [data-model.md §16](
 ## Open Questions
 
 P0 未决项见 [README.md](README.md) 与 [project-management.md §10](project-management.md)。
+
+## Loon M3 实现增补（2026-10-01）
+
+宿主无关的 Stash 会话编排、设置页资源和 Trace 抽取为 `packages/webvpn-plugin-runtime`，薄 Adapter 分别映射宿主 API。Loon 复用 Settings V2，Argument 仅覆盖 enabled/debug；站点设置保存后下一请求生效。Safari Web Crypto nonce bootstrap、安全来源门禁、新版 Script 与独立真机验证边界由 [ADR-0016](../../docs/architecture/adr/ADR-0016-loon-local-settings-runtime.md) 定义。桌面 API、数据、登录隔离与协议语义不变；Stash 行为保持原回归基线。

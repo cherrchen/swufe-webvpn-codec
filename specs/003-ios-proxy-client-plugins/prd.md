@@ -326,3 +326,7 @@ Stash 优先通过 Tile 展示；Loon 使用插件 UI 可提供的信息、通�
 - [ ] AC-SETTINGS-015：Settings schema 升级不清除 `swufe.session.v1`。
 - [ ] AC-SETTINGS-016：Interception Scope 与 Routing Scope 在文档和测试中分开验证。
 - [ ] AC-SETTINGS-017：`*.swufe.edu.cn` 中未选流量保持 PASS。
+
+## Loon M3 站点管理增补（2026-10-01）
+
+用户确认 Loon 复用本地 Settings 页。IOS-REQ-013/014/015 与 AC-SETTINGS-001..017 的站点配置、精确路由、本地终结、CSRF/nonce、安全与迁移要求同样适用于 Loon；Tile 入口改为 Generic 通知或直接 Safari URL。安全 nonce 来源由 [ADR-0016](../../docs/architecture/adr/ADR-0016-loon-local-settings-runtime.md) 定义。Loon 设备证据单独记录，不继承 Stash 验收结果。Stash 现有实现冻结，未通过的验证保留原状态。

@@ -88,18 +88,16 @@ Tile 不主动以高频网络请求探测 Session，避免耗电。脚本每 30 
 
 ### 4.1 Plugin 参数
 
-本参数草图记录既有 Loon adapter 的独立配置面；Stash Settings V2 不暴露 wildcard routing，且首期 dynamic website management 由 §5 定义。Loon 未来若实现站点 UI，需单独应用 Routing Scope 的 exact-host 安全边界。
+2026-10-01 M3 复用 §5 本地 Settings V2 页面。Loon Argument 仅提供 enabled/debug；没有 wildcard route 或 Gateway/key/iv 参数。站点开关、增删与 HTTP/HTTPS 协议来自设置页。Generic「网站设置」通知或直接 Safari URL 提供入口。
 
-建议 `[Argument]`：
+当前 `[Argument]`：
 
 ```text
 启用插件               [ on ]
-SWUFE 通配             [ off ]
 调试日志               [ off ]
-Gateway                 webvpn.swufe.edu.cn
 ```
 
-普通用户无需修改 Gateway/key/iv；这些字段如果保留覆盖能力，应归入 Advanced。
+关闭转发仍可访问本地设置页；Generic「打开网页登录」不受自动通知节流。
 
 ### 4.2 登录入口
 
@@ -206,7 +204,7 @@ stateDiagram-v2
 
 ## 9. 代理网站交互
 
-第一版 Routing Scope 为 Settings 中选中的精确 hostname；没有用户可开关的全 SWUFE wildcard routing。Interception Scope 允许为该体验预先包含 wildcard，详见 [architecture.md](architecture.md) 与 [security 说明](prd.md#ios-req-014-拦截与路由边界)。Loon 的同等管理 UI 不属于本次首发要求，第二适配器可使用宿主 Argument 或后续独立设计。
+第一版 Routing Scope 为 Settings 中选中的精确 hostname；没有用户可开关的全 SWUFE wildcard routing。Interception Scope 允许为该体验预先包含 wildcard，详见 [architecture.md](architecture.md) 与 [security 说明](prd.md#ios-req-014-拦截与路由边界)。Loon M3 已采用同一管理页；其 Safari nonce bootstrap 与独立真机门槛见 [ADR-0016](../../docs/architecture/adr/ADR-0016-loon-local-settings-runtime.md)。
 
 ## 10. 可访问性与视觉
 

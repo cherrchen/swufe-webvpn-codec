@@ -221,3 +221,7 @@ Description: Telemetry UI is a leaf (it only calls App Shell through preload IPC
 | Telemetry UI | cherrchen | Whether new IPC is introduced or sensitive data is displayed |
 | Window Registry | cherrchen | Whether single-instance reuse, non-modal secondary windows and quit-on-main-window-close (ADR-0012) change |
 | Debug Log Buffer | cherrchen | Whether the capacity cap and "in-memory only, never persisted" (NFR-003) change |
+
+## iOS plugin components
+
+`packages/webvpn-core-js` provides pure protocol/DTO logic; `packages/webvpn-plugin-runtime` provides injected session/settings/Trace orchestration and bundled page resources; `plugins/stash`/`plugins/loon` provide thin native API adapters and artifacts. Orchestration has no host globals; stores remain host-local. See [Spec 003 architecture](../../specs/003-ios-proxy-client-plugins/architecture.md) and [ADR-0016](adr/ADR-0016-loon-local-settings-runtime.en.md).

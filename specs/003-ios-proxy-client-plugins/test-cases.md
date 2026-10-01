@@ -113,7 +113,7 @@
 | G12 | QUIC | 稳定进入 HTTP script |
 | G13 | Safari 打开 `http://jwxt.swufe.edu.cn/` | HTTP/80 命中 request/response 脚本；上游使用 WRD `/http/` |
 | G14 | 捕获 Cookie 后首次教务 CAS 往返 | 首次 CAS 302 保留 `captured`；回调仍可改写；成功响应后才标 `valid` |
-| G15 | 已确认会话后再次跳 CAS | 按过期契约失效并可重登 |
+| G15 | 已确认会话后再次跳 CAS | CAS-only redirect 保留 Session；只有绑定 ticket 明确删除/到期才清理并可重登 |
 | G16 | 浏览器进入原生 WebVPN `/http/<token>/` | 不反向改写网关 bootstrap；无指向当前 URL 的 302 或重定向循环 |
 | G17 | Loon request/response URL 与 Header-only 响应 | 记录两阶段 URL 语义；Header 改写不清空业务 body |
 | G18 | 插件更新后的日志定位 | 能区分未加载、脚本未执行与流量未命中；远程 bundle 使用预期版本，日志无敏感值 |
@@ -229,3 +229,16 @@ N01 已通过。N02 在 2026-09-25 的 tyxycg 真机尝试中观察到代理执�
 | N08 | raw authserver 与 gateway 上 WRD-wrapped authserver URL 并存 | Safe Auth Trace 分别记录 request host/route kind 与 decoded original host；`service` 只记录 target hostname；不记录 query、token 或 ticket value；不会把 authserver 加入普通 Routing Scope | Pending |
 | N09 | `tyxycg.swufe.edu.cn` 跨 App 流程 | Trace 可区分 gateway ticket 缺失/未注入后由 Gateway login redirect 到 CAS，与 Gateway 已认证访问业务站后由业务系统继续 redirect 到 CAS；后者不被误判为 Gateway Session 复用失败，也不因 CAS 页面单独清除 stored Gateway Session | Pending |
 | N10 | `GATEWAY_ROOT` 显式重新登录意图 | 即使 stored Gateway Session ready，也不注入旧 Session；意图未知时采取同样的 no-injection 行为，保留官方登录流程 | Pending |
+
+## O. Loon M3 Settings / native mapping
+
+| ID | 场景 | 预期 |
+| --- | --- | --- |
+| O01 | 新 Script 语法、插件参数与最低 Build | Build 983+ 可导入；typed enabled/debug 正确；response URL guard；Settings 先命中 |
+| O02 | Safari 本地页 GET bootstrap | 安全随机 nonce、Settings 页 Referer、精确 HTTPS API；本地 JSON/HTML，未到 upstream |
+| O03 | 缺失/跨站/伪造来源、token replay/过期、超限 POST、未知路径或 store 异常 | 本地 4xx/5xx；无上游、敏感日志或误成功；body >16 KiB 本地 413 |
+| O04 | 设置保存与 disable/update | 精确站点/协议下一请求生效；disabled 业务 PASS，Settings 可用；V1 migration 不改 Session；升级保留 store |
+| O05 | Loon native API | write bool 不伪报；undefined 删除单 key；openUrl 通知；每次一次 done；请求 body 省略、响应二进制保留 |
+| O06 | 通知频率 | 登录/过期 30 分钟，错误 10 分钟，同事件独立节流；手动 Generic 入口可用 |
+
+O 系列须分别记录本地 VM/文本检查和真机结果，不能将前者写成宿主网络验收。

@@ -15,7 +15,9 @@
 
 `Draft | Approved | In Progress | Implemented | Verified | Archived`
 
-当前为 **In Progress**（2026-09-25）：P0、M1 Shared Core 与 Stash M2 基础实现已交付；Gateway Cookie capture/store、普通目标 WRD 注入，以及已知路径上的 direct Gateway request 注入已有本地实现和测试。客户端 ticket 优先、CAS-only redirect 不清 Session 与 Safe Auth Trace 已完成本地回归；用户已确认正常 Gateway logout 端点为 `/logout`，本地实现已对该精确路径清 Session 且不注入。N02 的 tyxycg 真机尝试已见注入决定，但 Gateway 仍重新进入登录，记为 Failed；原因待 Safe Trace 与上游 header 复核。N03–N10 仍 Pending，callback 真实 endpoint 未确认。M3/M4 未开始。
+2026-10-01：Stash 已交付实现按用户决定暂时冻结，保留尚未通过的设备风险；开发重心转入 Loon M3。Loon Adapter、新语法制品与本地 Settings 已实现，真机验收及 M4 仍 Pending。
+
+此前基线（2026-09-25）：P0、M1 Shared Core 与 Stash M2 基础实现已交付；Gateway Cookie capture/store、普通目标 WRD 注入，以及已知路径上的 direct Gateway request 注入已有本地实现和测试。客户端 ticket 优先、CAS-only redirect 不清 Session 与 Safe Auth Trace 已完成本地回归；用户已确认正常 Gateway logout 端点为 `/logout`，本地实现已对该精确路径清 Session 且不注入。N02 的 tyxycg 真机尝试已见注入决定，但 Gateway 仍重新进入登录，记为 Failed；原因待 Safe Trace 与上游 header 复核。N03–N10 仍 Pending，callback 真实 endpoint 未确认。后续状态见本节 2026-10-01 更新。
 
 | Gate | 含义 | 本 Spec 状态 |
 | --- | --- | --- |
@@ -104,3 +106,7 @@
 ## Acceptance Criteria
 
 见 [prd.md §10](prd.md)，Requirement → Verification 映射见 [verification.md](verification.md)。
+
+### M3 本地 Settings
+
+Loon 复用 Stash 本地设置页，IOS-REQ-013/014/015 与 AC-SETTINGS 的站点、安全和本地终结约束同样适用。Generic/直接 Safari URL 提供入口；不依赖第三方 BoxJS。安全随机 nonce 来源和新增宿主验证项见 [ADR-0016](../../docs/architecture/adr/ADR-0016-loon-local-settings-runtime.md) 与 [interfaces.md](interfaces.md)。

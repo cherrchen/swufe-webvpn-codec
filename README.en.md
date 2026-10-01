@@ -10,7 +10,7 @@ SWUFE WebVPN Bridge is a desktop tool for macOS and Windows. After the user sign
 
 - Phase 1 real-machine acceptance and browser interaction with the academic-affairs site have passed on macOS and Windows. See the [acceptance record](specs/001-phase1-local-bridge/verification.md) and [known issues](specs/001-phase1-local-bridge/known-issues.md).
 - `KI-019` remains `Open`: occasional requests to the academic-affairs site stop responding through the bridge. Field records locate the issue in the bridge's upstream request/response stage, but there is no packet-level evidence establishing the root cause. Reloading the page may recover; the issue is not fixed.
-- The iOS Stash/Loon plugin is a separate [Spec 003](specs/003-ios-proxy-client-plugins/spec.md) track, currently In Progress. The Stash M2 foundation is delivered; direct Gateway Session injection, Safe Auth Trace, and device verification remain in progress. There is no user release artifact yet.
+- iOS Stash/Loon plugins belong to [Spec 003](specs/003-ios-proxy-client-plugins/spec.md), currently In Progress. Further Stash development is paused; [Loon M3](plugins/loon/README.en.md) is locally implemented with the shared local Settings page and new plugin syntax. Device acceptance and public release remain pending.
 - The repository currently provides source code and developer run instructions. It has **no end-user installer, signed/notarised build, or official distribution channel**. Open-source preparation does not mean an installable release is available.
 - License: [MIT](LICENSE).
 

@@ -33,6 +33,8 @@
 
 ### Phase M3 — Loon
 
+2026-10-01 起暂停 Stash 后续开发（不将 Pending/Failed 真机项改为 Passed），推进 Loon 本地实现。复用本地 Settings V2 页、合成 API 与共享 plugin runtime，增加 Generic 入口和新版 Script 语法；详见 T059–T061。
+
 - 目标：Loon Adapter、.plugin、bundle、HTTP/3 fallback、Session notifications、Gateway Request Kind 与 direct Gateway Session reuse、Safe Auth Trace、E2E。
 - 退出条件：Loon 主路径、跨 App Gateway Session、ticket precedence、CAS boundary 与 disable/update smoke 通过。每个宿主独立实机验证。
 

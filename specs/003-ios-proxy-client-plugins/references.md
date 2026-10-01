@@ -146,3 +146,11 @@ Settings token 的候选实现为 request script `engine: webkit` + `crypto.getR
 6. 两个宿主对大响应 Body Script 的实际内存、超时与大小上限。
 
 1–4 已由 2026-09-24 真机关闭，结论见 [verification.md](verification.md)。5 与 6 仍待 M2/M4。
+
+## 5. Loon M3 新语法核对（2026-10-01）
+
+- [新版 Script](https://nsloon.app/docs/Script/script_v2/)：Build 983 起使用 `request/response if … then script(…) with …`；snake_case options，HTTP 第一条命中，response 强制 URL guard，插件对象保留参数类型。Plugin 页的旧示例不作为本轮 Script 语法依据。
+- [Script API](https://nsloon.app/docs/Script/script_api/)：`$loon` 字符串、store bool 返回/undefined 删除、通知 `{openUrl}`、Uint8Array、每次一次 `$done`；没有公开 secure random 契约。
+- [协议规则](https://nsloon.app/docs/Rule/protocol_rule/)与[逻辑规则](https://nsloon.app/docs/Rule/logic_rule/)：QUIC 与 AND 可组合；[MitM](https://nsloon.app/docs/MitM/)支持 wildcard hostname。
+
+以上是官方能力描述，本项目 Loon 设备验收仍独立 Pending。

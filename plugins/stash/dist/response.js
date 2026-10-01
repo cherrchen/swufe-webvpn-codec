@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 70781d4 */
+/* swufe-webvpn stash 7afa05c */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1921,10 +1921,10 @@
     return { event, title: "SWUFE WebVPN", body: "\u63D2\u4EF6\u4E0E\u5F53\u524D\u5BBF\u4E3B\u4E0D\u517C\u5BB9" };
   }
 
-  // src/adapter.ts
+  // ../../packages/webvpn-plugin-runtime/src/runtime.ts
   var NOTIFY_GAP_MS = 6e4;
   var DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
-  function handleStashResponse(runtime) {
+  function handlePluginResponse(runtime) {
     if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
       runtime.finishResponse({});
       return;
@@ -2163,7 +2163,7 @@
       }
     }
     const now = Date.parse(runtime.nowIso);
-    if (Number.isFinite(now) && now - last < NOTIFY_GAP_MS) {
+    if (Number.isFinite(now) && now - last < (runtime.notificationGapMs?.(event) ?? NOTIFY_GAP_MS)) {
       return;
     }
     const note = notificationFor(event);
@@ -2300,7 +2300,7 @@
     }
   }
 
-  // src/script-trace.ts
+  // ../../packages/webvpn-plugin-runtime/src/script-trace.ts
   function traceEntered(script, requestUrl2) {
     writeTrace({
       ts: (/* @__PURE__ */ new Date()).toISOString(),
@@ -2337,7 +2337,7 @@
   var requestUrl = typeof $request === "undefined" ? void 0 : $request?.url;
   try {
     traceEntered("swufe-webvpn-response", requestUrl);
-    handleStashResponse(bindResponseRuntime());
+    handlePluginResponse(bindResponseRuntime());
   } catch (error) {
     traceThrew("swufe-webvpn-response", requestUrl, error);
     $done({});

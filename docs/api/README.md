@@ -14,6 +14,7 @@
 | [electron-ipc.md](electron-ipc.md) | Electron IPC，preload 暴露命名空间 `window.swufeBridge` | Electron Main → Renderer | 进程内 | Internal |
 | [bridge-control-protocol.md](bridge-control-protocol.md) | 桥控制协议 | Electron Main → mitm sidecar | 进程间（仅本机） | Internal / Evolving（两种实现方式未定，见该文档） |
 | [wrd-codec-library.md](wrd-codec-library.md) | WrdCodec 库 API（主机名加解密与 URL 互转） | WrdCodec 库 → 调用方（桥 addon、App） | 库级 | Evolving |
+| [ios-plugin-settings.md](ios-plugin-settings.md) | iOS 本地 Settings 合成 API | Script Adapter → Safari | 宿主内合成 HTTP | Evolving |
 
 > 新增接口面时在上表补一行，并按下方「接口文档模板」新建 `docs/api/<surface>.md`。
 

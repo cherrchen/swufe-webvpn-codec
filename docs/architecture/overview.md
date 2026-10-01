@@ -81,3 +81,5 @@ flowchart LR
 | R2 Cookie / 会话策略变化 | 会话失效判定与 Cookie 注入失效，桥可用性下降 | 会话采集与失效检测集中在 Session Broker 单一变更点，便于快速适配 | Open |
 | R3 mitm 分发体积与签名 | 发布包体积增大、签名/公证复杂度上升 | 把嵌入式 sidecar 与外置 mitmproxy 的差异隔离在部署层，开发期先用外置方式 | Open |
 | R6 默认密钥轮换 | 若 portal 更换 key/IV，全部改写失败 | 默认 key/iv 通过 `AppSettings` 保留配置覆盖点，作为结构性接口而非写死路径 | Open |
+
+移动端 Loon 同样复用本地 Settings；共享编排与宿主 nonce 来源边界见 [ADR-0016](adr/ADR-0016-loon-local-settings-runtime.md)。

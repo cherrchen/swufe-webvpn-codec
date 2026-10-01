@@ -3,7 +3,7 @@
 > Spec ID: 003  
 > Status: In Progress  
 > Owner: cherrchen  
-> Last Updated: 2026-09-25
+> Last Updated: 2026-10-01
 
 ## Phase P0 — Host Capability
 
@@ -41,10 +41,16 @@
 
 ## Phase M3 — Loon
 
-- [ ] T016 实现 LoonAdapter，覆盖首次 CAS 会话状态、原生 WebVPN 命名空间与 Header-only 响应 — 依赖：T011..T015 — 验证：Adapter unit、IOS-TC-G14..G17 — 关联：IOS-REQ-001/011
-- [ ] T017 生成 request/response self-contained bundles — 依赖：T016 — 验证：bundle scan — 关联：IOS-REQ-011
-- [ ] T018 编写 `.plugin` Argument/Script/MitM/Rule（GitHub 远程安装 URL），确认 HTTP/80 捕获与脚本日志/版本 — 依赖：T017 — 验证：IOS-TC-G01..G04/G13/G18 — 关联：IOS-REQ-001
-- [ ] T019 实现 Session 缺失/过期通知节流 — 依赖：T016 — 验证：IOS-TC-G05 — 关联：IOS-REQ-008
+2026-10-01：按用户决定暂停 Stash 后续开发，保留已交付实现与尚未通过的真机记录。当前推进 Loon，复用 Stash 本地 Settings 页，不引入第三方 BoxJS。实现和本地验证不等同于真机验收。
+
+- [x] T059 将 Stash 宿主无关的会话/设置/Trace 流程抽取到共享 plugin runtime，保留 Stash API 与行为 — 输入：现有 Stash 实现 — 输出：Loon/Stash 共用流程 — 验证：现有 Stash 全套回归
+- [x] T060 Loon 复用本地 Settings V2 页面与合成 API，使用 Safari 安全随机 nonce bootstrap；Argument 只管理 enabled/debug，站点保存即时生效 — 依赖：T059 — 验证：Settings no-upstream、CSRF/nonce/replay/storage/size/路由测试；安全设计见 ADR-0016
+- [x] T061 Loon 新语法制品、Generic 设置/登录入口、bundle 扫描与执行测试接入 workspace/CI，并同步设计和安装说明 — 依赖：T016,T017,T060 — 验证：typecheck/test/build/docs:check
+
+- [x] T016 实现 LoonAdapter，覆盖首次 CAS 会话状态、原生 WebVPN 命名空间与 Header-only 响应 — 依赖：T011..T015 — 验证：Adapter unit 与 G14..G17 本地契约通过；真机归 T021 — 关联：IOS-REQ-001/011
+- [x] T017 生成 request/response self-contained bundles — 依赖：T016 — 验证：bundle scan — 关联：IOS-REQ-011
+- [x] T018 编写新语法 `.plugin` Argument/Script/MitM/Rule（GitHub raw URL）、HTTP/80 match 与脚本日志/版本；本地文本/VM 检查已通过，真机导入/捕获归 T021 — 依赖：T017 — 验证：O01 本地文本检查、VM entry、bundle scan；G01..G04/G13/G18 真机 Pending — 关联：IOS-REQ-001
+- [x] T019 实现 Session 缺失/过期通知节流 — 依赖：T016 — 验证：IOS-TC-G05 — 关联：IOS-REQ-008
 - [ ] T020 验证 Loon QUIC/HTTP path — 依赖：T018 — 验证：IOS-TC-G12 — 关联：IOS-REQ-010
 - [ ] T021 Loon 真机 E2E 教务 — 依赖：T018..T020 — 验证：IOS-TC-G07..G18 — 关联：AC-IOS-001/002
 
@@ -73,8 +79,8 @@
 
 ## Phase M3 — Loon Gateway Session Parity additions
 
-- [ ] T055 Loon Adapter 实现同一 Gateway Request Kind 与直接 Gateway Session 注入契约；不猜 endpoint，不将 CAS Cookie 纳入 store — 依赖：T016 — 验证：共享 Core contract + Adapter cases — 关联：IOS-REQ-016/017
-- [ ] T056 Loon Adapter Safe Auth Trace allowlist/redaction 与 raw / WRD-wrapped authserver 区分 — 依赖：T055 — 验证：N07/N08 contract cases — 关联：IOS-REQ-018
+- [x] T055 Loon Adapter 实现同一 Gateway Request Kind 与直接 Gateway Session 注入契约；不猜 endpoint，不将 CAS Cookie 纳入 store — 依赖：T016 — 验证：共享 Core contract + Adapter cases — 关联：IOS-REQ-016/017
+- [x] T056 Loon Adapter Safe Auth Trace allowlist/redaction 与 raw / WRD-wrapped authserver 区分 — 依赖：T055 — 验证：N07/N08 contract cases — 关联：IOS-REQ-018
 - [ ] T057 Loon 真机验证 Safari capture 与跨 App/WKWebView direct Gateway reuse、ticket precedence、logout/login intent 与 tyxycg 分流 — 依赖：T055,T056,T021 — 验证：N01–N10 — 关联：AC-IOS-011..014
 
 ## 注意事项

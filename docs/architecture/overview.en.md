@@ -83,3 +83,5 @@ Decisions are not expanded here; this is an index into the ADRs:
 | R2 Cookie / session policy changes | Session expiry detection and Cookie injection break; bridge availability drops | Session capture and expiry detection live in the single Session Broker change point, making adaptation fast | Open |
 | R3 mitm distribution size and signing | Larger release bundle, more complex signing/notarization | Isolate the embedded-sidecar vs external-mitmproxy difference in the deployment layer; use the external form during development | Open |
 | R6 Default key rotation | If the portal changes key/IV, all rewriting fails | Keep the default key/iv overridable through `AppSettings` as a structural interface rather than a hard-coded path | Open |
+
+Loon also reuses local Settings; shared orchestration and host nonce boundaries are defined in [ADR-0016](adr/ADR-0016-loon-local-settings-runtime.en.md).

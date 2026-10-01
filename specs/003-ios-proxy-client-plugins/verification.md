@@ -3,7 +3,7 @@
 > Spec ID: 003  
 > Status: In Progress  
 > Owner: cherrchen  
-> Last Updated: 2026-09-25
+> Last Updated: 2026-10-01
 
 ## 映射表
 
@@ -268,3 +268,43 @@ request/response 脚本新增安全摘要：每个被处理请求生成短 trace
 2. 打开 Tile「打开网页登录」，完成 CAS/MFA。确认 Tile 变为「已登录」。不要记录 Cookie 值。
 3. 用 Safari 明确打开 `http://jwxt.swufe.edu.cn/`，确认 request 日志出现 `jwxt` 的 `rewrite` 且 WebVPN URL 使用 `/http/`；继续走教务主路径，观察是否按网关 bootstrap 规则升级到原生 WebVPN URL 空间。
 4. 在 Stash 连接里确认 `jwxt` / `webvpn` / `authserver` 的 QUIC 被拒绝、TCP 进入 HTTP Engine（IOS-TC-H09）。未确认前不要把 H09 标成 Passed。
+
+## Loon M3 本地实现与验证（2026-10-01）
+
+任务分类：Spec 003 M3 Feature。用户已确认暂停 Stash 后续开发、Loon 复用 Stash 本地设置页；不引入第三方 BoxJS。Stash 既有设备 Failed/Pending 记录保留，不能因冻结视作通过。Spec 003 整体继续 In Progress，Loon 本地实现完成也不等同于真机验收或发布。
+
+| 工作 | 本地证据 | 本地状态 | 设备状态 |
+| --- | --- | --- | --- |
+| T059 共享 runtime 抽取 | Stash 原有 36 个测试、typecheck、三 bundle scan；原 API/存储 key 保持兼容 | Passed | 既有 Stash 风险不变 |
+| T016/T055 Loon request/response 与 Gateway Session | Loon VM：HTTP/80、透明 POST body 保留、stored ticket 优先、logout、ticket rotation/删除绑定、CAS-only redirect、native bootstrap 防环、header-only/body mapping | Passed | G/N 系列 Pending |
+| T019 通知节流 | 30 分钟登录/过期、10 分钟错误；独立事件时间戳；openUrl 与 Generic | Passed | G05/O06 Pending |
+| T056 Safe Trace | raw/WRD authserver 分类与敏感值负向测试 | Passed | N07–N09 Pending |
+| T060 Settings 页面/API | O02–O05 VM：无 host crypto 的 browser bootstrap、来源、nonce/replay/TTL、schema/reserved host/16 KiB、storage false/exception、Settings short-circuit、下一请求路由/V1迁移不改 Session | Passed | O02–O04/K/M 等价设备项 Pending |
+| T017/T018/T061 制品 | 新语法文本检查、Build guard、脚本执行与各一次 done；request/response/generic IIFE；bundle scan；workspace/CI 配置 | Passed | Loon parser/import、真实两阶段 URL、QUIC/HTTP 与脚本 load/update Pending |
+
+### 执行命令与结果
+
+本地 pnpm 11 默认在 run 前检查依赖；本次安装忽略 Electron 安装脚本，因此执行脚本时使用 `pnpm_config_verify_deps_before_run=false` 前缀，避免触发重复安装/网络元数据校验。该设置没有写入仓库配置。初次 offline install 缺少缓存 tarball，已用 `CI=true pnpm install --ignore-scripts --no-frozen-lockfile` 完成安装；lockfile 仅新增 workspace importer/link，未升级第三方依赖。
+
+| 命令（pnpm 命令均使用上述临时前缀） | 结果 |
+| --- | --- |
+| `pnpm --filter swufe-webvpn-loon run typecheck` | Passed |
+| `pnpm --filter swufe-webvpn-loon run test` | 40 Passed；随后 build 与三 bundle scan Passed |
+| `pnpm --filter webvpn-plugin-runtime run typecheck` | Passed |
+| `pnpm --filter swufe-webvpn-stash run typecheck/test`（分别执行） | Passed；36 tests、build、bundle scan Passed |
+| `pnpm --filter webvpn-core-js run typecheck/test`（分别执行） | Passed；75 tests（包括 Python 权威 codec vectors） |
+| `pnpm --filter swufe-webvpn-bridge run typecheck/test:unit/test:ui`（分别执行） | 三命令 Passed；UI 36 tests；jsdom 仍输出不支持 pseudo-element getComputedStyle 的警告，测试通过 |
+| `UV_CACHE_DIR=/tmp/swufe-loon-uv-cache uv run --no-sync --directory bridges/python pytest -q` | 219 Passed / 1 Failed；见下节 |
+| 同上环境的 `pytest tests/l2/test_upstream_stall.py::test_an_unreachable_gateway_gives_the_client_a_bounded_failure -q --disable-warnings` | 单独复跑同一 Failure |
+| `pnpm run docs:check` / `pnpm run typecheck` / `git diff --check` | Passed |
+
+Python L2 已有不可达网关测试失败：客户端收到预期 502 并满足时限，但 `192.0.2.1:80` 诊断为 `stage=error, detail=server closed connection`，测试要求包含 `connect_failed`。单独复跑仍失败；本轮 `apps/desktop` 和 `bridges/python` 无代码改动。该测试不由 JS/Loon bundle 驱动；未在本轮修改其既有行为/断言。Python L0/L1 与其它 L2 项均包含在全量 219 Passed 中，不能宣称 Python 全量绿。
+
+### 兼容性、安全和文档影响
+
+- Codec/session/settings schema 与桌面 IPC/登录隔离不变；新增共享 runtime 是对 Stash 实现的抽取，保留其导出与 native navigation workaround，现有 Stash bundles 同步重建。
+- Loon native store 使用布尔写结果、undefined 单 key 删除；Settings 所有异常本地合成响应，不向 Gateway 泄露 body。Browser nonce bootstrap 与风险边界记录于 ADR-0016，POST 仍走既有 Core 防护。
+- 没有新增第三方运行时依赖；AES 继续使用已固定的 aes-js 3.1.2。bundle 无 runtime import、Node crypto/fs/Buffer 或 CDN UI。CI 工作流已配置，本次仅执行本地等价命令，没有声称 GitHub CI 已运行。
+- 已同步 Spec 003 的 scope/design/interfaces/UI/plan/tasks/test/verification、AGENTS/README 中英状态、architecture/components/interfaces、local API 索引、security、testing strategy、roadmap 和 ADR-0016 中英决策。
+- 未执行 Loon 真机：缺少本轮可控制的设备/宿主会话。T020/T021/T057、O 系列设备验收与 M4 性能/发布仍 Pending；真实 upstream Cookie、两阶段 URL、wildcard MitM、QUIC 回落、Settings 来源/超限 body 必须由设备取证。
+- `.plugin` 中 raw URL 指向 main；本轮文件未推送，远程 URL 不能视作已发布。可按 Loon README 导入本地 bundles 先验收；正式 release/rollback 不属于本轮交付状态。

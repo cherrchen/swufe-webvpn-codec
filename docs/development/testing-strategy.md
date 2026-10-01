@@ -100,3 +100,7 @@ CI test job:    L0：.github/workflows/python-tests.yml（pull_request 与 main 
 
 测试通过 ≠ Feature 完成。完成标准见 [docs/verification/verification-strategy.md](../verification/verification-strategy.md)，
 逐需求映射见 `specs/<id>/verification.md`。
+
+## iOS 插件自动化
+
+`.github/workflows/plugin-tests.yml` 对 Core、共享 plugin runtime、Stash 与 Loon 执行类型检查；Core/两 Adapter 单测、两宿主 bundle 构建和隔离扫描由各包 `test` 执行。Loon VM 测试仅验证原生 API 映射；配置文本检查不能代替宿主 parser/网络/真机 E2E。实际设备矩阵见 [Spec 003 verification](../../specs/003-ios-proxy-client-plugins/verification.md)。

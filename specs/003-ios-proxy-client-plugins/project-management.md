@@ -118,3 +118,7 @@ M2 direct Gateway injection may be enabled only after Settings short-circuit, au
 ## 13. 不做的顺手优化
 
 不重写 desktop Python、不重构 Electron UI、不建后端/账号系统、不支持更多代理 App、不做云同步、不做复杂管理后台、不自动化 CAS/MFA。轻量 Stash Settings 网站列表管理属于本 Feature scope。
+
+## 13. 当前工作重心（2026-10-01）
+
+Stash 已交付实现按用户决定暂停后续开发，既有 Failed/Pending 真机证据仍保留。Loon M3 本地 Adapter、Settings、bundles 与新语法配置已实现；独立设备验收及 M4 发布门槛未完成。新增任务见 [tasks.md](tasks.md) T059–T061，当前证据见 [verification.md](verification.md)。

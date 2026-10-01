@@ -88,11 +88,43 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.20.4)(jsdom@26.1.0)(tsx@4.23.15)
 
+  packages/webvpn-plugin-runtime:
+    dependencies:
+      webvpn-core-js:
+        specifier: workspace:*
+        version: link:../webvpn-core-js
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  plugins/loon:
+    dependencies:
+      webvpn-core-js:
+        specifier: workspace:*
+        version: link:../../packages/webvpn-core-js
+      webvpn-plugin-runtime:
+        specifier: workspace:*
+        version: link:../../packages/webvpn-plugin-runtime
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@22.20.4)(jsdom@26.1.0)(tsx@4.23.15)
+
   plugins/stash:
     dependencies:
       webvpn-core-js:
         specifier: workspace:*
         version: link:../../packages/webvpn-core-js
+      webvpn-plugin-runtime:
+        specifier: workspace:*
+        version: link:../../packages/webvpn-plugin-runtime
     devDependencies:
       esbuild:
         specifier: ^0.28.2

@@ -28,7 +28,7 @@ Status:           Phase 1 P0 cases and academic-affairs browser acceptance pass 
                   renders a four-window layout (720×560 scroll-free main window and three single-instance
                   non-modal secondary windows). Real-session academic-affairs use and process-capture
                   scope were checked on Windows with spec 001; see spec 002 verification.md for what remains.
-                  Spec 003 (iOS Stash/Loon proxy plugins, not a standalone app) is In Progress; Gate A and M1 have passed and the Stash M2 foundation is delivered. Direct Gateway Session injection, Safe Auth Trace, and device acceptance remain pending.
+                  Spec 003 (iOS Stash/Loon proxy plugins, not a standalone app) is In Progress; Gate A and M1 have passed. Stash implementation is delivered and further development is paused; Loon M3 Adapter, local Settings and new-syntax artifacts are locally implemented. Device acceptance and M4 release remain pending.
 Primary language: Python 3 (bridge sidecar/Addon, WRD codec, see `bridges/python/swufe_bridge/`) + TypeScript (Electron app, from M2);
                   Markdown docs (`docs/` + `specs/`) plus Node documentation-check scripts form the bulk
 Repository type:  Documentation-first (docs/ + specs/) + implementation (Python bridge `bridges/python/`,

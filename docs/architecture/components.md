@@ -220,3 +220,7 @@ flowchart TD
 | Telemetry UI | cherrchen | 是否引入新的 IPC 或展示敏感数据 |
 | Window Registry | cherrchen | 单实例复用、二级窗口非模态、主窗口关闭即退出（ADR-0012）是否改变 |
 | Debug Log Buffer | cherrchen | 容量上限与「仅内存不落盘」（NFR-003）是否改变 |
+
+## iOS 插件组件
+
+`packages/webvpn-core-js` 提供纯协议/DTO；`packages/webvpn-plugin-runtime` 提供注入 runtime 的会话/设置/Trace 编排和 bundled page；`plugins/stash`/`plugins/loon` 提供薄宿主 API 与制品。运行流程无宿主全局访问，store 各宿主独立；职责和安全边界见 [Spec 003 architecture](../../specs/003-ios-proxy-client-plugins/architecture.md) 与 [ADR-0016](adr/ADR-0016-loon-local-settings-runtime.md)。

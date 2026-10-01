@@ -202,3 +202,7 @@ Session 若无法安全迁移，直接清除并要求重新登录，不猜测转
 ## 17. 默认与敏感性
 
 默认 `builtinSiteStates.jwxt = true`，`customHosts = []`，`hostSchemes = {}`，无 wildcard routing。`hostSchemes` 只保存显式选择的 `https`；缺省项在改写时使用 HTTP，因此新增域名不必逐个填写协议。Settings API 返回 public Settings DTO 时不包含 WRD key/iv overrides。敏感性：站点选择为低敏感；CSRF nonce 为短期本机秘密；WebVPN Cookie 仍是独立高敏感 `swufe.session.v1`。
+
+## Loon M3 复用（2026-10-01）
+
+Loon 使用同一 Settings V2/Session V1 与独立的宿主 persistent store，无跨宿主迁移或 Cookie 同步。Settings nonce schema 与 one-use TTL 不变；nonce 来源改为 Safari Web Crypto bootstrap，契约见 [interfaces.md §17](interfaces.md)。Argument enabled/debug 是运行时覆盖，不扩展持久 schema。

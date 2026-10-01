@@ -130,3 +130,5 @@ Stash 为支持保存后动态启用新的 SWUFE 子域，Interception Scope 可
 
 Settings WebUI 由 Stash bundle 本地提供，Settings namespace 在 Session/Routing/Codec 之前由 Script synthetic response short-circuit，永不发送到 gateway server。`POST /__swufe_bridge__/api/settings` 只写站点配置，需使用设备本地 one-use nonce、来源与 Content-Type 校验、严格 schema 和 16 KiB body limit；未知路径/方法、处理异常及 oversized body 必须本地终止，不能 fall through upstream。API 和日志不得暴露 Cookie、Authorization、MFA、WRD secret 或 raw POST body。具体契约与尚待设备验证项见 [Spec 003 interfaces](../../specs/003-ios-proxy-client-plugins/interfaces.md)、[verification](../../specs/003-ios-proxy-client-plugins/verification.md)。
 - 威胁相关测试用例（代理冲突、会话过期、响应改写）⇒ [testing-strategy.md](../development/testing-strategy.md)
+
+Loon Settings 的 Safari Web Crypto nonce bootstrap、精确来源门禁与 fail-closed 条件见 [ADR-0016](../architecture/adr/ADR-0016-loon-local-settings-runtime.md)。该 API 始终在代理宿主本地终结；运行流程抽取不改变 Gateway/CAS Realm 隔离。Loon 的来源/body/QUIC 和 E2E 设备验证独立于 Stash，仍是发布门槛。

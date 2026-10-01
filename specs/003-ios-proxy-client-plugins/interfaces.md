@@ -486,3 +486,15 @@ swufe.last-error.v1
 `MITM_NOT_READY` / `NOT_LOGGED_IN` / `SESSION_EXPIRED` / `CODEC_FAILED` / `INVALID_SETTINGS` / `RUNTIME_INCOMPATIBLE` / `BODY_TOO_LARGE` / `REWRITE_FAILED` / `STORAGE_FAILED`。
 
 错误码用于机器判断；用户文案由 Adapter/ViewModel 映射。
+
+## 17. Loon M3 宿主与 Settings 契约
+
+- 最低版本：Loon 3.5.1 (983)。`.plugin` 使用 `request/response if … then script(…) with …`、`generic then script(…)`；HTTP 第一条命中，Settings request 必须优先；每个 response 有 URL guard。
+- `$loon` 是字符串，从版本 `x.y.z(build)` 解析环境；未能确认最低 build 时业务 PASS，Settings 本地 503。
+- `$persistentStore.write(value,key)` 的布尔结果不得伪报成功；删除单 key 使用 `undefined`，禁止 `remove()` 全量清理。通知使用 `{openUrl}`。request `$done({url,headers})` 不包含 body；headers-only response 不包含 body，Uint8Array 保持二进制。
+- `[Argument]` 对象只包含 `enabled`/`debug`，逐请求覆盖运行开关；local Settings 是站点配置的唯一来源。关闭转发仍拦截 Settings 和维护明确 logout；完全关闭插件由宿主控制。
+- 制品为 `dist/request.js`、`dist/response.js`、`dist/generic.js`，版本 `0.1.0-m3`；Generic 字符串参数 `settings`/`login` 分别发送设置/官方登录 URL 通知。
+- Settings 路径、V2 schema、POST 来源/token/replay/16 KiB/本地错误契约复用既有定义。Loon 的 GET `/__swufe_bridge__/api/settings` 额外要求 `X-SWUFE-Settings-Bootstrap`：Safari Web Crypto 生成的 32 位十六进制随机值；URL 精确 HTTPS origin 和 API path，Referer 必须来自精确 Settings 页 path，Origin 若存在必须同源。缺失/不可信 bootstrap 返回本地 503 `SETTINGS_UNAVAILABLE`，不回退弱随机。GET 返回的 token 仍由 Core 持久化、两分钟有效且一次使用；请求/响应不开放 CORS。
+- 通知：登录缺失/过期同一事件 30 分钟一次，codec/runtime 错误同一事件 10 分钟一次；独立事件时间戳保留。Generic 用户操作不受自动通知节流。
+
+安全决策见 [ADR-0016](../../docs/architecture/adr/ADR-0016-loon-local-settings-runtime.md)。设备上的 Referer、Script 解析、超限请求与 upstream no-leak 验收仍 Pending。

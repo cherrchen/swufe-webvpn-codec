@@ -1,4 +1,4 @@
-/* swufe-webvpn stash 70781d4 */
+/* swufe-webvpn stash 7afa05c */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -1746,7 +1746,7 @@
     return { event, title: "SWUFE WebVPN", body: "\u63D2\u4EF6\u4E0E\u5F53\u524D\u5BBF\u4E3B\u4E0D\u517C\u5BB9" };
   }
 
-  // src/settings-page.ts
+  // ../../packages/webvpn-plugin-runtime/src/settings-page.ts
   var SETTINGS_PAGE_HTML = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1900,16 +1900,16 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
 </body>
 </html>`;
 
-  // src/adapter.ts
+  // ../../packages/webvpn-plugin-runtime/src/runtime.ts
   var NOTIFY_GAP_MS = 6e4;
   var DIAGNOSTIC_TRACE_KEY = "swufe.trace.pending.v1";
-  function handleStashRequest(runtime) {
+  function handlePluginRequest(runtime) {
     if (runtime.request?.url && isSettingsNamespaceUrl(runtime.request.url)) {
       try {
         const response = handleSettingsRequest(settingsDto(runtime), {
           kv: kv(runtime),
           statusProvider: { getStatus: () => sessionStatus(runtime) },
-          pageHtml: SETTINGS_PAGE_HTML
+          pageHtml: runtime.pageHtml ?? SETTINGS_PAGE_HTML
         });
         runtime.finishRequest({ decision: "respond", response });
       } catch {
@@ -2092,7 +2092,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       referer: header(request?.headers, "referer"),
       contentType: header(request?.headers, "content-type"),
       token: header(request?.headers, "x-swufe-settings-token"),
-      freshNonce: secureNonce() ?? void 0,
+      freshNonce: (runtime.settingsNonce ? runtime.settingsNonce() : secureNonce()) ?? void 0,
       body: request?.body
     };
   }
@@ -2137,7 +2137,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       }
     }
     const now = Date.parse(runtime.nowIso);
-    if (Number.isFinite(now) && now - last < NOTIFY_GAP_MS) {
+    if (Number.isFinite(now) && now - last < (runtime.notificationGapMs?.(event) ?? NOTIFY_GAP_MS)) {
       return;
     }
     const note = notificationFor(event);
@@ -2254,7 +2254,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
     }
   }
 
-  // src/script-trace.ts
+  // ../../packages/webvpn-plugin-runtime/src/script-trace.ts
   function traceEntered(script, requestUrl2) {
     writeTrace({
       ts: (/* @__PURE__ */ new Date()).toISOString(),
@@ -2291,7 +2291,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
   var requestUrl = typeof $request === "undefined" ? void 0 : $request?.url;
   try {
     traceEntered("swufe-webvpn-request", requestUrl);
-    handleStashRequest(bindRuntime());
+    handlePluginRequest(bindRuntime());
   } catch (error) {
     traceThrew("swufe-webvpn-request", requestUrl, error);
     $done({});

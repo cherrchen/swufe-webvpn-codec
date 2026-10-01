@@ -111,3 +111,7 @@ Documentation-check workflow: [docs-check.yml](../../.github/workflows/docs-chec
 ## 7. Relationship to verification
 
 Passing tests is not the same as a finished feature. See [docs/verification/verification-strategy.md](../verification/verification-strategy.md) for the definition of done, and `specs/<id>/verification.md` for the per-requirement mapping.
+
+## iOS plugin automation
+
+`.github/workflows/plugin-tests.yml` typechecks Core, shared plugin runtime, Stash and Loon. Package tests run Core/adapter unit tests, both host bundle builds and isolation scans. Loon VM tests verify native API mapping; configuration text checks do not replace host parsing, networking or device E2E. See [Spec 003 verification](../../specs/003-ios-proxy-client-plugins/verification.md).

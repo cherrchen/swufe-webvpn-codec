@@ -51,3 +51,7 @@ not the entire repository documentation.
 - 临时调试记录、聊天记录、实验结论 → [.agents/notes/](../.agents/notes/README.md)
 - 单个 Feature 的设计与任务 → [specs/](../specs/README.md)
 - 代码风格的工具配置 → 仓库根部的配置文件
+
+Loon 本地 Settings 与共享插件运行流程的长期决策：[ADR-0016](architecture/adr/ADR-0016-loon-local-settings-runtime.md)。
+
+iOS 本地设置接口索引：[ios-plugin-settings](api/ios-plugin-settings.md)。

@@ -51,3 +51,7 @@ Classify the task first (feature / bug / architecture / API / UI / database / te
 - Temporary debug notes, chat transcripts, experiment results → [.agents/notes/](../.agents/notes/README.md)
 - Per-feature design and tasks → [specs/](../specs/README.md)
 - Tool configuration for coding style → repository root configuration files
+
+Long-lived decision for Loon local Settings and shared plugin runtime: [ADR-0016](architecture/adr/ADR-0016-loon-local-settings-runtime.en.md).
+
+iOS local Settings interface index: [ios-plugin-settings](api/ios-plugin-settings.en.md).

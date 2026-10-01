@@ -8,6 +8,8 @@ build/
 # Stash script-providers load these bundles from GitHub raw.
 !plugins/stash/dist/
 !plugins/stash/dist/*.js
+!plugins/loon/dist/
+!plugins/loon/dist/*.js
 
 # Environment
 .env

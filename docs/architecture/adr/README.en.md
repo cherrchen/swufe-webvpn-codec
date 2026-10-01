@@ -60,6 +60,7 @@ docs/architecture/adr/ADR-0001-<short-slug>.md
 | [ADR-0013](ADR-0013-js-core-aes-cfb128.en.md) | Shared JS core for iOS plugins, with aes-js as the AES block primitive | Accepted | 2026-09-24 | Does not supersede ADR-0005: desktop keeps the Python codec; this decision only constrains the mobile JS backend |
 | [ADR-0014](ADR-0014-stash-local-settings-and-routing-scope.en.md) | Stash uses a local pseudo WebUI to manage exact WebVPN sites | Accepted | 2026-09-25 | Does not supersede existing ADRs; defines Spec 003 Stash Settings and Interception/Routing Scope boundaries |
 | [ADR-0015](ADR-0015-session-realm-and-proxy-reuse.en.md) | Separate Session Realms and proxy-layer Gateway Session reuse | Accepted | 2026-09-25 | Does not change desktop ADR-0007; defines Spec 003 Gateway/CAS boundaries and Inter-App reuse |
+| [ADR-0016](ADR-0016-loon-local-settings-runtime.en.md) | Loon local Settings and shared plugin runtime | Accepted | 2026-10-01 | Extends Loon; does not supersede ADR-0014 for Stash |
 
 ## Rules
 

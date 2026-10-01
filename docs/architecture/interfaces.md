@@ -137,3 +137,7 @@ flowchart LR
 | IF-004 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-C01–C04） | 冲突拒绝、设置与清除代理 |
 | IF-005 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-E01–E03） | 安装、卸载与未安装提示 |
 | IF-006 | [specs/001-phase1-local-bridge/verification.md](../../specs/001-phase1-local-bridge/verification.md)（TC-F01–F03、TC-G01–G03、TC-D01）+ L1 `bridges/python/tests/l1/test_addon_request.py` / `test_addon_response.py`（网关自有路径直通、bootstrap 升级与不误升级）+ L2 `bridges/python/tests/l2/test_proxy_end_to_end.py` | 上行改写、响应反向改写、网关自有命名空间直通与升级、浏览器验收 |
+
+## iOS 插件接口
+
+Core/HostAdapter 与本地 Settings 契约见 [Spec 003 interfaces](../../specs/003-ios-proxy-client-plugins/interfaces.md)。Loon M3 增加 browser nonce bootstrap，宿主 native mapping、Argument 覆盖、通知与制品由该文件 §17 定义；安全决策见 [ADR-0016](adr/ADR-0016-loon-local-settings-runtime.md)。无公网 API 或桌面 IPC 变更。

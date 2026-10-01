@@ -16,6 +16,7 @@ This repository has **no public HTTP API**: every Phase 1 interface is either in
 | [electron-ipc.md](electron-ipc.md) | Electron IPC, preload namespace `window.swufeBridge` | Electron Main → Renderer | in-process | Internal |
 | [bridge-control-protocol.md](bridge-control-protocol.md) | Bridge control protocol | Electron Main → mitm sidecar | inter-process (local only) | Internal / Evolving (two candidate implementations, undecided — see that document) |
 | [wrd-codec-library.md](wrd-codec-library.md) | WrdCodec library API (host encrypt/decrypt and URL conversion) | WrdCodec library → callers (bridge addon, app) | library-level | Evolving |
+| [ios-plugin-settings.en.md](ios-plugin-settings.en.md) | iOS local synthetic Settings API | Script Adapter → Safari | Host-local synthetic HTTP | Evolving |
 
 > When adding a surface, add a row above and create `docs/api/<surface>.md` from the template below.
 

@@ -1,0 +1,34 @@
+name: plugin-tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Shared core and runtime
+        run: |
+          pnpm --filter webvpn-core-js run typecheck
+          pnpm --filter webvpn-core-js run test
+          pnpm --filter webvpn-plugin-runtime run typecheck
+      - name: Stash regression
+        run: |
+          pnpm --filter swufe-webvpn-stash run typecheck
+          pnpm --filter swufe-webvpn-stash run test
+      - name: Loon contracts, bundles and syntax checks
+        run: |
+          pnpm --filter swufe-webvpn-loon run typecheck
+          pnpm --filter swufe-webvpn-loon run test

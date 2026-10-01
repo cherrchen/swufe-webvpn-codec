@@ -373,3 +373,9 @@ CAS Session remains in the client App's own Cookie Jar; no Safari sharing or Gat
 - [ADR-0013](../../docs/architecture/adr/ADR-0013-js-core-aes-cfb128.md)：移动端共享 JS Core 与 AES-CFB128 backend；
 - [ADR-0014](../../docs/architecture/adr/ADR-0014-stash-local-settings-and-routing-scope.md)：Stash 本地 pseudo WebUI、精确 Routing Scope 与宽 Interception Scope。
 - P0 Safari 呈现方式已在本 Spec 与 [verification.md](verification.md) 记录，不改变 Host Runtime 架构，无需新增 ADR。
+
+## 19. Loon M3 共享运行流程
+
+`packages/webvpn-plugin-runtime` 从原 Stash Adapter 抽取宿主无关编排、设置页和 Trace；Core 仍纯协议/DTO，runtime 不直接引用宿主全局。Stash source 保留原 export 和其专用 navigation redirect；Loon 原生映射独立在 `plugins/loon/src/runtime.ts`。
+
+Loon Settings 从同一 bundled HTML 派生，新增 Safari Web Crypto bootstrap，配置持久化于 Loon store。Loon 普通 request 使用透明 URL/header 改写并省略 body；response 在原 URL 可见时重建上下文，Gateway 原生 URL 保守不再 promotion。真实 `$request.url` 语义和 E2E 须经 G13–G18 独立验证，不能继承 Stash 真机结论。安全边界与 nonce 来源见 [ADR-0016](../../docs/architecture/adr/ADR-0016-loon-local-settings-runtime.md)。

@@ -10,7 +10,7 @@ SWUFE WebVPN Bridge 是面向 macOS 和 Windows 的桌面工具：用户在应�
 
 - macOS 和 Windows 的第一期真机验收及教务浏览器操作均已通过；实现与未解决事项见 [验收记录](specs/001-phase1-local-bridge/verification.md) 和 [已知问题](specs/001-phase1-local-bridge/known-issues.md)。
 - `KI-019` 仍为 `Open`：经桥访问教务偶发无响应，现场记录已定位到桥的上游请求/响应阶段，但尚无报文级根因证据。遇到时可重载页面；这不等于问题已修复。
-- iOS Stash/Loon 插件属于独立的 [Spec 003](specs/003-ios-proxy-client-plugins/spec.md)，当前为 In Progress：Stash M2 基础实现已交付，direct Gateway Session 注入、安全 Trace 与真机验证仍在开发/验证中；尚无面向用户的发布制品。
+- iOS Stash/Loon 插件属于独立的 [Spec 003](specs/003-ios-proxy-client-plugins/spec.md)，当前为 In Progress：Stash 现有实现冻结，后续开发暂缓；[Loon M3](plugins/loon/README.md) 已完成本地实现，复用本地设置页并采用新插件语法。真机验收与正式发布仍待完成。
 - 当前仓库提供源码和开发运行方式，**没有面向普通用户的安装包、签名/公证产物或正式发行渠道**。开源准备不代表已经发布可直接安装的版本。
 - 许可：[MIT](LICENSE)。
 

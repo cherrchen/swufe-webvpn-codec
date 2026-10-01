@@ -88,3 +88,7 @@ swufe-webvpn-codec/
 | OQ-006–010 | Settings nonce/header 能力、wildcard MitM/HTTP/QUIC、Tile URL 与 oversized POST short-circuit | Gate D 真机验证；失败按 spec 规定 fail-closed/静态范围退化 | Settings POST、动态拦截为阻塞项 |
 
 OQ-001 的结果是系统 Safari，产品文案不得再称「应用内登录」。OQ-002 通过，Gate A 不改走 Companion App，也不把手工复制 Cookie 当默认流程。
+
+## 当前实现（2026-10-01）
+
+Stash 后续开发暂缓；Loon M3 本地实现已交付，复用 Settings V2 和共享 plugin runtime。安装、构建与真机边界见 [Loon README](../../plugins/loon/README.md)。M3 真机与 M4 发布未完成，Spec 保持 In Progress，既有 Stash 风险记录保留。
