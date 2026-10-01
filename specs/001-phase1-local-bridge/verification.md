@@ -3,7 +3,7 @@
 > Spec ID: 001
 > Status: In Progress
 > Owner: cherrchen
-> Last Updated: 2026-09-23
+> Last Updated: 2026-10-01
 > 界面结构提示（2026-09-23）：本文件中的界面结构相关记录（REQ-009 日志面板、REQ-005 allowlist 编辑界面、REQ-003 候选应用列表、AC-009 等）描述的是迁移前的单窗口实现；对应的界面结构事实已由 [spec 002](../002-desktop-ui-multiwindow/spec.md)（[REQ-012](../../docs/requirements/functional-requirements.md)）取代，002 将重新执行这些用例。本文件的历史证据与结论保留不变。
 
 > 本文件建立 **Requirement → Verification** 映射，是「Feature 是否完成」的判定依据。
@@ -629,6 +629,22 @@ M3 体验打磨手工验证（TC-B05 / TC-H02 / TC-F04 / TC-G04 / TC-H01 / NFR-0
 | CA 状态与卸载目标按本地证书指纹匹配，保留其它同名 CA | `apps/desktop/test/cert-parse.test.ts`、`cert-manager.test.ts`：同名证书列表与 macOS/Windows 删除参数 | Passed（注入式 App 单测；Windows 真机仍待 `KI-001`） |
 
 回归命令：`pnpm --filter swufe-webvpn-bridge run build`、`test:unit`（103 passed）、`test:ui`（36 passed）、`UV_CACHE_DIR=/private/tmp/swufe-review-uv-cache uv run --directory bridges/python pytest -q`（198 passed）、`pnpm run docs:check`（0 error / 0 warning），均通过。Python 测试输出 42 条依赖弃用告警；UI 测试有 jsdom `getComputedStyle` 未实现提示，均未造成用例失败。Spec 仍为 `Implemented`；Windows 真机验收按 `KI-001` 留待后续执行。
+
+## 2026-10-01 Python 上游 L2 回归修复（T050）
+
+分类：既有 Spec 001 的测试 Bug。原用例假设 `192.0.2.1:80` 必然建连失败；复跑时客户端得到预期的有界 502，但日志只有 `error / server closed connection`，未满足 `connect_failed` 断言。TEST-NET 地址不能作为可控的故障夹具。
+
+用例现使用本地 socket 保持绑定、不调用 listen，直到请求结束再释放端口，避免端口被其它服务占用。保留 502、`2 × connect timeout + 4s` 上限、`connect_failed` 与超时重试的断言；操作系统可以直接拒绝或超时。新增本地假上游收到请求后关闭连接的用例，要求有界 502、`connect_done → error`、无 `connect_failed` 或 `response`，分别验证建连与响应阶段的故障。
+
+| 验证 | 结果 |
+| --- | --- |
+| `UV_CACHE_DIR=/tmp/swufe-loon-uv-cache uv run --no-sync --directory bridges/python pytest -q` | Passed：221 tests（L0 105 / L1 104 / L2 12），42 条依赖弃用警告 |
+| `pnpm --filter swufe-webvpn-bridge run typecheck` | Passed：主进程、渲染层、preload 三项 |
+| `pnpm --filter swufe-webvpn-bridge run test:unit` | Passed：110 tests |
+| `pnpm --filter swufe-webvpn-bridge run test:ui` | Passed：36 tests；既有 jsdom pseudo-element getComputedStyle 警告不影响结果 |
+| `pnpm run docs:check` / `pnpm run spec:check` / `git diff --check` | Passed：文档与 Spec 0 error / 0 warning；diff 无空白错误 |
+
+pnpm 命令使用临时环境变量 `pnpm_config_verify_deps_before_run=false`；未改变仓库配置。本次只修改 Python 测试与验证文档，不改变生产代码、桌面 IPC、配置/数据模型、日志阶段契约、安全边界或依赖；无需新增 ADR。`KI-019` 的现场根因与 Accepted 残余风险不因本次自动测试修复而改变，Spec 001 继续 `Implemented`。
 
 ## 未验证 / 无法验证项
 

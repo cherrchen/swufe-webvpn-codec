@@ -300,6 +300,8 @@ request/response 脚本新增安全摘要：每个被处理请求生成短 trace
 
 Python L2 已有不可达网关测试失败：客户端收到预期 502 并满足时限，但 `192.0.2.1:80` 诊断为 `stage=error, detail=server closed connection`，测试要求包含 `connect_failed`。单独复跑仍失败；本轮 `apps/desktop` 和 `bridges/python` 无代码改动。该测试不由 JS/Loon bundle 驱动；未在本轮修改其既有行为/断言。Python L0/L1 与其它 L2 项均包含在全量 219 Passed 中，不能宣称 Python 全量绿。
 
+后续独立修复（2026-10-01，Spec 001 T050）：上述失败由不可控的 TEST-NET 测试地址引起；改用本地未监听端口，另补连接后关闭的阶段测试。Python 全量复验 221 Passed；桌面类型检查、110 单测与 36 UI 用例 Passed。详见 [Spec 001 修复记录](../001-phase1-local-bridge/verification.md)。保留上表的提交前历史失败证据；本次修复不改变 Loon 设备 Pending 或 KI-019 风险状态。
+
 ### 兼容性、安全和文档影响
 
 - Codec/session/settings schema 与桌面 IPC/登录隔离不变；新增共享 runtime 是对 Stash 实现的抽取，保留其导出与 native navigation workaround，现有 Stash bundles 同步重建。

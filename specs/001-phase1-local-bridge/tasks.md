@@ -3,7 +3,7 @@
 > Spec ID: 001
 > Status: In Progress
 > Owner: cherrchen
-> Last Updated: 2026-09-21
+> Last Updated: 2026-10-01
 
 > 本文件供 Coding Agent **逐条执行**。任务必须足够小、可独立验证、说明输入输出与依赖。
 > **禁止**把「实现整个 Feature」当作一个任务。
@@ -99,6 +99,10 @@
 - [x] T040 编写开发版运行说明 — 输入：T014、T007 — 输出：开发运行说明（本机 Node + Python venv + mitmdump 的启动步骤与前置条件） — 依赖：T014、T007 — 验证：按说明在干净环境可启动开发版并通过 L0/L1 — 关联：NFR-006 ｜ **M4 证据**：[docs/operations/development-run.md](../../docs/operations/development-run.md)（+en）——前置条件（含 TUN 模式必须关闭）、首次准备、启动、管理员权限操作、验证与自检（指向 `pnpm run acceptance:check`）、常见故障、Windows 差异、停止与重置；README §3 与 apps/desktop/README 已交叉引用
 - [ ] T041 构建安装包骨架（后置） — 输入：T040 — 输出：Electron 打包配置与 sidecar 外置的安装包构建脚本 — 依赖：T040 — 验证：构建产物可安装启动并开桥 — 关联：REQ-011 / R-003
 - [ ] T042 确定 sidecar 分发形态并验证体积 — 输入：T041、[spec.md](spec.md) Q-002 / DQ-002 — 输出：嵌入式 Python 与外置 `mitmproxy` 可执行文件的取舍结论与体积记录 — 依赖：T041 — 验证：记录两种形态的包体积与启动验证结果；跨平台分发说明完整 — 关联：REQ-011 / NFR-001 / R-003
+
+## 回归维护
+
+- [x] T050 修复上游不可达 L2 测试的外部网络依赖 — 输入：`test_upstream_stall.py` 使用 TEST-NET 地址时仅记录 `error` 的失败 — 输出：保持绑定但不监听的本地端口夹具；新增连接后关闭的独立阶段测试 — 依赖：既有上游有界化实现 — 验证：Python 全量 221 passed；App 类型检查、110 单测与 36 UI 用例通过；见 [verification.md](verification.md) 的 2026-10-01 记录 — 关联：REQ-003 / NFR-004 / KI-019；只修测试，不改变 KI-019 的真机风险状态
 
 ## 注意事项
 

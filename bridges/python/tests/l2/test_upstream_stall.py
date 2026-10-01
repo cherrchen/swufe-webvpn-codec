@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import socket
 import time
 from contextlib import contextmanager
 from collections.abc import Iterator
@@ -38,10 +39,18 @@ from tests.l2.test_proxy_end_to_end import (  # noqa: F401 - shared fixtures/hel
 
 pytestmark = pytest.mark.skipif(shutil.which("curl") is None, reason="curl is required")
 
-# RFC 5737 TEST-NET-1: never routed, so the connect either times out or is refused at once.
-UNREACHABLE_BASE = "http://192.0.2.1"
 SLOW_RESPONSE_SECONDS = upstream.SLOW_MS / 1000 + 0.5
 SILENT_UPSTREAM_SECONDS = 30
+
+
+class ClosingHandler(BaseHTTPRequestHandler):
+    """Accepts the request, then closes without sending an HTTP response."""
+
+    def log_message(self, fmt: str, *args: object) -> None:
+        pass
+
+    def do_GET(self) -> None:  # noqa: N802 - http.server API
+        self.close_connection = True
 
 
 class SlowHandler(BaseHTTPRequestHandler):
@@ -107,19 +116,25 @@ def records(tmp_path: Path) -> list[dict[str, object]]:
 
 
 def test_an_unreachable_gateway_gives_the_client_a_bounded_failure(tmp_path: Path) -> None:
-    with running_bridge(tmp_path, UNREACHABLE_BASE) as (port, ca):
-        started = time.monotonic()
-        result = curl(
-            "--include",
-            "--proxy",
-            f"http://127.0.0.1:{port}",
-            "--cacert",
-            str(ca),
-            "-m",
-            "20",
-            f"http://{ALLOWLISTED_HOST}/",
-        )
-        elapsed = time.monotonic() - started
+    # Reserve a local port without listening, so it cannot accept TCP and no
+    # other server can take the port while the bridge starts. A TEST-NET address
+    # can be intercepted by the network and accept TCP before closing instead.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as refused:
+        refused.bind(("127.0.0.1", 0))
+        upstream_addr = f"127.0.0.1:{refused.getsockname()[1]}"
+        with running_bridge(tmp_path, f"http://{upstream_addr}") as (port, ca):
+            started = time.monotonic()
+            result = curl(
+                "--include",
+                "--proxy",
+                f"http://127.0.0.1:{port}",
+                "--cacert",
+                str(ca),
+                "-m",
+                "20",
+                f"http://{ALLOWLISTED_HOST}/",
+            )
+            elapsed = time.monotonic() - started
 
     assert result.returncode == 0, f"the client must get a response, not a timeout: {result.stderr}"
     assert result.stdout.splitlines()[0].startswith("HTTP/1.1 502"), result.stdout
@@ -129,14 +144,44 @@ def test_an_unreachable_gateway_gives_the_client_a_bounded_failure(tmp_path: Pat
 
     entries = records(tmp_path)
     stages = [entry["stage"] for entry in entries]
-    # Immediate refusal (connect_failed only) or a blackhole (timeout, retry, then failure).
     assert "connect_failed" in stages, stages
+    assert "connect_done" not in stages, stages
+    # Depending on the OS, a bound but non-listening socket refuses or times out.
     if "connect_timeout" in stages:
         assert stages.index("connect_timeout") < stages.index("connect_failed")
         assert "connect_retry" in stages, "a timed-out attempt must be retried"
-    assert any(
-        isinstance(entry["addr"], str) and "192.0.2.1" in entry["addr"] for entry in entries
-    ), entries
+    assert any(entry["addr"] == upstream_addr for entry in entries), entries
+
+
+def test_a_gateway_closing_before_response_reports_a_response_stage_error(tmp_path: Path) -> None:
+    closing = FakeUpstream(ClosingHandler)
+    try:
+        with running_bridge(tmp_path, f"http://127.0.0.1:{closing.port}", debug=True) as (port, ca):
+            started = time.monotonic()
+            result = curl(
+                "--include",
+                "--proxy",
+                f"http://127.0.0.1:{port}",
+                "--cacert",
+                str(ca),
+                "-m",
+                "20",
+                f"http://{ALLOWLISTED_HOST}/",
+            )
+            elapsed = time.monotonic() - started
+    finally:
+        closing.stop()
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[0].startswith("HTTP/1.1 502"), result.stdout
+    assert elapsed <= 2 * upstream.CONNECT_TIMEOUT_SECONDS + 4
+    entries = records(tmp_path)
+    stages = [entry["stage"] for entry in entries]
+    assert "connect_done" in stages, entries
+    assert "error" in stages, entries
+    assert stages.index("connect_done") < stages.index("error"), entries
+    assert "connect_failed" not in stages, entries
+    assert "response" not in stages, entries
 
 
 def test_a_slow_but_answering_gateway_shows_up_as_a_response_record(tmp_path: Path) -> None:
