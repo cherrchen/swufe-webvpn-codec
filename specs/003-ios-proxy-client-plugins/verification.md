@@ -359,3 +359,16 @@ T065/G13/G17：用户复检 0.1.1-m3，HTTP 教务根请求完成 URL/Host 改�
 设备复验 Pending：更新插件及脚本，确认 entered 版本 0.1.3-m3，从 http://jwxt.swufe.edu.cn/ 新开导航；首个请求应为插件合成 302，Location 为完整官方网关 URL，下一请求应为单层 WRD 且进入真实响应；继续验证教务页面与操作。若仍失败，采集原生 Gateway 请求的状态/错误与连接目标，不把本地测试视作真机通过。
 
 本地验证：Loon 50 tests、构建与 bundle scan Passed；Loon typecheck、docs:check、spec:check 与 git diff --check Passed。新增页面 HTTP/HTTPS 导航、query 保留、下一原生请求注入及 bootstrap 防环、非文档 GET/HEAD 回归；既有 POST body、省略 body、未选/禁用/Settings 和相对 WRD Location 用例通过。设备仍 Pending。
+
+
+### 0.1.3-m3 用户真机复验（2026-10-02）
+
+用户在本轮修复发布并通知复验后确认：现在已能成功进入 jwxt。记录为原始教务入口访问恢复 Passed（用户真人验收），关联 T065/G13 的页面进入结果；沿用本轮已提供的设备环境 Loon 3.5.1 (998)。未另行取得本次完整请求/响应链或脚本版本截图，因此不把 302 头、单层 WRD 路径和底层连接机制逐项标为已取证，也不认定先前无响应的唯一根因。
+
+| 验证项 | 状态 | 证据 / 边界 |
+| --- | --- | --- |
+| 0.1.3-m3 修复后原始教务入口进入 | Passed（用户真人验收） | 用户确认已成功进入 jwxt |
+| G17 完整重定向链、路径与 Header-only 行为 | Pending | 本次未提供完整响应链 |
+| 修复后教务页面内操作 / POST 提交 | Pending | 本次仅确认进入页面，未确认具体操作 |
+
+上述结论更新 T065 的设备页面进入结果，不追溯标记 0.1.1/0.1.2 通过；其余 M3/M4 设备验收与 Spec 状态不变。

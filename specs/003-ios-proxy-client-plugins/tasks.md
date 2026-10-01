@@ -118,4 +118,4 @@
 | T048 | 未完成 | Stash Settings device E2E + update persistence；记录 App/iOS/Override/bundle 版本 | T041–T047 | K01–K09、M01–M09 | 001–017 |
 | T049 | 未完成 | 同步 README、UI/security/update/rollback guide 与发布制品清单 | T048 | links/review；安全披露清楚 | 002,016–017 |
 
-- [x] T065 Loon 页面 GET 复用 Stash 原生 Gateway 导航：request 合成 302、透明非导航请求保留与防环回归；0.1.3-m3 — 关联：G13/G17；设备复验 Pending。
+- [x] T065 Loon 页面 GET 复用 Stash 原生 Gateway 导航：request 合成 302、透明非导航请求保留与防环回归；0.1.3-m3 — 关联：G13/G17；2026-10-02 用户真机确认教务入口可进入；完整响应链与教务内操作仍 Pending。
