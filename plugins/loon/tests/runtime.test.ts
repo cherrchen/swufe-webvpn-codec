@@ -73,15 +73,39 @@ describe("Loon native runtime and request mapping", () => {
     expect(rt.run("request", { url: "http://jwxt.swufe.edu.cn/" }, undefined, undefined, { $loon: loon })).toEqual({});
     expect(rt.run("request", { url: api }, undefined, undefined, { $loon: loon })).toMatchObject({ response: { status: 503 } });
   });
-  it("rewrites HTTP/80 documents and preserves a POST body by omission", () => {
+  it("redirects HTTP/80 documents and preserves a POST body by omission", () => {
     const rt = fixture({ [STORAGE_KEYS.session]: session() });
     const out = rt.run("request", { url: "http://jwxt.swufe.edu.cn/", headers: { accept: "text/html" } });
-    expect(out.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn\/http\//);
-    expect(out).not.toHaveProperty("response");
+    expect(out).toEqual({ response: { status: 302, headers: { location: codec.encodeUrl("http://jwxt.swufe.edu.cn/", gateway), "cache-control": "no-store" } } });
     const post = rt.run("request", { url: "http://jwxt.swufe.edu.cn/api", method: "POST", headers: {}, body: "password=do-not-log" });
     expect(post).not.toHaveProperty("body");
     expect(JSON.stringify(post.headers)).toContain("stored-ticket");
     expect(rt.logs.join("")).not.toContain("do-not-log");
+  });
+  it.each(["http", "https"])("redirects %s page navigation without looping on the gateway", scheme => {
+    const rt = fixture({ [STORAGE_KEYS.session]: session() });
+    const out = rt.run("request", { url: `${scheme}://jwxt.swufe.edu.cn/xtgl/login_slogin.html?q=1`, headers: { Accept: "text/html" } });
+    const response = out.response as { status: number; headers: Record<string, string> };
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toBe(codec.encodeUrl("http://jwxt.swufe.edu.cn/xtgl/login_slogin.html?q=1", gateway));
+    expect(out).not.toHaveProperty("url");
+    const next = rt.run("request", { url: response.headers.location!, headers: { accept: "text/html" } });
+    expect(next).not.toHaveProperty("response");
+    expect(next).not.toHaveProperty("url");
+    expect(next.headers).toHaveProperty("cookie");
+    expect(rt.run("response", { url: response.headers.location! }, { status: 200, headers: { "content-type": "text/html" }, body: "<html>native bootstrap</html>" })).toEqual({});
+  });
+  it("keeps non-document GET and HEAD requests transparent", () => {
+    const rt = fixture({ [STORAGE_KEYS.session]: session() });
+    for (const request of [
+      { url: "http://jwxt.swufe.edu.cn/api", method: "GET", headers: { accept: "application/json" } },
+      { url: "http://jwxt.swufe.edu.cn/", method: "HEAD", headers: { accept: "text/html" } },
+    ]) {
+      const out = rt.run("request", request);
+      expect(out.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn\/http\//);
+      expect(out).not.toHaveProperty("response");
+      expect(out).not.toHaveProperty("body");
+    }
   });
   it.each(["Host", "host", "HOST"])("replaces %s with the rewritten gateway authority", hostKey => {
     const rt = fixture({ [STORAGE_KEYS.session]: session() });
@@ -106,7 +130,7 @@ describe("Loon native runtime and request mapping", () => {
         gatewayBase: gateway + ":8443", builtinSiteStates: { jwxt: true },
         customHosts: [], hostSchemes: {}, debug: false, bodyRewriteMaxBytes: 1048576 }),
     });
-    const out = rt.run("request", { url: "http://jwxt.swufe.edu.cn/", headers: {} });
+    const out = rt.run("request", { url: "http://jwxt.swufe.edu.cn/api", method: "POST", headers: {} });
     expect(out.url).toMatch(/^https:\/\/webvpn\.swufe\.edu\.cn:8443\//);
     expect(out.headers).toMatchObject({ Host: "webvpn.swufe.edu.cn:8443" });
   });
@@ -129,7 +153,7 @@ describe("Loon native runtime and request mapping", () => {
     const rt = fixture({ [STORAGE_KEYS.session]: session() });
     expect(rt.run("request", { url: "http://jwxt.swufe.edu.cn/" }, undefined, { enabled: false })).toEqual({});
     expect(rt.run("request", { url: SETTINGS_PAGE_URL }, undefined, { enabled: false })).toMatchObject({ response: { status: 200 } });
-    expect(rt.run("request", { url: "http://jwxt.swufe.edu.cn/" }, undefined, { enabled: true }).url).toBeDefined();
+    expect(rt.run("request", { url: "http://jwxt.swufe.edu.cn/" }, undefined, { enabled: true })).toMatchObject({ response: { status: 302 } });
   });
   it("throttles login notifications for 30 minutes and uses openUrl", () => {
     const rt = fixture();

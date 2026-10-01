@@ -492,10 +492,11 @@ swufe.last-error.v1
 - 最低版本：Loon 3.5.1 (983)。`.plugin` 使用 `request/response if … then script(…) with …`、`generic then script(…)`；HTTP 第一条命中，Settings request 必须优先；每个 response 有 URL guard。
 - `$loon` 是字符串，从版本 `x.y.z(build)` 解析环境；未能确认最低 build 时业务 PASS，Settings 本地 503。
 - `$persistentStore.write(value,key)` 的布尔结果不得伪报成功；删除单 key 使用 `undefined`，禁止 `remove()` 全量清理。通知使用 `{openUrl}`。request `$done({url,headers})` 不包含 body；headers-only response 不包含 body，Uint8Array 保持二进制。
-- Loon request 的 URL rewrite 输出必须同步设置唯一的 `Host` 为改写后 URL 的 authority（包含非默认端口），移除原 headers 中大小写不同的 Host；不依赖宿主自动重算。PASS、headers-only 会话注入及 Settings 合成响应不走该映射。HTTP→HTTPS 连接切换仍需 G13 真机复验。
+- Loon 对已选主机且具备可用 Gateway Session 的页面 GET（根路径或 Accept 含 text/html）在 request 阶段返回合成 302，Location 为完整 WRD Gateway URL，Cache-Control 为 no-store；浏览器随后通过原生网关请求注入 Session。复用 Stash 的 nativeGatewayRedirect 判断，POST/HEAD/非文档 GET 仍透明改写，Settings/PASS/原生 Gateway 不进入此跳转。设备恢复须 G13/G17 独立验证。
+- Loon request 的透明 URL rewrite 输出必须同步设置唯一的 `Host` 为改写后 URL 的 authority（包含非默认端口），移除原 headers 中大小写不同的 Host；不依赖宿主自动重算。PASS、headers-only 会话注入及 Settings 合成响应不走该映射。HTTP→HTTPS 连接切换仍需 G13 真机复验。
 - Loon response 若暴露原始站点 URL，按既有 Core 契约反向解码 Location；若暴露原生/改写后 Gateway WRD URL，3xx 的相对 WRD Location 必须补为同源网关绝对 URL，避免 Safari 在原站点域名下解析并二次包装。仅处理可解码、同源、非自跳转的 WRD 目标；原生页面 body/bootstrap 不反向改写，外部/未知跳转不修改。此回退会使浏览器导航到原生 WebVPN 域名。
 - `[Argument]` 对象只包含 `enabled`/`debug`，逐请求覆盖运行开关；local Settings 是站点配置的唯一来源。关闭转发仍拦截 Settings 和维护明确 logout；完全关闭插件由宿主控制。
-- 制品为 `dist/request.js`、`dist/response.js`、`dist/generic.js`，版本 `0.1.2-m3`；Generic 字符串参数 `settings`/`login` 分别发送设置/官方登录 URL 通知。
+- 制品为 `dist/request.js`、`dist/response.js`、`dist/generic.js`，版本 `0.1.3-m3`；Generic 字符串参数 `settings`/`login` 分别发送设置/官方登录 URL 通知。
 - Settings 路径、V2 schema、POST 来源/token/replay/16 KiB/本地错误契约复用既有定义。Loon 的 GET `/__swufe_bridge__/api/settings` 额外要求 `X-SWUFE-Settings-Bootstrap`：Safari Web Crypto 生成的 32 位十六进制随机值；URL 精确 HTTPS origin 和 API path，Referer 必须来自精确 Settings 页 path，Origin 若存在必须同源。缺失/不可信 bootstrap 返回本地 503 `SETTINGS_UNAVAILABLE`，不回退弱随机。GET 返回的 token 仍由 Core 持久化、两分钟有效且一次使用；请求/响应不开放 CORS。
 - 通知：登录缺失/过期同一事件 30 分钟一次，codec/runtime 错误同一事件 10 分钟一次；独立事件时间戳保留。Generic 用户操作不受自动通知节流。
 

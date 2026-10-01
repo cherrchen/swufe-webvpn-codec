@@ -1,5 +1,5 @@
 import { isSettingsNamespaceUrl, settingsErrorResponse, type HostRequestResult, type HostResponseResult } from "webvpn-core-js";
-import { traceEntered, traceThrew } from "webvpn-plugin-runtime";
+import { nativeGatewayRedirect, traceEntered, traceThrew } from "webvpn-plugin-runtime";
 import { handleLoonRequest, handleLoonResponse, loonEnvironment, type LoonRuntime } from "./adapter.ts";
 
 export interface LoonGlobals {
@@ -19,7 +19,7 @@ export function bindLoonRuntime(globals: LoonGlobals): LoonRuntime {
     write: (key, value) => globals.store.write(value === null ? undefined : value, key),
     notify: input => globals.notification.post(input.title, "", input.body, input.openUrl ? { openUrl: input.openUrl } : undefined),
     debug: record => console.log(JSON.stringify(record)),
-    finishRequest: result => globals.done(requestOutput(result)),
+    finishRequest: result => globals.done(requestOutput(result, globals.request)),
     finishResponse: result => globals.done(responseOutput(result)),
     env: () => loonEnvironment(globals.loon),
   };
@@ -33,7 +33,7 @@ export function executeLoonHttp(kind: "request" | "response", globals: LoonGloba
     globals.done(value);
   };
   try {
-    traceEntered(`swufe-webvpn-loon-${kind} 0.1.2-m3`, globals.request?.url);
+    traceEntered(`swufe-webvpn-loon-${kind} 0.1.3-m3`, globals.request?.url);
     const runtime = bindLoonRuntime({ ...globals, done });
     if (kind === "request") handleLoonRequest(runtime, globals.argument);
     else handleLoonResponse(runtime, globals.argument);
@@ -44,8 +44,10 @@ export function executeLoonHttp(kind: "request" | "response", globals: LoonGloba
   }
 }
 
-function requestOutput(result: HostRequestResult): Record<string, unknown> {
+function requestOutput(result: HostRequestResult, request: LoonRuntime["request"]): Record<string, unknown> {
   if (result.decision === "respond" && result.response) return { response: result.response };
+  const nativeUrl = nativeGatewayRedirect(request, result);
+  if (nativeUrl) return { response: { status: 302, headers: { location: nativeUrl, "cache-control": "no-store" } } };
   if (result.decision === "rewrite" && result.url) {
     // Loon retains an explicitly supplied Host when applying a URL rewrite.
     // Keep the upstream authority consistent with the gateway URL, including

@@ -18,9 +18,11 @@ MitM 范围包含 `*.swufe.edu.cn`，会在本机解密 SWUFE 子域 HTTPS；只
 
 ## 制品与开发
 
-当前本地制品为 `0.1.2-m3`：Loon 的 URL rewrite 同步设置网关 `Host`（含非默认端口），避免保留原教务 Host。原始教务 URL 的设备失败与修复后复验状态见 [verification](../../specs/003-ios-proxy-client-plugins/verification.md)。真机复验尚未通过。
+当前本地制品为 `0.1.3-m3`：Loon 的 URL rewrite 同步设置网关 `Host`（含非默认端口），避免保留原教务 Host。原始教务 URL 的设备失败与修复后复验状态见 [verification](../../specs/003-ios-proxy-client-plugins/verification.md)。真机复验尚未通过。
 
 此版本也修复相对 WRD 302 Location：响应上下文暴露上游 URL 时补成完整网关 URL，避免浏览器按教务域名解析后再次包装。更新后从 `http://jwxt.swufe.edu.cn/` 重新进入，不刷新旧的混拼/嵌套地址。
+
+页面 GET（根路径或 Accept 含 text/html）现在直接返回 302 到完整 WebVPN URL，由浏览器建立原生网关连接；POST、HEAD 与非文档 GET 继续透明改写。该处理复用 Stash 的导航判断，Loon 真机恢复仍待复验。
 
 `dist/request.js`、`dist/response.js`、`dist/generic.js` 是无 Node runtime 的单文件 bundle。插件引用本仓库 main 分支的 GitHub raw 文件；**本地实现未推送前，远程链接不能提供本轮制品**。可先把三个 bundle 导入 Loon，并将插件 Script 路径改为对应本地文件。发布时需把 `.plugin` 与三个 bundle 一起分发，回滚时固定同一版本的完整制品。
 

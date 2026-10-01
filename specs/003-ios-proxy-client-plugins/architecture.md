@@ -318,11 +318,11 @@ Loon 有 UDP 端口/规则能力，但全局 `disable-udp-ports = 443` 不应成
 
 ### Loon 实现时需逐项确认的宿主边界
 
-以下是 Stash M2 真机问题提炼出的检查项，证据见 [verification.md 的 Stash 真机记录](verification.md)。Loon 是否呈现相同行为仍待 M3 真机验证，不能直接复制 Stash 的配置或绕行实现。
+以下是 Stash M2 真机问题提炼出的检查项，证据见 [verification.md 的 Stash 真机记录](verification.md)。Loon 是否呈现相同行为仍待 M3 真机验证，不能直接推定 Stash 的配置或绕行实现已在 Loon 验证；0.1.3-m3 复用导航判断的变更须独立验收。
 
 1. **入口协议与脚本命中**：教务验收入口是 `http://jwxt.swufe.edu.cn/`，WebVPN 对应 `/http/`。在 Loon 中分别确认 HTTP/80 请求进入 request 与 response 脚本、HTTPS gateway/CAS 进入所需脚本，并核对浏览器所见 URL 与 WRD 上游 URL。Stash 的 `force-http-engine` 是其宿主配置，不能推定 Loon 有同名或同语义选项。
 2. **会话状态与 CAS 往返**：捕获 gateway Cookie 只表示 `captured`，不是教务访问已验证。首次或后续出现 CAS 页面/redirect 均不能单独证明 Gateway Session 失效，也不能单独触发清理；教务成功响应后才能升级为 `valid`。时钟到期、显式 `/logout`，或请求 ticket 与 stored ticket 一致时服务端明确删除该 ticket，才可清理共享 Session；其它 App 无 ticket/不同 ticket 的 Gateway `/login` 响应删除 ticket，不能据此清理 Safari 捕获的 stored Session。已有 stored ticket 时，响应中的新 ticket 也仅在请求携带相同 stored ticket 时作为轮换写入；无 ticket/不同 ticket 请求的新 ticket 不能覆盖另一客户端的共享 Session。其它失效信号仍需真机证据。
-3. **原生 WebVPN 命名空间**：分别观察 Loon request/response 脚本中的 `$request.url`，不能从 URL 外观推定请求是透明改写还是浏览器直接发出的 `/http/<token>/`。对浏览器已处于原生 WebVPN URL 的响应应保持网关原有语义；任何 promotion 302 的目标都不能与当前浏览器 URL 相同。Stash 在 request 阶段返回 302 的适配方案仍待其真机复验，Loon 须按自身脚本能力确定实现。
+3. **原生 WebVPN 命名空间**：分别观察 Loon request/response 脚本中的 `$request.url`，不能从 URL 外观推定请求是透明改写还是浏览器直接发出的 `/http/<token>/`。对浏览器已处于原生 WebVPN URL 的响应应保持网关原有语义；任何 promotion 302 的目标都不能与当前浏览器 URL 相同。Stash 在 request 阶段返回 302 的适配方案仍待其真机复验，Loon 0.1.3-m3 已在 request 映射中复用该导航判断，真机结果仍 Pending。
 4. **响应体与诊断**：仅改写响应 Header 时，若宿主未提供 body，不得写出空 body；同时验证 Location、Set-Cookie 与业务 HTML 不被截断。分别确认插件加载、脚本执行、脚本日志位置和远程 bundle 更新，避免用“没有普通日志”推断脚本未运行。诊断只记录脱敏主机、状态、动作和错误码，不记录 Cookie、WRD token 或页面内容。
 
 对于动态子域，Stash 官方 rule grammar 包含 `DOMAIN-SUFFIX`、`PROTOCOL,QUIC` 和 `AND` 逻辑规则，因此候选规则为 `AND,((DOMAIN-SUFFIX,swufe.edu.cn),(PROTOCOL,QUIC)),REJECT`。它比旧的 3 条精确域规则覆盖更多 SWUFE 子域，只阻止该后缀 QUIC；现有 Demo 没有该规则，需导入并在真机验证匹配、回落与未选 host PASS。绝不全局拒绝 UDP/443。
@@ -376,6 +376,6 @@ CAS Session remains in the client App's own Cookie Jar; no Safari sharing or Gat
 
 ## 19. Loon M3 共享运行流程
 
-`packages/webvpn-plugin-runtime` 从原 Stash Adapter 抽取宿主无关编排、设置页和 Trace；Core 仍纯协议/DTO，runtime 不直接引用宿主全局。Stash source 保留原 export 和其专用 navigation redirect；Loon 原生映射独立在 `plugins/loon/src/runtime.ts`。
+`packages/webvpn-plugin-runtime` 从原 Stash Adapter 抽取宿主无关编排、设置页和 Trace；Core 仍纯协议/DTO，runtime 不直接引用宿主全局。Stash source 保留原 export；Loon 与 Stash 复用 navigation redirect 判断；Loon 原生映射独立在 `plugins/loon/src/runtime.ts`。
 
-Loon Settings 从同一 bundled HTML 派生，新增 Safari Web Crypto bootstrap，配置持久化于 Loon store。Loon 普通 request 使用透明 URL/header 改写并省略 body；response 在原 URL 可见时重建上下文，Gateway 原生 URL 保守不再 promotion。真实 `$request.url` 语义和 E2E 须经 G13–G18 独立验证，不能继承 Stash 真机结论。安全边界与 nonce 来源见 [ADR-0016](../../docs/architecture/adr/ADR-0016-loon-local-settings-runtime.md)。
+Loon Settings 从同一 bundled HTML 派生，新增 Safari Web Crypto bootstrap，配置持久化于 Loon store。Loon 已选站点的页面 GET 在 request 阶段直接 302 到原生 Gateway URL；POST/HEAD/非文档 GET 使用透明 URL/header 改写并省略 body；response 在原 URL 可见时重建上下文，Gateway 原生 URL 保守不再 promotion。真实 `$request.url` 语义和 E2E 须经 G13–G18 独立验证，不能继承 Stash 真机结论。安全边界与 nonce 来源见 [ADR-0016](../../docs/architecture/adr/ADR-0016-loon-local-settings-runtime.md)。

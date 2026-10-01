@@ -348,3 +348,14 @@ Open：旧 Host 保留是已复现的输出缺陷，但它是否是唯一导致 
 本地验证：Loon 47 tests、Loon 与共享 runtime typecheck、bundle scan 通过；Stash 36 tests 与 bundle scan 通过；docs/spec/diff 检查通过。覆盖原始 URL / 上游 URL 两种 Location 语义、浏览器下一请求无双重包装、query 保留、绝对/外部/非法/自跳转/非 3xx/禁用转发负向用例与 bootstrap 防环。
 
 设备状态：Pending。需加载 0.1.2-m3，重新从 `http://jwxt.swufe.edu.cn/` 发起；确认 302 Location 要么为解码后的原始教务 URL，要么为完整官方 Gateway URL，下一请求仅含单层 WRD 路径，页面与 Cookie 查询 path 无混拼。已有错误 URL 需从入口重新开始，不能只刷新旧的嵌套路径。
+
+
+## Loon 请求阶段原生网关导航（2026-10-02）
+
+T065/G13/G17：用户复检 0.1.1-m3，HTTP 教务根请求完成 URL/Host 改写并注入 Gateway Session，但请求记录为 NO Response Header、发送 674 B/接收 0 B。该证据不证明存在 302 循环，也不证明实际连接目标/端口；现场根因仍未确定。未保存真实 Cookie 或完整请求头。
+
+0.1.3-m3 在 Loon Adapter 复用 Stash 的 nativeGatewayRedirect：仅 rewrite 决策的页面 GET（根路径或 Accept 含 text/html）向浏览器合成完整 Gateway WRD URL 的 302 + Cache-Control: no-store。后续原生 Gateway 请求通过既有 headers-only 注入 Session；原生 bootstrap 响应保持原样。POST/HEAD/非文档 GET 保留透明 URL/Host 改写且省略 body；Settings、禁用/未选站点和未登录 PASS 不生成导航跳转。此变更用于绕开页面请求的跨 host/scheme 透明连接和浏览器原域名上下文，复用已有宿主适配契约，无存储/权限变更，无需新 ADR。
+
+设备复验 Pending：更新插件及脚本，确认 entered 版本 0.1.3-m3，从 http://jwxt.swufe.edu.cn/ 新开导航；首个请求应为插件合成 302，Location 为完整官方网关 URL，下一请求应为单层 WRD 且进入真实响应；继续验证教务页面与操作。若仍失败，采集原生 Gateway 请求的状态/错误与连接目标，不把本地测试视作真机通过。
+
+本地验证：Loon 50 tests、构建与 bundle scan Passed；Loon typecheck、docs:check、spec:check 与 git diff --check Passed。新增页面 HTTP/HTTPS 导航、query 保留、下一原生请求注入及 bootstrap 防环、非文档 GET/HEAD 回归；既有 POST body、省略 body、未选/禁用/Settings 和相对 WRD Location 用例通过。设备仍 Pending。

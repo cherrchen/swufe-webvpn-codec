@@ -50,7 +50,7 @@ Stash Settings E2E 另验证 synthetic HTML、同源 API GET/POST、pseudo endpo
 
 校外网络：Safari 登录后确认 Gateway Session 写入 plugin store；再从没有自身 Gateway ticket 的独立 App/WKWebView 发起 direct Gateway request，验证分类允许且 login intent 确认为 none 时的代理层注入；覆盖显式/未知 login intent 不注入、新 ticket 优先、过期、logout、CAS-only redirect 不清 Session 和 Settings namespace；访问 tyxycg 时用 Safe Auth Trace 判别 Gateway 登录跳转与业务系统发起的 CAS。至少完成一项真实只读/低风险教务操作、redirect/Cookie/body rewrite、失效后重登、Wi-Fi/Cellular 冒烟。尚未在设备验证的场景在 verification 中保持 Pending。
 
-Loon M3 执行时，按 [G13–G18](test-cases.md) 顺序记录：先确认 HTTP/80 命中与 `/http/` 上游，再覆盖首次 CAS 往返、原生 WebVPN bootstrap、Header-only 响应和更新后的日志可见性。对重定向记录脱敏的来源/目标主机与路径类别，并确认目标不是当前浏览器 URL；不得保存完整 WRD token。Stash M2 的对应修复只作为风险线索，Loon 的宿主行为须独立取证。
+Loon M3 执行时，按 [G13–G18](test-cases.md) 顺序记录：先确认 HTTP/80 request 合成 302、完整 Gateway `/http/` Location 与下一原生网关 response，再覆盖首次 CAS 往返、原生 WebVPN bootstrap、Header-only 响应和更新后的日志可见性。对重定向记录脱敏的来源/目标主机与路径类别，并确认目标不是当前浏览器 URL；不得保存完整 WRD token。Stash M2 的对应修复只作为风险线索，Loon 的宿主行为须独立取证。
 
 ## 3. 测试环境
 

@@ -111,7 +111,7 @@
 | G10 | disable | 不再 rewrite |
 | G11 | update | schema 兼容数据保留 |
 | G12 | QUIC | 稳定进入 HTTP script |
-| G13 | Safari 打开 `http://jwxt.swufe.edu.cn/` | HTTP/80 命中 request/response 脚本；上游使用 WRD `/http/` |
+| G13 | Safari 打开 `http://jwxt.swufe.edu.cn/` | HTTP/80 命中 request 并合成 302 到完整 Gateway `/http/` URL；下一原生请求进入网关 response，无重复跳转 |
 | G14 | 捕获 Cookie 后首次教务 CAS 往返 | 首次 CAS 302 保留 `captured`；回调仍可改写；成功响应后才标 `valid` |
 | G15 | 已确认会话后再次跳 CAS | CAS-only redirect 保留 Session；只有绑定 ticket 明确删除/到期才清理并可重登 |
 | G16 | 浏览器进入原生 WebVPN `/http/<token>/` | 不反向改写网关 bootstrap；无指向当前 URL 的 302 或重定向循环 |

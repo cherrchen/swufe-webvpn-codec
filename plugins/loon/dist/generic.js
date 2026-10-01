@@ -1,4 +1,4 @@
-/* swufe-webvpn loon 7d40a66 */
+/* swufe-webvpn loon 43eec12 */
 "use strict";
 (() => {
   var __create = Object.create;
@@ -850,6 +850,18 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
 </html>`;
 
   // ../../packages/webvpn-plugin-runtime/src/runtime.ts
+  function nativeGatewayRedirect(request, result) {
+    if (result.decision !== "rewrite" || !result.url || !request?.url) return null;
+    let url;
+    try {
+      url = new URL(request.url);
+    } catch {
+      return null;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:" || (request.method ?? "GET").toUpperCase() !== "GET") return null;
+    const accept = Object.entries(request.headers ?? {}).find(([key]) => key.toLowerCase() === "accept")?.[1] ?? "";
+    return url.pathname === "/" || accept.toLowerCase().includes("text/html") ? result.url : null;
+  }
   function handleStatusTile(runtime) {
     const raw = runtime.read(STORAGE_KEYS.session);
     const parsed = raw ? parseSession(raw) : null;
@@ -937,13 +949,15 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
       write: (key, value) => globals.store.write(value === null ? void 0 : value, key),
       notify: (input) => globals.notification.post(input.title, "", input.body, input.openUrl ? { openUrl: input.openUrl } : void 0),
       debug: (record) => console.log(JSON.stringify(record)),
-      finishRequest: (result) => globals.done(requestOutput(result)),
+      finishRequest: (result) => globals.done(requestOutput(result, globals.request)),
       finishResponse: (result) => globals.done(responseOutput(result)),
       env: () => loonEnvironment(globals.loon)
     };
   }
-  function requestOutput(result) {
+  function requestOutput(result, request) {
     if (result.decision === "respond" && result.response) return { response: result.response };
+    const nativeUrl = nativeGatewayRedirect(request, result);
+    if (nativeUrl) return { response: { status: 302, headers: { location: nativeUrl, "cache-control": "no-store" } } };
     if (result.decision === "rewrite" && result.url) {
       const headers = {};
       for (const [key, value] of Object.entries(result.headers ?? {})) {
@@ -965,7 +979,7 @@ load().catch(() => show("feedback", "\u8BBE\u7F6E\u6682\u4E0D\u53EF\u7528", "bad
 
   // src/generic-entry.ts
   try {
-    traceEntered("swufe-webvpn-loon-generic 0.1.2-m3", void 0);
+    traceEntered("swufe-webvpn-loon-generic 0.1.3-m3", void 0);
     const runtime = bindLoonRuntime({
       loon: typeof $loon === "undefined" ? "" : $loon,
       store: $persistentStore,
