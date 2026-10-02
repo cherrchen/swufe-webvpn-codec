@@ -55,3 +55,5 @@ Classify the task first (feature / bug / architecture / API / UI / database / te
 Long-lived decision for Loon local Settings and shared plugin runtime: [ADR-0016](architecture/adr/ADR-0016-loon-local-settings-runtime.en.md).
 
 iOS local Settings interface index: [ios-plugin-settings](api/ios-plugin-settings.en.md).
+
+iOS plugin comparison and proposals for the next alignment review (Draft): [Stash / Loon functional alignment](../specs/003-ios-proxy-client-plugins/functional-alignment.en.md).

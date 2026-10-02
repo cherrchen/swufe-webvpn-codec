@@ -402,3 +402,22 @@ Bug 任务 T066–T069。恢复现有 Safe Auth Trace、一次性 nonce、正文
 - `pnpm -r run typecheck`、根 `pnpm run typecheck` 与 `pnpm run docs:check`：Passed。
 
 全仓库本轮自动化合计 550 passed（Python 221 + desktop unit 121 + UI 38 + Core 76 + Stash 42 + Loon 52）。这些是本地/VM 证据：iOS parser、超限 Settings 本地终结、QUIC 回落、真实会话与跨 App/WKWebView E2E 仍按既有 Pending/Failed 矩阵执行，不以自动化通过替代真机。Spec 003 保持 `In Progress`。
+
+## Stash / Loon 功能对照文档（2026-10-02）
+
+任务分类：Documentation。新增 [功能对照与对齐建议](functional-alignment.md) 及 [英文副本](functional-alignment.en.md)，以 Git `648167b` 的正式源码/配置为基线；对齐建议为 Draft，未创建或完成新的实现任务，也未解除 Stash 暂停。主要输出为共用功能、14 项宿主/体验/策略/覆盖差异、共同缺口、候选工作包与 Open Questions。
+
+| 本轮执行命令 | 结果 | 边界 |
+| --- | --- | --- |
+| `pnpm --filter webvpn-core-js exec vitest run` | 76 Passed | 共享 Core 回归 |
+| `pnpm --filter swufe-webvpn-stash exec vitest run` | 42 Passed | Adapter/entry 与两宿主页面处理器 |
+| `pnpm --filter swufe-webvpn-loon exec vitest run` | 52 Passed | Loon entry VM、plugin 文本检查 |
+| 两宿主目录各执行 `node scripts/scan-bundle.mjs` | Passed | 六个现有 bundle 的依赖隔离，未重建 |
+| `pnpm_config_verify_deps_before_run=false pnpm run docs:check` | Passed；0 errors / 0 warnings | 链接、中英配对与 Spec 结构 |
+| `git diff --check` | Passed | 已跟踪文档补丁空白检查 |
+
+另从两份正式配置读取正则并对四个构造 URL 做 Node `RegExp` 只读检查，确认 Stash 缺少域名结束边界且区分大小写、Loon authority 边界更严格；结果见功能对照 §4.2。没有请求外部网站；规则文本匹配不等于实际 MitM 或 Cookie 注入。
+
+使用直接 Vitest 命令以免 package test 重建 dist；测试内 entry bundle 仅在内存构建。未修改源码、测试、插件配置、dist 或已有六个未跟踪 P0 文件。未执行真机、远程制品核验或发布；所有已有需求/设备验收状态保留，不以文档对照或 170 项自动化通过提升 Spec 状态。
+
+Documentation Update Matrix：仅文档结构/索引受影响，已补中英副本和 Spec/docs 导航；需求、API、模型、组件边界、安全策略、配置、依赖和测试方式均未变更，相关长期正文无需修改，无需新 ADR。后续接受新增控件/状态接口等提案时重新评估契约与 ADR。

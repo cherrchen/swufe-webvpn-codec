@@ -55,3 +55,5 @@ not the entire repository documentation.
 Loon 本地 Settings 与共享插件运行流程的长期决策：[ADR-0016](architecture/adr/ADR-0016-loon-local-settings-runtime.md)。
 
 iOS 本地设置接口索引：[ios-plugin-settings](api/ios-plugin-settings.md)。
+
+iOS 插件功能对照与下轮对齐建议（Draft）：[Stash / Loon 功能对齐](../specs/003-ios-proxy-client-plugins/functional-alignment.md)。

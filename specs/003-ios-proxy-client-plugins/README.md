@@ -44,6 +44,7 @@
 | 兼容 Spec | [plan.md](plan.md) | 对现有 Spec 体系的实施计划入口 |
 | 兼容 Spec | [tasks.md](tasks.md) | Coding Agent 可执行任务 |
 | 兼容 Spec | [verification.md](verification.md) | Requirement → Verification 映射 |
+| 功能对齐 | [functional-alignment.md](functional-alignment.md) / [English](functional-alignment.en.md) | Stash/Loon 当前实现差异、共同缺口与下轮对齐建议（Draft） |
 | 参考 | [references.md](references.md) | 官方文档与仓库事实来源 |
 
 ## 建议的代码落点
